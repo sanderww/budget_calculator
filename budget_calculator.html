@@ -172,6 +172,75 @@
                     </div>
                     <div id="future-cost-list" class="space-y-3"></div>
                 </div>
+
+                <!-- Monthly Allocation -->
+                <div class="card">
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Monthly Money Allocation</h2>
+                    
+                    <!-- Available Money Input -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-700 mb-2">Available Money at End of Month</label>
+                        <div class="relative">
+                            <span class="currency-prefix">R</span>
+                            <input type="number" id="available-money" class="input-field amount-input" placeholder="0.00">
+                        </div>
+                    </div>
+
+                    <!-- Allocation Percentages -->
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Mortgage Repayment (%)</label>
+                            <div class="relative">
+                                <input type="number" id="mortgage-percentage" class="input-field" placeholder="50" value="50" min="0" max="100" step="0.1">
+                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">EFT (%)</label>
+                            <div class="relative">
+                                <input type="number" id="eft-percentage" class="input-field" placeholder="50" value="50" min="0" max="100" step="0.1">
+                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-2">Crypto (%)</label>
+                            <div class="relative">
+                                <input type="number" id="crypto-percentage" class="input-field" placeholder="0" min="0" max="100" step="0.1">
+                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Calculate Button -->
+                    <button id="calculate-allocation" class="btn btn-primary w-full mb-4">Calculate Allocation</button>
+
+                    <!-- Results Display -->
+                    <div id="allocation-results" class="hidden">
+                        <h3 class="font-semibold text-slate-700 mb-3">Monthly Allocation Results</h3>
+                        <div class="space-y-2 text-sm">
+                            <div class="flex justify-between p-2 bg-green-50 rounded">
+                                <span class="text-slate-600">Required Savings:</span>
+                                <span id="allocation-savings" class="font-medium text-green-600">R 0.00</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-blue-50 rounded">
+                                <span class="text-slate-600">Mortgage Repayment:</span>
+                                <span id="allocation-mortgage" class="font-medium text-blue-600">R 0.00</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-purple-50 rounded">
+                                <span class="text-slate-600">EFT:</span>
+                                <span id="allocation-eft" class="font-medium text-purple-600">R 0.00</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-orange-50 rounded">
+                                <span class="text-slate-600">Crypto:</span>
+                                <span id="allocation-crypto" class="font-medium text-orange-600">R 0.00</span>
+                            </div>
+                            <div class="flex justify-between p-2 bg-slate-50 rounded border-t">
+                                <span class="font-medium text-slate-700">Total Allocated:</span>
+                                <span id="allocation-total" class="font-bold text-slate-800">R 0.00</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Right Column: Summary -->
@@ -262,6 +331,14 @@
             const serverStatus = document.getElementById('server-status');
             const copyUrlBtn = document.getElementById('copy-url');
             const showInstructionsBtn = document.getElementById('show-instructions');
+            
+            // Monthly allocation elements
+            const availableMoneyInput = document.getElementById('available-money');
+            const mortgagePercentageInput = document.getElementById('mortgage-percentage');
+            const eftPercentageInput = document.getElementById('eft-percentage');
+            const cryptoPercentageInput = document.getElementById('crypto-percentage');
+            const calculateAllocationBtn = document.getElementById('calculate-allocation');
+            const allocationResults = document.getElementById('allocation-results');
 
             // --- UTILITY FUNCTIONS ---
             const formatCurrency = (value) => {
@@ -407,6 +484,56 @@
                 document.getElementById('monthly-savings-target').style.color = monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b'; // purple-600 or slate-500
             };
 
+            // --- MONTHLY ALLOCATION LOGIC ---
+            const calculateMonthlyAllocation = () => {
+                const availableMoney = parseFloat(availableMoneyInput.value) || 0;
+                const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
+                const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
+                const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
+                
+                // Get the monthly savings target from the summary
+                const monthlySavingsTarget = parseFloat(document.getElementById('monthly-savings-target').textContent.replace(/[R\s,]/g, '')) || 0;
+                
+                // Calculate total percentage
+                const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
+                
+                // Validate percentages
+                if (totalPercentage > 100) {
+                    alert('Total percentage cannot exceed 100%. Please adjust your percentages.');
+                    return;
+                }
+                
+                if (totalPercentage === 0) {
+                    alert('Please enter at least one percentage allocation.');
+                    return;
+                }
+                
+                // Calculate remaining money after savings
+                const remainingMoney = availableMoney - monthlySavingsTarget;
+                
+                if (remainingMoney < 0) {
+                    alert('Available money is less than required monthly savings. You need to increase your available money or reduce your financial commitments.');
+                    return;
+                }
+                
+                // Calculate allocations based on percentages of remaining money
+                const mortgageAmount = (remainingMoney * mortgagePercentage) / 100;
+                const eftAmount = (remainingMoney * eftPercentage) / 100;
+                const cryptoAmount = (remainingMoney * cryptoPercentage) / 100;
+                
+                const totalAllocated = monthlySavingsTarget + mortgageAmount + eftAmount + cryptoAmount;
+                
+                // Update the results display
+                document.getElementById('allocation-savings').textContent = formatCurrency(monthlySavingsTarget);
+                document.getElementById('allocation-mortgage').textContent = formatCurrency(mortgageAmount);
+                document.getElementById('allocation-eft').textContent = formatCurrency(eftAmount);
+                document.getElementById('allocation-crypto').textContent = formatCurrency(cryptoAmount);
+                document.getElementById('allocation-total').textContent = formatCurrency(totalAllocated);
+                
+                // Show the results
+                allocationResults.classList.remove('hidden');
+            };
+
             // --- EVENT HANDLERS ---
             const handleListChange = (e, list) => {
                 const target = e.target;
@@ -462,6 +589,9 @@
             debtList.addEventListener('click', (e) => handleListChange(e, data.debts));
             provisionList.addEventListener('click', (e) => handleListChange(e, data.provisions));
             futureCostList.addEventListener('click', (e) => handleListChange(e, data.futureCosts));
+
+            // Monthly allocation event handlers
+            calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 
             // --- CSV HANDLING ---
             const parseCSV = (text) => {
@@ -618,13 +748,13 @@ The server must be running for the database to work!
                     futureCosts: []
                 };
                 
-                // Set the future date input to 6 months from today's date by default.
+                // Set the future date input to today + 365 days by default.
                 const today = new Date();
-                const sixMonthsFromToday = new Date(today);
-                sixMonthsFromToday.setMonth(sixMonthsFromToday.getMonth() + 6);
-                const yyyy = sixMonthsFromToday.getFullYear();
-                const mm = String(sixMonthsFromToday.getMonth() + 1).padStart(2, '0');
-                const dd = String(sixMonthsFromToday.getDate()).padStart(2, '0');
+                const oneYearFromToday = new Date(today);
+                oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
+                const yyyy = oneYearFromToday.getFullYear();
+                const mm = String(oneYearFromToday.getMonth() + 1).padStart(2, '0');
+                const dd = String(oneYearFromToday.getDate()).padStart(2, '0');
                 futureDateInput.value = `${yyyy}-${mm}-${dd}`;
 
                 // Render the empty state. The user will then load their CSV.
