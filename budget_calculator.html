@@ -117,6 +117,10 @@
                     class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
                     Investment Tracker
                 </button>
+                <button id="tab-debt"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    Debt Calculator
+                </button>
             </nav>
         </div>
 
@@ -442,6 +446,9 @@
                                     </div>
                                     <div class="text-xs text-slate-500">Invested: <span id="inv-discretionary"
                                             class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="text-xs text-slate-500">Gain/Loss (R): <span
+                                            id="gain-money-discretionary" class="font-medium text-slate-700">R
+                                            0.00</span></div>
                                     <div class="flex justify-between items-end mt-2">
                                         <div>
                                             <div class="text-xs text-slate-500">Gain/Loss</div>
@@ -467,6 +474,8 @@
                                     </div>
                                     <div class="text-xs text-slate-500">Invested: <span id="inv-tfsa"
                                             class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="text-xs text-slate-500">Gain/Loss (R): <span id="gain-money-tfsa"
+                                            class="font-medium text-slate-700">R 0.00</span></div>
                                     <div class="flex justify-between items-end mt-2">
                                         <div>
                                             <div class="text-xs text-slate-500">Gain/Loss</div>
@@ -491,6 +500,8 @@
                                         </div>
                                     </div>
                                     <div class="text-xs text-slate-500">Invested: <span id="inv-crypto"
+                                            class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="text-xs text-slate-500">Gain/Loss (R): <span id="gain-money-crypto"
                                             class="font-medium text-slate-700">R 0.00</span></div>
                                     <div class="flex justify-between items-end mt-2">
                                         <div>
@@ -532,6 +543,180 @@
             </div>
         </div>
 
+        <!-- DEBT TAB CONTENT -->
+        <div id="debt-content" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Left Sidebar -->
+                <div class="lg:col-span-1">
+                    <div class="card bg-gradient-to-b from-red-50 to-rose-50 border-l-4 border-red-400 sticky top-8">
+                        <div class="flex flex-col gap-4">
+                            <div class="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="text-red-600">
+                                    <path
+                                        d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z">
+                                    </path>
+                                    <path
+                                        d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z">
+                                    </path>
+                                </svg>
+                                <h3 class="font-semibold text-red-800">Debt Database</h3>
+                            </div>
+
+                            <!-- Database Section -->
+                            <div class="pt-4 border-t border-red-200">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="text-red-600">
+                                        <path
+                                            d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
+                                        </path>
+                                        <path d="M7 10l5 5 5-5"></path>
+                                        <path d="M12 15V3"></path>
+                                    </svg>
+                                    <span class="font-medium text-slate-700 text-sm">Database</span>
+                                </div>
+                                <div class="text-xs text-slate-600 mb-3">debt.csv</div>
+                                <button id="load-debt-csv" class="btn btn-secondary text-xs w-full mb-2">
+                                    Load Debt Data
+                                </button>
+                                <button id="save-debt-csv" class="btn btn-primary text-xs w-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="inline-block mr-2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    Save Debt Data
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="lg:col-span-3">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        <!-- Loan Details -->
+                        <div class="card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Mortgage Details</h2>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Total Loan
+                                        Amount</label>
+                                    <div class="relative">
+                                        <span class="currency-prefix">R</span>
+                                        <input type="number" id="debt-amount" class="input-field amount-input"
+                                            value="1709333.93">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Total Monthly
+                                        Repayment</label>
+                                    <div class="relative">
+                                        <span class="currency-prefix">R</span>
+                                        <input type="number" id="debt-repayment" class="input-field amount-input"
+                                            value="17554.73">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Monthly Service
+                                        Fee</label>
+                                    <div class="relative">
+                                        <span class="currency-prefix">R</span>
+                                        <input type="number" id="debt-service-fee" class="input-field amount-input"
+                                            value="69.00">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Interest Rate
+                                            (%)</label>
+                                        <input type="number" id="debt-interest-rate" class="input-field" value="9.26"
+                                            step="0.01">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Next Payment
+                                            Date</label>
+                                        <input type="date" id="debt-next-payment" class="input-field"
+                                            value="2025-12-25">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Results -->
+                        <div class="card bg-slate-50 border border-slate-200">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Projection Results</h2>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="p-3 bg-white rounded shadow-sm">
+                                        <div class="text-xs text-slate-500">Interest Saved</div>
+                                        <div id="debt-saved-amount" class="text-lg font-bold text-green-600">R 0.00
+                                        </div>
+                                    </div>
+                                    <div class="p-3 bg-white rounded shadow-sm">
+                                        <div class="text-xs text-slate-500">Total Extra Paid</div>
+                                        <div id="debt-total-extra" class="text-lg font-bold text-slate-700">R 0.00</div>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="p-3 bg-white rounded shadow-sm">
+                                        <div class="text-xs text-slate-500">Net Return (Cash)</div>
+                                        <div id="debt-net-return" class="text-lg font-bold text-indigo-600">R 0.00</div>
+                                    </div>
+                                    <div class="p-3 bg-white rounded shadow-sm">
+                                        <div class="text-xs text-slate-500">Annualised Yield</div>
+                                        <div id="debt-yield" class="text-lg font-bold text-orange-600">0.00%</div>
+                                    </div>
+                                </div>
+                                <div class="p-3 bg-white rounded shadow-sm border border-green-100 bg-green-50">
+                                    <div class="text-xs text-slate-600">Time Reduced</div>
+                                    <div id="debt-time-reduced" class="text-xl font-bold text-green-700">-</div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="p-3 bg-white rounded shadow-sm">
+                                        <div class="text-xs text-slate-500">New End Date</div>
+                                        <div id="debt-new-end-date" class="text-sm font-bold text-indigo-600">-</div>
+                                    </div>
+                                    <div class="p-3 bg-white rounded shadow-sm">
+                                        <div class="text-xs text-slate-500">Original End Date</div>
+                                        <div id="debt-original-end-date" class="text-sm font-medium text-slate-600">-
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Extra Repayments -->
+                        <div class="card lg:col-span-2">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-slate-800">Extra Repayments</h2>
+                                <button id="add-repayment" class="btn btn-secondary text-sm">+ Add Repayment</button>
+                            </div>
+
+                            <!-- Header Row -->
+                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                style="grid-template-columns: 1fr 2fr 1fr auto;">
+                                <div>Date</div>
+                                <div>Description</div>
+                                <div>Amount</div>
+                                <div></div>
+                            </div>
+
+                            <div id="repayment-list" class="space-y-2"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script>
@@ -539,29 +724,38 @@
             // --- TAB NAVIGATION ---
             const tabBudget = document.getElementById('tab-budget');
             const tabInvestment = document.getElementById('tab-investment');
+            const tabDebt = document.getElementById('tab-debt');
             const contentBudget = document.getElementById('budget-content');
             const contentInvestment = document.getElementById('investment-content');
+            const contentDebt = document.getElementById('debt-content');
 
             const switchTab = (tab) => {
+                // Reset all tabs
+                [tabBudget, tabInvestment, tabDebt].forEach(t => {
+                    t.classList.remove('border-indigo-500', 'text-indigo-600');
+                    t.classList.add('border-transparent', 'text-slate-500');
+                });
+                [contentBudget, contentInvestment, contentDebt].forEach(c => c.classList.add('hidden'));
+
+                // Activate selected tab
                 if (tab === 'budget') {
                     tabBudget.classList.add('border-indigo-500', 'text-indigo-600');
                     tabBudget.classList.remove('border-transparent', 'text-slate-500');
-                    tabInvestment.classList.remove('border-indigo-500', 'text-indigo-600');
-                    tabInvestment.classList.add('border-transparent', 'text-slate-500');
                     contentBudget.classList.remove('hidden');
-                    contentInvestment.classList.add('hidden');
-                } else {
+                } else if (tab === 'investment') {
                     tabInvestment.classList.add('border-indigo-500', 'text-indigo-600');
                     tabInvestment.classList.remove('border-transparent', 'text-slate-500');
-                    tabBudget.classList.remove('border-indigo-500', 'text-indigo-600');
-                    tabBudget.classList.add('border-transparent', 'text-slate-500');
                     contentInvestment.classList.remove('hidden');
-                    contentBudget.classList.add('hidden');
+                } else if (tab === 'debt') {
+                    tabDebt.classList.add('border-indigo-500', 'text-indigo-600');
+                    tabDebt.classList.remove('border-transparent', 'text-slate-500');
+                    contentDebt.classList.remove('hidden');
                 }
             };
 
             tabBudget.addEventListener('click', () => switchTab('budget'));
             tabInvestment.addEventListener('click', () => switchTab('investment'));
+            tabDebt.addEventListener('click', () => switchTab('debt'));
 
             // --- BUDGET CALCULATOR LOGIC ---
             // (Existing Logic Wrapped)
@@ -949,9 +1143,9 @@
             const valCrypto = document.getElementById('val-crypto');
 
             const updatePerformanceDisplay = () => {
-                calculatePerformance('Discretionary', investmentData.currentValues.Discretionary, 'inv-discretionary', 'gain-discretionary', 'ann-discretionary');
-                calculatePerformance('TFSA', investmentData.currentValues.TFSA, 'inv-tfsa', 'gain-tfsa', 'ann-tfsa');
-                calculatePerformance('Crypto', investmentData.currentValues.Crypto, 'inv-crypto', 'gain-crypto', 'ann-crypto');
+                calculatePerformance('Discretionary', investmentData.currentValues.Discretionary, 'inv-discretionary', 'gain-discretionary', 'ann-discretionary', 'gain-money-discretionary');
+                calculatePerformance('TFSA', investmentData.currentValues.TFSA, 'inv-tfsa', 'gain-tfsa', 'ann-tfsa', 'gain-money-tfsa');
+                calculatePerformance('Crypto', investmentData.currentValues.Crypto, 'inv-crypto', 'gain-crypto', 'ann-crypto', 'gain-money-crypto');
             };
 
             const renderTransactions = () => {
@@ -1029,7 +1223,7 @@
                 return div;
             };
 
-            const calculatePerformance = (type, currentValueStr, invId, gainId, annId) => {
+            const calculatePerformance = (type, currentValueStr, invId, gainId, annId, moneyGainId) => {
                 const currentValue = parseFloat(currentValueStr) || 0;
 
                 // Filter transactions for this type
@@ -1041,6 +1235,7 @@
 
                 const gainEl = document.getElementById(gainId);
                 const annEl = document.getElementById(annId);
+                const moneyGainEl = document.getElementById(moneyGainId);
 
                 if (!gainEl || !annEl) return;
 
@@ -1049,6 +1244,10 @@
                     gainEl.className = 'font-bold text-slate-800';
                     annEl.textContent = '0.00%';
                     annEl.className = 'font-bold text-slate-800';
+                    if (moneyGainEl) {
+                        moneyGainEl.textContent = 'R 0.00';
+                        moneyGainEl.className = 'font-bold text-slate-800';
+                    }
                     return;
                 }
 
@@ -1058,6 +1257,11 @@
 
                 gainEl.textContent = `${percentageReturn >= 0 ? '+' : ''}${percentageReturn.toFixed(2)}%`;
                 gainEl.className = `font-bold ${percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                if (moneyGainEl) {
+                    moneyGainEl.textContent = `${absoluteReturn >= 0 ? '+' : ''}${formatCurrency(absoluteReturn)}`;
+                    moneyGainEl.className = `font-bold ${absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                }
 
                 // Annualized Return (Approximate Time-Weighted)
                 const today = new Date();
@@ -1289,6 +1493,518 @@
             saveInvCsvBtn.addEventListener('click', saveInvestmentCSV);
 
 
+            // --- DEBT CALCULATOR LOGIC ---
+            let debtData = {
+                repayments: []
+            };
+
+            const repaymentList = document.getElementById('repayment-list');
+            const addRepaymentBtn = document.getElementById('add-repayment');
+            const loadDebtCsvBtn = document.getElementById('load-debt-csv');
+            const saveDebtCsvBtn = document.getElementById('save-debt-csv');
+
+            // Inputs
+            const debtAmountInput = document.getElementById('debt-amount');
+            const debtRepaymentInput = document.getElementById('debt-repayment');
+            const debtServiceFeeInput = document.getElementById('debt-service-fee');
+            const debtInterestRateInput = document.getElementById('debt-interest-rate');
+            const debtNextPaymentInput = document.getElementById('debt-next-payment');
+
+            // Results
+            const debtSavedAmountEl = document.getElementById('debt-saved-amount');
+            const debtTotalExtraEl = document.getElementById('debt-total-extra');
+            const debtNetReturnEl = document.getElementById('debt-net-return');
+            const debtYieldEl = document.getElementById('debt-yield');
+            const debtTimeReducedEl = document.getElementById('debt-time-reduced');
+            const debtNewEndDateEl = document.getElementById('debt-new-end-date');
+            const debtOriginalEndDateEl = document.getElementById('debt-original-end-date');
+
+            const calculateDebtProjection = () => {
+                const currentPrincipal = parseFloat(debtAmountInput.value) || 0;
+                const totalRepayment = parseFloat(debtRepaymentInput.value) || 0;
+                const serviceFee = parseFloat(debtServiceFeeInput.value) || 0;
+                const interestRate = parseFloat(debtInterestRateInput.value) || 0;
+                const nextPaymentDateStr = debtNextPaymentInput.value;
+
+                if (currentPrincipal <= 0 || totalRepayment <= 0 || !nextPaymentDateStr) return;
+
+                const monthlyRate = (interestRate / 100) / 12;
+                const effectiveRepayment = totalRepayment - serviceFee; // Logic: Principal + Interest part
+
+                if (effectiveRepayment <= (currentPrincipal * monthlyRate)) {
+                    debtSavedAmountEl.textContent = 'N/A';
+                    debtNewTermEl.textContent = 'Never';
+                    debtNewEndDateEl.textContent = 'Never';
+                    debtOriginalEndDateEl.textContent = 'Original: Never';
+                    return;
+                }
+
+                // 1. Determine Simulation Start Date
+                let startDate = new Date(nextPaymentDateStr);
+                // Adjust to 1st of month for consistency
+                startDate.setDate(1);
+
+                // Check for earlier transactions
+                const repayments = debtData.repayments;
+                if (repayments.length > 0) {
+                    const dates = repayments.map(r => new Date(r.date));
+                    const earliest = new Date(Math.min.apply(null, dates));
+                    earliest.setDate(1);
+                    if (earliest < startDate) {
+                        startDate = earliest;
+                    }
+                }
+
+                // 2. Back-Calculate Start Balance
+                // We know Current Balance at NextPaymentDate.
+                // We need Balance at StartDate.
+                // Formula: Balance_Start = (Balance_End + Payment) / (1 + r)
+
+                let simulatedBalance = currentPrincipal;
+                let currentDate = new Date(nextPaymentDateStr);
+                currentDate.setDate(1);
+
+                // We simulate backwards from CurrentDate to StartDate
+                // NOTE: This is an estimation. Exact bank math varies.
+
+                // Create a working date for iteration
+                let iterDate = new Date(currentDate);
+
+                while (iterDate > startDate) {
+                    // Move back one month
+                    iterDate.setMonth(iterDate.getMonth() - 1);
+
+                    // Identify extra repayments in this month
+                    const currentMonthStr = iterDate.toISOString().slice(0, 7);
+                    let monthlyExtra = 0;
+                    repayments.forEach(rep => {
+                        if (rep.date && rep.date.startsWith(currentMonthStr)) {
+                            monthlyExtra += (parseFloat(rep.amount) || 0);
+                        }
+                    });
+
+                    // Reverse the loan formula
+                    // Forward: End = Start * (1+r) - P_std - P_extra
+                    // Reverse: Start = (End + P_std + P_extra) / (1+r)
+
+                    simulatedBalance = (simulatedBalance + effectiveRepayment + monthlyExtra) / (1 + monthlyRate);
+                }
+
+                const startPrincipal = simulatedBalance;
+
+                // 3. Simulate Forward Scenarios
+
+                const simulateForward = (withExtras) => {
+                    let balance = startPrincipal;
+                    let totalInterest = 0;
+                    let totalFees = 0;
+                    let months = 0;
+                    let simDate = new Date(startDate);
+                    let today = new Date(); // For term calculation
+
+                    while (balance > 10 && months < 1200) { // 100 years cap
+                        // Fees
+                        totalFees += serviceFee;
+
+                        // Interest
+                        const interest = balance * monthlyRate;
+                        totalInterest += interest;
+                        balance += interest;
+
+                        // Repayment
+                        let payment = effectiveRepayment;
+
+                        if (withExtras) {
+                            const currentMonthStr = simDate.toISOString().slice(0, 7);
+                            repayments.forEach(rep => {
+                                if (rep.date && rep.date.startsWith(currentMonthStr)) {
+                                    payment += (parseFloat(rep.amount) || 0);
+                                }
+                            });
+                        }
+
+                        if (balance < payment) {
+                            payment = balance;
+                        }
+
+                        balance -= payment;
+                        months++;
+                        simDate.setMonth(simDate.getMonth() + 1);
+                    }
+
+                    return { totalInterest, totalFees, endDate: simDate, months };
+                };
+
+                const baseline = simulateForward(false); // No extras
+                const actual = simulateForward(true);    // With extras
+
+                // 4. Calculate Results
+                const totalCostBaseline = baseline.totalInterest + baseline.totalFees;
+                const totalCostActual = actual.totalInterest + actual.totalFees;
+
+                // Savings is the reduction in COST (Interest + Fees)
+                // BUT we also simulated the extra repayments as "Payments".
+                // Does "Money Saved" include the principal paid earlier? 
+                // Usually "Money Saved" = "Difference in Interest Paid".
+                // If I pay R10k extra, I save interest on that R10k.
+                // The Principal is the same in both cases (eventually paid off).
+                // So Savings = (InterestOriginal + FeesOriginal) - (InterestNew + FeesNew).
+                // This seems correct.
+
+                const moneySaved = totalCostBaseline - totalCostActual;
+
+                // Calculate Total Extra Paid
+                const totalExtra = debtData.repayments.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                debtTotalExtraEl.textContent = formatCurrency(totalExtra);
+
+                debtSavedAmountEl.textContent = formatCurrency(moneySaved);
+                debtSavedAmountEl.className = moneySaved >= 0 ? 'text-lg font-bold text-green-600' : 'text-lg font-bold text-red-600';
+
+                // Net Return (Cash)
+                const netReturn = moneySaved - totalExtra;
+                debtNetReturnEl.textContent = formatCurrency(netReturn);
+                debtNetReturnEl.className = netReturn >= 0 ? 'text-lg font-bold text-indigo-600' : 'text-lg font-bold text-orange-600';
+
+                // Time Reduced
+                const diffMonths = baseline.months - actual.months;
+                if (diffMonths > 0) {
+                    const diffY = Math.floor(diffMonths / 12);
+                    const diffM = diffMonths % 12;
+                    debtTimeReducedEl.textContent = `${diffY}y ${diffM}m`;
+                } else {
+                    debtTimeReducedEl.textContent = '0 Months';
+                }
+
+                // XIRR Calculation
+                // Cash Flows:
+                // - Extra Repayments (Dates provided)
+                // + Monthly Savings (From ActualEndDate to BaselineEndDate)
+                // NOTE: "Monthly Savings" means we STOP paying the repyament earlier.
+                // So the "Inflow" is the repayment amount we DON'T pay each month.
+
+                const cashFlows = [];
+
+                // Outflows: Extra Repayments
+                debtData.repayments.forEach(rep => {
+                    if (rep.amount > 0 && rep.date) {
+                        cashFlows.push({ amount: -parseFloat(rep.amount), date: new Date(rep.date) });
+                    }
+                });
+
+                // Inflows: Saved Repayments
+                if (cashFlows.length > 0 && diffMonths > 0) {
+                    let flowDate = new Date(actual.endDate);
+                    // Add 1 month to start the "saved" period
+                    flowDate.setMonth(flowDate.getMonth() + 1);
+
+                    const endDate = new Date(baseline.endDate);
+
+                    while (flowDate <= endDate) {
+                        cashFlows.push({ amount: totalRepayment, date: new Date(flowDate) });
+                        flowDate.setMonth(flowDate.getMonth() + 1);
+                    }
+
+                    // XIRR Solver
+                    const xirr = (values, guess = 0.1) => {
+                        const xnpv = (rate) => {
+                            return values.reduce((sum, item) => {
+                                const days = (item.date - values[0].date) / (1000 * 60 * 60 * 24);
+                                return sum + item.amount / Math.pow(1 + rate, days / 365);
+                            }, 0);
+                        };
+
+                        let rate = guess;
+                        for (let i = 0; i < 20; i++) { // 20 iterations
+                            const fValue = xnpv(rate);
+                            if (Math.abs(fValue) < 1) break; // Precision
+
+                            // Derivative
+                            const derivative = values.reduce((sum, item) => {
+                                const days = (item.date - values[0].date) / (1000 * 60 * 60 * 24);
+                                return sum - (days / 365) * item.amount / Math.pow(1 + rate, (days / 365) + 1);
+                            }, 0);
+
+                            const newRate = rate - fValue / derivative;
+                            if (Math.abs(newRate - rate) < 0.0001) { rate = newRate; break; }
+                            rate = newRate;
+                        }
+                        return rate;
+                    };
+
+                    try {
+                        // Sort by date required for XIRR? 
+                        cashFlows.sort((a, b) => a.date - b.date);
+                        if (cashFlows.length > 0) {
+                            const rate = xirr(cashFlows);
+                            const percent = rate * 100;
+                            debtYieldEl.textContent = `${percent.toFixed(2)}%`;
+                        } else {
+                            debtYieldEl.textContent = '0.00%';
+                        }
+                    } catch (e) {
+                        debtYieldEl.textContent = 'N/A';
+                    }
+                } else {
+                    debtYieldEl.textContent = '0.00%';
+                }
+
+
+                const options = { year: 'numeric', month: 'long', day: 'numeric' };
+                debtNewEndDateEl.textContent = actual.endDate.toLocaleDateString('en-ZA', options);
+                debtOriginalEndDateEl.textContent = `Original: ${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
+            };
+
+            const renderRepayments = () => {
+                repaymentList.innerHTML = '';
+                if (debtData.repayments.length === 0) {
+                    repaymentList.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No extra repayments added.</p>`;
+                } else {
+                    // Sort by date ascending
+                    const sorted = [...debtData.repayments].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    sorted.forEach(item => {
+                        const div = document.createElement('div');
+                        div.className = 'grid gap-2 items-center';
+                        div.style.gridTemplateColumns = '1fr 2fr 1fr auto';
+                        div.dataset.id = item.id;
+
+                        // Date
+                        const dateInput = document.createElement('input');
+                        dateInput.type = 'date';
+                        dateInput.value = item.date;
+                        dateInput.className = 'input-field date-input text-xs';
+                        div.appendChild(dateInput);
+
+                        // Description
+                        const descInput = document.createElement('input');
+                        descInput.type = 'text';
+                        descInput.value = item.description;
+                        descInput.placeholder = 'Description';
+                        descInput.className = 'input-field description-input text-xs';
+                        div.appendChild(descInput);
+
+                        // Amount
+                        const amountDiv = document.createElement('div');
+                        amountDiv.className = 'relative';
+                        const amountPrefix = document.createElement('span');
+                        amountPrefix.className = 'currency-prefix text-xs';
+                        amountPrefix.textContent = 'R';
+                        const amountInput = document.createElement('input');
+                        amountInput.type = 'number';
+                        amountInput.value = item.amount;
+                        amountInput.placeholder = '0.00';
+                        amountInput.className = 'input-field amount-input text-xs';
+                        amountDiv.append(amountPrefix, amountInput);
+                        div.appendChild(amountDiv);
+
+                        // Remove
+                        const removeBtn = document.createElement('button');
+                        removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+                        removeBtn.className = 'btn btn-danger remove-btn p-1.5';
+                        div.appendChild(removeBtn);
+
+                        repaymentList.appendChild(div);
+                    });
+                }
+                calculateDebtProjection();
+            };
+
+            // Event Listeners
+            addRepaymentBtn.addEventListener('click', () => {
+                const today = new Date().toISOString().split('T')[0];
+                debtData.repayments.push({
+                    id: generateId(),
+                    date: today,
+                    description: '',
+                    amount: ''
+                });
+                renderRepayments();
+            });
+
+            repaymentList.addEventListener('input', (e) => {
+                const target = e.target;
+                const itemDiv = target.closest('[data-id]');
+                if (!itemDiv) return;
+                const id = itemDiv.dataset.id;
+                const item = debtData.repayments.find(i => i.id === id);
+                if (!item) return;
+
+                if (target.classList.contains('description-input')) item.description = target.value;
+                else if (target.classList.contains('amount-input')) item.amount = target.value;
+                else if (target.classList.contains('date-input')) item.date = target.value;
+
+                calculateDebtProjection();
+            });
+
+            repaymentList.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-btn')) {
+                    const itemDiv = e.target.closest('[data-id]');
+                    const id = itemDiv.dataset.id;
+                    const index = debtData.repayments.findIndex(i => i.id === id);
+                    if (index > -1) {
+                        debtData.repayments.splice(index, 1);
+                        renderRepayments();
+                    }
+                }
+            });
+
+            [debtAmountInput, debtRepaymentInput, debtServiceFeeInput, debtInterestRateInput, debtNextPaymentInput].forEach(input => {
+                input.addEventListener('input', calculateDebtProjection);
+            });
+
+            // CSV Handling
+            const parseDebtCSV = (text) => {
+                const rows = text.split('\n').filter(row => row.trim() !== '');
+                // Expected Header: Date,Description,Amount
+                // But we also need to store the loan details?
+                // The prompt says "All the amounts need to be persisted in csv file like for investments and budget"
+                // It doesn't explicitly say to save the loan parameters, but it's good practice.
+                // However, for simplicity and consistency with other tabs, let's just save the transactions for now,
+                // OR we can use a key-value format for parameters like in investment tab (current_value).
+
+                const repayments = [];
+                const params = {};
+
+                rows.forEach(row => {
+                    const cols = row.split(',').map(s => s.trim());
+                    if (cols[0] === 'param') {
+                        params[cols[1]] = cols[2];
+                    } else if (cols[0] !== 'Date' && cols[0] !== 'type') { // Skip header
+                        // Check if it's a transaction
+                        // Format: Date,Description,Amount
+                        // Let's assume standard format: Date,Description,Amount
+                        if (cols.length >= 3 && !isNaN(parseFloat(cols[2]))) {
+                            repayments.push({
+                                id: generateId(),
+                                date: cols[0],
+                                description: cols[1],
+                                amount: parseFloat(cols[2])
+                            });
+                        }
+                    }
+                });
+                return { repayments, params };
+            };
+
+            const generateDebtCSV = () => {
+                let csv = 'Date,Description,Amount\n';
+
+                // Save Parameters
+                csv += `param,principal,${debtAmountInput.value}\n`;
+                csv += `param,repayment,${debtRepaymentInput.value}\n`;
+                csv += `param,service_fee,${debtServiceFeeInput.value}\n`;
+                csv += `param,interest_rate,${debtInterestRateInput.value}\n`;
+                csv += `param,next_payment,${debtNextPaymentInput.value}\n`;
+
+                // Save Repayments
+                debtData.repayments.forEach(r => {
+                    csv += `${r.date},${r.description},${r.amount}\n`;
+                });
+
+                return csv;
+            };
+
+            let debtFileHandle = null;
+
+            const loadDebtCSVFromServer = async () => {
+                try {
+                    const response = await fetch('debt.csv', { cache: 'no-store' });
+                    if (response.ok) {
+                        const text = await response.text();
+                        const parsed = parseDebtCSV(text);
+                        debtData.repayments = parsed.repayments;
+
+                        // Load params if exist
+                        if (parsed.params.principal) debtAmountInput.value = parsed.params.principal;
+                        if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
+                        if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
+                        if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
+                        if (parsed.params.next_payment) debtNextPaymentInput.value = parsed.params.next_payment;
+
+                        renderRepayments();
+                    } else {
+                        // Initialize with default extra repayments from prompt if file not found?
+                        // "Add extra repayments to the csv: ..."
+                        // The prompt lists specific repayments. I should pre-populate them if starting fresh?
+                        // "Add extra repayments to the csv:" implies I should add them to the file or the initial state.
+                        // I will add them to the initial state if no CSV is found.
+
+                        debtData.repayments = [
+                            { id: generateId(), date: '2025-11-25', description: 'Extra Repayment', amount: 9500 },
+                            { id: generateId(), date: '2025-10-25', description: 'Extra Repayment', amount: 8600 },
+                            { id: generateId(), date: '2025-09-05', description: 'Extra Repayment', amount: 4000 },
+                            { id: generateId(), date: '2025-07-25', description: 'Extra Repayment', amount: 4000 },
+                            { id: generateId(), date: '2025-07-01', description: 'Extra Repayment', amount: 4000 },
+                            { id: generateId(), date: '2025-05-31', description: 'Extra Repayment', amount: 4000 }
+                        ];
+                        renderRepayments();
+                    }
+                } catch (e) {
+                    console.log('Could not auto-load debt.csv');
+                }
+            };
+
+            const saveDebtCSV = async () => {
+                const csvData = generateDebtCSV();
+                try {
+                    if (!debtFileHandle) {
+                        if (!window.showOpenFilePicker) {
+                            alert('Direct file saving is not supported. Use Chrome/Edge.');
+                            return;
+                        }
+                        try {
+                            const [handle] = await window.showOpenFilePicker({
+                                multiple: false,
+                                types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
+                                excludeAcceptAllOption: false
+                            });
+                            debtFileHandle = handle;
+                        } catch (err) {
+                            alert('Please select debt.csv');
+                            return;
+                        }
+                    }
+                    const writable = await debtFileHandle.createWritable();
+                    await writable.write(csvData);
+                    await writable.close();
+
+                    const btn = saveDebtCsvBtn;
+                    const original = btn.innerHTML;
+                    btn.innerHTML = 'Saved!';
+                    setTimeout(() => btn.innerHTML = original, 2000);
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to save debt data.');
+                }
+            };
+
+            loadDebtCsvBtn.addEventListener('click', async () => {
+                if (!window.showOpenFilePicker) return;
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        multiple: false,
+                        types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
+                    });
+                    debtFileHandle = handle;
+                    const file = await handle.getFile();
+                    const text = await file.text();
+                    const parsed = parseDebtCSV(text);
+                    debtData.repayments = parsed.repayments;
+
+                    if (parsed.params.principal) debtAmountInput.value = parsed.params.principal;
+                    if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
+                    if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
+                    if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
+                    if (parsed.params.next_payment) debtNextPaymentInput.value = parsed.params.next_payment;
+
+                    renderRepayments();
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+
+            saveDebtCsvBtn.addEventListener('click', saveDebtCSV);
+
+
             // --- INITIALIZATION ---
             (async () => {
                 try {
@@ -1300,6 +2016,7 @@
                 }
 
                 await loadInvestmentCSVFromServer();
+                await loadDebtCSVFromServer();
             })();
         });
     </script>
