@@ -1,3 +1,4 @@
-start it by doing: 
-`cd "/Users/sanderwiersma/Documents/dev_projects/budget_calculator" && python3 -m http.server 8000`
-`python3 -m http.server 8000`
+Open `budget_calculator.html` directly in your browser.
+
+Run `python3 -m http.server` to serve the files on port 8000.
+

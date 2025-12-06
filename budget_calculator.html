@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,8 +10,10 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc; /* slate-50 */
+            background-color: #f8fafc;
+            /* slate-50 */
         }
+
         .card {
             background-color: white;
             border-radius: 0.75rem;
@@ -18,18 +21,24 @@
             padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
+
         .input-field {
             width: 100%;
             padding: 0.5rem 0.75rem;
-            border: 1px solid #cbd5e1; /* slate-300 */
+            border: 1px solid #cbd5e1;
+            /* slate-300 */
             border-radius: 0.375rem;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
+
         .input-field:focus {
             outline: none;
-            border-color: #4f46e5; /* indigo-600 */
-            box-shadow: 0 0 0 2px #c7d2fe; /* indigo-200 */
+            border-color: #4f46e5;
+            /* indigo-600 */
+            box-shadow: 0 0 0 2px #c7d2fe;
+            /* indigo-200 */
         }
+
         .btn {
             padding: 0.5rem 1rem;
             border-radius: 0.375rem;
@@ -37,302 +46,544 @@
             cursor: pointer;
             transition: background-color 0.2s;
         }
+
         .btn-primary {
-            background-color: #4f46e5; /* indigo-600 */
+            background-color: #4f46e5;
+            /* indigo-600 */
             color: white;
         }
+
         .btn-primary:hover {
-            background-color: #4338ca; /* indigo-700 */
+            background-color: #4338ca;
+            /* indigo-700 */
         }
+
         .btn-secondary {
-            background-color: #e2e8f0; /* slate-200 */
-            color: #1e293b; /* slate-800 */
+            background-color: #e2e8f0;
+            /* slate-200 */
+            color: #1e293b;
+            /* slate-800 */
         }
+
         .btn-secondary:hover {
-            background-color: #cbd5e1; /* slate-300 */
+            background-color: #cbd5e1;
+            /* slate-300 */
         }
+
         .btn-danger {
-            background-color: #ef4444; /* red-500 */
+            background-color: #ef4444;
+            /* red-500 */
             color: white;
         }
+
         .btn-danger:hover {
-            background-color: #dc2626; /* red-600 */
+            background-color: #dc2626;
+            /* red-600 */
         }
+
         .currency-prefix {
             position: absolute;
             left: 0.75rem;
             top: 50%;
             transform: translateY(-50%);
-            color: #64748b; /* slate-500 */
+            color: #64748b;
+            /* slate-500 */
         }
+
         .amount-input {
             padding-left: 2.5rem;
             text-align: right;
         }
     </style>
 </head>
+
 <body class="p-4 sm:p-6 md:p-8">
 
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <header class="mb-8">
-            <h1 class="text-3xl font-bold text-slate-800">Personal Budget Calculator</h1>
-            <p class="text-slate-500 mt-1">Manage your savings, debts, and future costs in ZAR.</p>
+        <header class="mb-6">
+            <h1 class="text-3xl font-bold text-slate-800">Personal Finance Dashboard</h1>
+            <p class="text-slate-500 mt-1">Manage your budget and track your investments.</p>
         </header>
 
-        <!-- Main Layout with Sidebar -->
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            <!-- Left Sidebar: Server Status -->
-            <div class="lg:col-span-1">
-                <div class="card bg-gradient-to-b from-blue-50 to-indigo-50 border-l-4 border-blue-400 sticky top-8">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex items-center gap-3">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v6m0 6v6"></path><path d="M21 12h-6m-6 0H3"></path></svg>
-                            <div>
-                                <h3 class="font-semibold text-blue-800">Server Status</h3>
-                                <p class="text-sm text-blue-600">Local Database</p>
-                            </div>
-                        </div>
-                        
-                        <div class="space-y-3">
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-slate-600">Server:</span>
-                                <span id="server-status" class="text-sm px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium">Running</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-slate-600">Database:</span>
-                                <span id="db-status" class="text-sm px-2 py-1 rounded-full bg-green-100 text-green-700">Connected</span>
-                            </div>
-                            <div class="flex items-center justify-between">
-                                <span class="text-sm text-slate-600">Port:</span>
-                                <span class="text-sm text-slate-800 font-medium">8000</span>
-                            </div>
-                        </div>
+        <!-- Tab Navigation -->
+        <div class="mb-6 border-b border-slate-200">
+            <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                <button id="tab-budget"
+                    class="border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    Budget Calculator
+                </button>
+                <button id="tab-investment"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                    Investment Tracker
+                </button>
+            </nav>
+        </div>
 
-                        <div class="flex flex-col gap-2 pt-2 border-t border-blue-200">
-                            <button id="copy-url" class="btn btn-secondary text-xs w-full">Copy URL</button>
-                            <button id="show-instructions" class="btn btn-secondary text-xs w-full">Server Help</button>
-                        </div>
-
-                        <!-- Database Section -->
-                        <div class="pt-4 border-t border-blue-200">
-                            <div class="flex items-center gap-2 mb-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><path d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z"></path><path d="M7 10l5 5 5-5"></path><path d="M12 15V3"></path></svg>
-                                <span class="font-medium text-slate-700 text-sm">Database</span>
+        <!-- BUDGET TAB CONTENT -->
+        <div id="budget-content">
+            <!-- Main Layout with Sidebar -->
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Left Sidebar -->
+                <div class="lg:col-span-1">
+                    <div
+                        class="card bg-gradient-to-b from-blue-50 to-indigo-50 border-l-4 border-blue-400 sticky top-8">
+                        <div class="flex flex-col gap-4">
+                            <div class="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="text-indigo-600">
+                                    <path d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
+                                    </path>
+                                    <path d="M7 10l5 5 5-5"></path>
+                                    <path d="M12 15V3"></path>
+                                </svg>
+                                <h3 class="font-semibold text-blue-800">Budget Database</h3>
                             </div>
-                            <div class="text-xs text-slate-600 mb-3">calulator_data.csv</div>
-                            <button id="save-csv" class="btn btn-primary text-xs w-full">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                                Save Changes
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Main Content Area -->
-            <div class="lg:col-span-3">
-
-        <!-- Main Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Left Column: Inputs -->
-            <div class="lg:col-span-2">
-                <!-- Savings -->
-                <div class="card">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Current Savings</h2>
-                    <div class="relative">
-                        <span class="currency-prefix">R</span>
-                        <input type="number" id="savings" class="input-field amount-input text-2xl font-bold" placeholder="0.00">
-                    </div>
-                </div>
-
-                <!-- Debts -->
-                <div class="card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-slate-800">Debts</h2>
-                        <button id="add-debt" class="btn btn-secondary text-sm">+ Add Debt</button>
-                    </div>
-                    <div id="debt-list" class="space-y-3"></div>
-                </div>
-
-                <!-- Provisions -->
-                <div class="card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-slate-800">Provisions</h2>
-                        <button id="add-provision" class="btn btn-secondary text-sm">+ Add Provision</button>
-                    </div>
-                    <div id="provision-list" class="space-y-3"></div>
-                </div>
-
-                <!-- Future Costs -->
-                <div class="card">
-                    <div class="flex justify-between items-center mb-4">
-                        <h2 class="text-xl font-semibold text-slate-800">Future Costs</h2>
-                        <button id="add-future-cost" class="btn btn-secondary text-sm">+ Add Cost</button>
-                    </div>
-                    <div id="future-cost-list" class="space-y-3"></div>
-                </div>
-
-                <!-- Monthly Allocation -->
-                <div class="card">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Monthly Money Allocation</h2>
-                    
-                    <!-- Available Money Input -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-slate-700 mb-2">Available Money at End of Month</label>
-                        <div class="relative">
-                            <span class="currency-prefix">R</span>
-                            <input type="number" id="available-money" class="input-field amount-input" placeholder="0.00">
-                        </div>
-                    </div>
-
-                    <!-- Allocation Percentages -->
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Mortgage Repayment (%)</label>
-                            <div class="relative">
-                                <input type="number" id="mortgage-percentage" class="input-field" placeholder="50" value="50" min="0" max="100" step="0.1">
-                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">EFT (%)</label>
-                            <div class="relative">
-                                <input type="number" id="eft-percentage" class="input-field" placeholder="50" value="50" min="0" max="100" step="0.1">
-                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-slate-700 mb-2">Crypto (%)</label>
-                            <div class="relative">
-                                <input type="number" id="crypto-percentage" class="input-field" placeholder="0" min="0" max="100" step="0.1">
-                                <span class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Calculate Button -->
-                    <button id="calculate-allocation" class="btn btn-primary w-full mb-4">Calculate Allocation</button>
-
-                    <!-- Results Display -->
-                    <div id="allocation-results" class="hidden">
-                        <h3 class="font-semibold text-slate-700 mb-3">Monthly Allocation Results</h3>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between p-2 bg-green-50 rounded">
-                                <span class="text-slate-600">Required Savings:</span>
-                                <span id="allocation-savings" class="font-medium text-green-600">R 0.00</span>
-                            </div>
-                            <div class="flex justify-between p-2 bg-blue-50 rounded">
-                                <span class="text-slate-600">Mortgage Repayment:</span>
-                                <span id="allocation-mortgage" class="font-medium text-blue-600">R 0.00</span>
-                            </div>
-                            <div class="flex justify-between p-2 bg-purple-50 rounded">
-                                <span class="text-slate-600">EFT:</span>
-                                <span id="allocation-eft" class="font-medium text-purple-600">R 0.00</span>
-                            </div>
-                            <div class="flex justify-between p-2 bg-orange-50 rounded">
-                                <span class="text-slate-600">Crypto:</span>
-                                <span id="allocation-crypto" class="font-medium text-orange-600">R 0.00</span>
-                            </div>
-                            <div class="flex justify-between p-2 bg-slate-50 rounded border-t">
-                                <span class="font-medium text-slate-700">Total Allocated:</span>
-                                <span id="allocation-total" class="font-bold text-slate-800">R 0.00</span>
+                            <!-- Database Section -->
+                            <div class="pt-4 border-t border-blue-200">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="text-indigo-600">
+                                        <path
+                                            d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
+                                        </path>
+                                        <path d="M7 10l5 5 5-5"></path>
+                                        <path d="M12 15V3"></path>
+                                    </svg>
+                                    <span class="font-medium text-slate-700 text-sm">Database</span>
+                                </div>
+                                <div class="text-xs text-slate-600 mb-3">calulator_data.csv</div>
+                                <button id="save-csv" class="btn btn-primary text-xs w-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="inline-block mr-2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    Save Budget
+                                </button>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
 
-            <!-- Right Column: Summary -->
-            <div class="lg:col-span-1">
-                <div class="card sticky top-8">
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Financial Summary</h2>
-                    
-                    <div class="space-y-6">
-                        <!-- Current Net Amount -->
-                        <div class="p-4 bg-slate-50 rounded-lg">
-                            <p class="text-sm font-medium text-slate-500">Current Net Amount</p>
-                            <p id="current-net-amount" class="text-3xl font-bold text-green-600">R 0.00</p>
-                            <p class="text-xs text-slate-400 mt-1">Savings - (Debts + Provisions)</p>
+                <!-- Main Content Area -->
+                <div class="lg:col-span-3">
+
+                    <!-- Main Grid -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Left Column: Inputs -->
+                        <div class="lg:col-span-2">
+                            <!-- Savings -->
+                            <div class="card">
+                                <h2 class="text-xl font-semibold text-slate-800 mb-4">Current Savings</h2>
+                                <div class="relative">
+                                    <span class="currency-prefix">R</span>
+                                    <input type="number" id="savings"
+                                        class="input-field amount-input text-2xl font-bold" placeholder="0.00">
+                                </div>
+                            </div>
+
+                            <!-- Debts -->
+                            <div class="card">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl font-semibold text-slate-800">Debts</h2>
+                                    <button id="add-debt" class="btn btn-secondary text-sm">+ Add Debt</button>
+                                </div>
+                                <div id="debt-list" class="space-y-3"></div>
+                            </div>
+
+                            <!-- Provisions -->
+                            <div class="card">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl font-semibold text-slate-800">Provisions</h2>
+                                    <button id="add-provision" class="btn btn-secondary text-sm">+ Add
+                                        Provision</button>
+                                </div>
+                                <div id="provision-list" class="space-y-3"></div>
+                            </div>
+
+                            <!-- Future Costs -->
+                            <div class="card">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h2 class="text-xl font-semibold text-slate-800">Future Costs</h2>
+                                    <button id="add-future-cost" class="btn btn-secondary text-sm">+ Add Cost</button>
+                                </div>
+                                <div id="future-cost-list" class="space-y-3"></div>
+                            </div>
+
+                            <!-- Monthly Allocation -->
+                            <div class="card">
+                                <h2 class="text-xl font-semibold text-slate-800 mb-4">Monthly Money Allocation</h2>
+
+                                <!-- Available Money Input -->
+                                <div class="mb-4">
+                                    <label class="block text-sm font-medium text-slate-700 mb-2">Available Money at End
+                                        of Month</label>
+                                    <div class="relative">
+                                        <span class="currency-prefix">R</span>
+                                        <input type="number" id="available-money" class="input-field amount-input"
+                                            placeholder="0.00">
+                                    </div>
+                                </div>
+
+                                <!-- Allocation Percentages -->
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-2">Mortgage Repayment
+                                            (%)</label>
+                                        <div class="relative">
+                                            <input type="number" id="mortgage-percentage" class="input-field"
+                                                placeholder="50" value="50" min="0" max="100" step="0.1">
+                                            <span
+                                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-2">EFT (%)</label>
+                                        <div class="relative">
+                                            <input type="number" id="eft-percentage" class="input-field"
+                                                placeholder="50" value="50" min="0" max="100" step="0.1">
+                                            <span
+                                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-2">Crypto (%)</label>
+                                        <div class="relative">
+                                            <input type="number" id="crypto-percentage" class="input-field"
+                                                placeholder="0" min="0" max="100" step="0.1">
+                                            <span
+                                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Calculate Button -->
+                                <button id="calculate-allocation" class="btn btn-primary w-full mb-4">Calculate
+                                    Allocation</button>
+
+                                <!-- Results Display -->
+                                <div id="allocation-results" class="hidden">
+                                    <h3 class="font-semibold text-slate-700 mb-3">Monthly Allocation Results</h3>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between p-2 bg-green-50 rounded">
+                                            <span class="text-slate-600">Required Savings:</span>
+                                            <span id="allocation-savings" class="font-medium text-green-600">R
+                                                0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-2 bg-blue-50 rounded">
+                                            <span class="text-slate-600">Mortgage Repayment:</span>
+                                            <span id="allocation-mortgage" class="font-medium text-blue-600">R
+                                                0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-2 bg-purple-50 rounded">
+                                            <span class="text-slate-600">EFT:</span>
+                                            <span id="allocation-eft" class="font-medium text-purple-600">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-2 bg-orange-50 rounded">
+                                            <span class="text-slate-600">Crypto:</span>
+                                            <span id="allocation-crypto" class="font-medium text-orange-600">R
+                                                0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-2 bg-slate-50 rounded border-t">
+                                            <span class="font-medium text-slate-700">Total Allocated:</span>
+                                            <span id="allocation-total" class="font-bold text-slate-800">R 0.00</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
-                        <!-- Future Net Amount -->
-                        <div class="p-4 bg-slate-50 rounded-lg">
-                            <label for="future-date" class="text-sm font-medium text-slate-500">Future Net Amount by</label>
-                            <input type="date" id="future-date" class="input-field w-full mt-1">
-                            <p id="future-net-amount" class="text-3xl font-bold text-indigo-600 mt-2">R 0.00</p>
-                            <p class="text-xs text-slate-400 mt-1">Current Net - Future Costs up to selected date</p>
-                        </div>
-                    </div>
+                        <!-- Right Column: Summary -->
+                        <div class="lg:col-span-1">
+                            <div class="card sticky top-8">
+                                <h2 class="text-xl font-semibold text-slate-800 mb-4">Financial Summary</h2>
 
-                    <hr class="my-6">
+                                <div class="space-y-6">
+                                    <!-- Current Net Amount -->
+                                    <div class="p-4 bg-slate-50 rounded-lg">
+                                        <p class="text-sm font-medium text-slate-500">Current Net Amount</p>
+                                        <p id="current-net-amount" class="text-3xl font-bold text-green-600">R 0.00</p>
+                                        <p class="text-xs text-slate-400 mt-1">Savings - (Debts + Provisions)</p>
+                                    </div>
 
-                    <!-- Breakdown -->
-                    <div>
-                        <h3 class="font-semibold text-slate-700 mb-2">Breakdown</h3>
-                        <div class="space-y-2 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-slate-600">Total Savings:</span>
-                                <span id="summary-savings" class="font-medium text-slate-800">R 0.00</span>
+                                    <!-- Future Net Amount -->
+                                    <div class="p-4 bg-slate-50 rounded-lg">
+                                        <label for="future-date" class="text-sm font-medium text-slate-500">Future Net
+                                            Amount by</label>
+                                        <input type="date" id="future-date" class="input-field w-full mt-1">
+                                        <p id="future-net-amount" class="text-3xl font-bold text-indigo-600 mt-2">R 0.00
+                                        </p>
+                                        <p class="text-xs text-slate-400 mt-1">Current Net - Future Costs up to selected
+                                            date</p>
+                                    </div>
+                                </div>
+
+                                <hr class="my-6">
+
+                                <!-- Breakdown -->
+                                <div>
+                                    <h3 class="font-semibold text-slate-700 mb-2">Breakdown</h3>
+                                    <div class="space-y-2 text-sm">
+                                        <div class="flex justify-between">
+                                            <span class="text-slate-600">Total Savings:</span>
+                                            <span id="summary-savings" class="font-medium text-slate-800">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-slate-600">Total Debts:</span>
+                                            <span id="summary-debts" class="font-medium text-red-500">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-slate-600">Total Provisions:</span>
+                                            <span id="summary-provisions" class="font-medium text-orange-500">R
+                                                0.00</span>
+                                        </div>
+                                        <div class="flex justify-between">
+                                            <span class="text-slate-600">Total Future Costs:</span>
+                                            <span id="summary-future-costs" class="font-medium text-blue-500">R
+                                                0.00</span>
+                                        </div>
+                                    </div>
+
+                                    <!-- Monthly Savings Target -->
+                                    <div class="mt-4 pt-3 border-t border-slate-200">
+                                        <div class="flex justify-between items-center">
+                                            <span class="text-sm font-medium text-slate-600">Monthly Savings
+                                                Needed:</span>
+                                            <span id="monthly-savings-target"
+                                                class="text-sm font-bold text-purple-600">R 0.00</span>
+                                        </div>
+                                        <p class="text-xs text-slate-400 mt-1">To reach future net amount by selected
+                                            date</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-600">Total Debts:</span>
-                                <span id="summary-debts" class="font-medium text-red-500">R 0.00</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-600">Total Provisions:</span>
-                                <span id="summary-provisions" class="font-medium text-orange-500">R 0.00</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-slate-600">Total Future Costs:</span>
-                                <span id="summary-future-costs" class="font-medium text-blue-500">R 0.00</span>
-                            </div>
-                        </div>
-                        
-                        <!-- Monthly Savings Target -->
-                        <div class="mt-4 pt-3 border-t border-slate-200">
-                            <div class="flex justify-between items-center">
-                                <span class="text-sm font-medium text-slate-600">Monthly Savings Needed:</span>
-                                <span id="monthly-savings-target" class="text-sm font-bold text-purple-600">R 0.00</span>
-                            </div>
-                            <p class="text-xs text-slate-400 mt-1">To reach future net amount by selected date</p>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
+
+        <!-- INVESTMENT TAB CONTENT -->
+        <div id="investment-content" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Left Sidebar -->
+                <div class="lg:col-span-1">
+                    <div
+                        class="card bg-gradient-to-b from-green-50 to-emerald-50 border-l-4 border-green-400 sticky top-8">
+                        <div class="flex flex-col gap-4">
+                            <div class="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="text-green-600">
+                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                </svg>
+                                <h3 class="font-semibold text-green-800">Investment Database</h3>
+                            </div>
+
+                            <!-- Database Section -->
+                            <div class="pt-4 border-t border-green-200">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="text-green-600">
+                                        <path
+                                            d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
+                                        </path>
+                                        <path d="M7 10l5 5 5-5"></path>
+                                        <path d="M12 15V3"></path>
+                                    </svg>
+                                    <span class="font-medium text-slate-700 text-sm">Database</span>
+                                </div>
+                                <div class="text-xs text-slate-600 mb-3">investments.csv</div>
+                                <button id="load-inv-csv" class="btn btn-secondary text-xs w-full mb-2">
+                                    Load Investments
+                                </button>
+                                <button id="save-inv-csv" class="btn btn-primary text-xs w-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                        stroke-linejoin="round" class="inline-block mr-2">
+                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
+                                        </path>
+                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                                        <polyline points="7 3 7 8 15 8"></polyline>
+                                    </svg>
+                                    Save Investments
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="lg:col-span-3">
+                    <div class="grid grid-cols-1 gap-6">
+
+                        <!-- Performance Summary -->
+                        <div class="card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Portfolio Performance</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <!-- Discretionary -->
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <h3 class="font-semibold text-slate-700 mb-2">Discretionary</h3>
+                                    <div class="mb-2">
+                                        <label class="text-xs text-slate-500">Current Value</label>
+                                        <div class="relative">
+                                            <span class="currency-prefix text-xs">R</span>
+                                            <input type="number" id="val-discretionary"
+                                                class="input-field amount-input text-sm font-bold" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-slate-500">Invested: <span id="inv-discretionary"
+                                            class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="flex justify-between items-end mt-2">
+                                        <div>
+                                            <div class="text-xs text-slate-500">Gain/Loss</div>
+                                            <div id="gain-discretionary" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs text-slate-500">Annualized</div>
+                                            <div id="ann-discretionary" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- TFSA -->
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <h3 class="font-semibold text-slate-700 mb-2">TFSA</h3>
+                                    <div class="mb-2">
+                                        <label class="text-xs text-slate-500">Current Value</label>
+                                        <div class="relative">
+                                            <span class="currency-prefix text-xs">R</span>
+                                            <input type="number" id="val-tfsa"
+                                                class="input-field amount-input text-sm font-bold" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-slate-500">Invested: <span id="inv-tfsa"
+                                            class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="flex justify-between items-end mt-2">
+                                        <div>
+                                            <div class="text-xs text-slate-500">Gain/Loss</div>
+                                            <div id="gain-tfsa" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs text-slate-500">Annualized</div>
+                                            <div id="ann-tfsa" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Crypto -->
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <h3 class="font-semibold text-slate-700 mb-2">Crypto</h3>
+                                    <div class="mb-2">
+                                        <label class="text-xs text-slate-500">Current Value</label>
+                                        <div class="relative">
+                                            <span class="currency-prefix text-xs">R</span>
+                                            <input type="number" id="val-crypto"
+                                                class="input-field amount-input text-sm font-bold" placeholder="0.00">
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-slate-500">Invested: <span id="inv-crypto"
+                                            class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="flex justify-between items-end mt-2">
+                                        <div>
+                                            <div class="text-xs text-slate-500">Gain/Loss</div>
+                                            <div id="gain-crypto" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs text-slate-500">Annualized</div>
+                                            <div id="ann-crypto" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transactions -->
+                        <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-slate-800">Transactions</h2>
+                                <button id="add-transaction" class="btn btn-secondary text-sm">+ Add
+                                    Transaction</button>
+                            </div>
+
+                            <!-- Header Row -->
+                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                style="grid-template-columns: 1fr 2fr 1fr 1fr auto;">
+                                <div>Date</div>
+                                <div>Description</div>
+                                <div>Amount</div>
+                                <div>Account</div>
+                                <div></div>
+                            </div>
+
+                            <div id="transaction-list" class="space-y-2"></div>
+                        </div>
+
+                    </div>
+                </div>
             </div>
         </div>
+
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // --- STATE MANAGEMENT ---
-            let data = {
+            // --- TAB NAVIGATION ---
+            const tabBudget = document.getElementById('tab-budget');
+            const tabInvestment = document.getElementById('tab-investment');
+            const contentBudget = document.getElementById('budget-content');
+            const contentInvestment = document.getElementById('investment-content');
+
+            const switchTab = (tab) => {
+                if (tab === 'budget') {
+                    tabBudget.classList.add('border-indigo-500', 'text-indigo-600');
+                    tabBudget.classList.remove('border-transparent', 'text-slate-500');
+                    tabInvestment.classList.remove('border-indigo-500', 'text-indigo-600');
+                    tabInvestment.classList.add('border-transparent', 'text-slate-500');
+                    contentBudget.classList.remove('hidden');
+                    contentInvestment.classList.add('hidden');
+                } else {
+                    tabInvestment.classList.add('border-indigo-500', 'text-indigo-600');
+                    tabInvestment.classList.remove('border-transparent', 'text-slate-500');
+                    tabBudget.classList.remove('border-indigo-500', 'text-indigo-600');
+                    tabBudget.classList.add('border-transparent', 'text-slate-500');
+                    contentInvestment.classList.remove('hidden');
+                    contentBudget.classList.add('hidden');
+                }
+            };
+
+            tabBudget.addEventListener('click', () => switchTab('budget'));
+            tabInvestment.addEventListener('click', () => switchTab('investment'));
+
+            // --- BUDGET CALCULATOR LOGIC ---
+            // (Existing Logic Wrapped)
+            let budgetData = {
                 savings: 0,
                 debts: [],
                 provisions: [],
                 futureCosts: []
             };
 
-            // --- DOM ELEMENTS ---
             const savingsInput = document.getElementById('savings');
             const debtList = document.getElementById('debt-list');
             const provisionList = document.getElementById('provision-list');
             const futureCostList = document.getElementById('future-cost-list');
             const futureDateInput = document.getElementById('future-date');
-            
+
             const addDebtBtn = document.getElementById('add-debt');
             const addProvisionBtn = document.getElementById('add-provision');
             const addFutureCostBtn = document.getElementById('add-future-cost');
-            
+
             const saveCsvBtn = document.getElementById('save-csv');
-            const dbStatus = document.getElementById('db-status');
-            const serverStatus = document.getElementById('server-status');
-            const copyUrlBtn = document.getElementById('copy-url');
-            const showInstructionsBtn = document.getElementById('show-instructions');
-            
-            // Monthly allocation elements
+
             const availableMoneyInput = document.getElementById('available-money');
             const mortgagePercentageInput = document.getElementById('mortgage-percentage');
             const eftPercentageInput = document.getElementById('eft-percentage');
@@ -340,20 +591,18 @@
             const calculateAllocationBtn = document.getElementById('calculate-allocation');
             const allocationResults = document.getElementById('allocation-results');
 
-            // --- UTILITY FUNCTIONS ---
             const formatCurrency = (value) => {
                 const num = parseFloat(value) || 0;
                 return `R ${num.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
             };
-            
+
             const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-            // --- RENDERING LOGIC ---
-            const renderAll = () => {
-                savingsInput.value = data.savings || '';
-                renderList(debtList, data.debts, createDebtItem);
-                renderList(provisionList, data.provisions, createProvisionItem);
-                renderList(futureCostList, data.futureCosts, createFutureCostItem);
+            const renderBudget = () => {
+                savingsInput.value = budgetData.savings || '';
+                renderList(debtList, budgetData.debts, createDebtItem);
+                renderList(provisionList, budgetData.provisions, createProvisionItem);
+                renderList(futureCostList, budgetData.futureCosts, createFutureCostItem);
                 calculateAndDisplaySummary();
             };
 
@@ -372,14 +621,12 @@
                 div.style.gridTemplateColumns = hasDate ? '1fr 1fr 1fr auto' : '1fr 1fr auto';
                 div.dataset.id = item.id;
 
-                // Description Input
                 const descInput = document.createElement('input');
                 descInput.type = 'text';
                 descInput.value = item.description;
                 descInput.placeholder = 'Description';
                 descInput.className = 'input-field description-input';
-                
-                // Amount Input
+
                 const amountDiv = document.createElement('div');
                 amountDiv.className = 'relative';
                 const amountPrefix = document.createElement('span');
@@ -395,7 +642,6 @@
                 div.appendChild(descInput);
                 div.appendChild(amountDiv);
 
-                // Date Input (if applicable)
                 if (hasDate) {
                     const dateInput = document.createElement('input');
                     dateInput.type = 'date';
@@ -404,7 +650,6 @@
                     div.appendChild(dateInput);
                 }
 
-                // Remove Button
                 const removeBtn = document.createElement('button');
                 removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
                 removeBtn.className = 'btn btn-danger remove-btn p-2';
@@ -412,23 +657,22 @@
 
                 return div;
             };
-            
+
             const createDebtItem = (item) => createGenericItem(item, false);
             const createProvisionItem = (item) => createGenericItem(item, true);
             const createFutureCostItem = (item) => createGenericItem(item, true);
 
-            // --- CALCULATION LOGIC ---
             const calculateAndDisplaySummary = () => {
-                const totalDebts = data.debts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-                const totalProvisions = data.provisions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-                const totalFutureCosts = data.futureCosts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-                const savings = parseFloat(data.savings) || 0;
+                const totalDebts = budgetData.debts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                const totalProvisions = budgetData.provisions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                const totalFutureCosts = budgetData.futureCosts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                const savings = parseFloat(budgetData.savings) || 0;
 
                 const currentNetAmount = savings - totalDebts - totalProvisions;
 
                 const futureDate = futureDateInput.value ? new Date(futureDateInput.value) : null;
-                const relevantFutureCosts = futureDate 
-                    ? data.futureCosts.reduce((sum, item) => {
+                const relevantFutureCosts = futureDate
+                    ? budgetData.futureCosts.reduce((sum, item) => {
                         const itemDate = item.date ? new Date(item.date) : null;
                         if (itemDate && itemDate <= futureDate) {
                             return sum + (parseFloat(item.amount) || 0);
@@ -436,105 +680,88 @@
                         return sum;
                     }, 0)
                     : 0;
-                
+
                 const futureNetAmount = currentNetAmount - relevantFutureCosts;
 
-                // Update UI
                 document.getElementById('current-net-amount').textContent = formatCurrency(currentNetAmount);
-                document.getElementById('current-net-amount').style.color = currentNetAmount >= 0 ? '#16a34a' : '#ef4444'; // green-600 or red-500
-                
+                document.getElementById('current-net-amount').style.color = currentNetAmount >= 0 ? '#16a34a' : '#ef4444';
+
                 document.getElementById('future-net-amount').textContent = formatCurrency(futureNetAmount);
-                document.getElementById('future-net-amount').style.color = futureNetAmount >= 0 ? '#4f46e5' : '#ef4444'; // indigo-600 or red-500
+                document.getElementById('future-net-amount').style.color = futureNetAmount >= 0 ? '#4f46e5' : '#ef4444';
 
                 document.getElementById('summary-savings').textContent = formatCurrency(savings);
                 document.getElementById('summary-debts').textContent = `- ${formatCurrency(totalDebts)}`;
                 document.getElementById('summary-provisions').textContent = `- ${formatCurrency(totalProvisions)}`;
                 document.getElementById('summary-future-costs').textContent = formatCurrency(totalFutureCosts);
 
-                // Calculate monthly savings target
                 let monthlySavingsTarget = 0;
                 if (futureDate) {
                     const today = new Date();
-                    today.setHours(0, 0, 0, 0); // Reset time to start of day for accurate calculation
+                    today.setHours(0, 0, 0, 0);
                     const targetDate = new Date(futureDate);
                     targetDate.setHours(0, 0, 0, 0);
-                    
+
                     const timeDiff = targetDate - today;
                     const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                    const monthsDiff = Math.max(1, Math.ceil(daysDiff / 30)); // At least 1 month for calculation
-                    
+                    const monthsDiff = Math.max(1, Math.ceil(daysDiff / 30));
+
                     if (daysDiff > 0) {
-                        // Calculate what we need to save to maintain or improve our financial position
                         if (futureNetAmount < 0) {
-                            // We're in debt by the future date, need to save to get out
                             monthlySavingsTarget = Math.abs(futureNetAmount) / monthsDiff;
                         } else if (futureNetAmount < currentNetAmount) {
-                            // We're losing money, need to save to maintain current position
                             monthlySavingsTarget = (currentNetAmount - futureNetAmount) / monthsDiff;
                         } else if (currentNetAmount < 0 && futureNetAmount >= 0) {
-                            // We're currently in debt but will be positive by the future date
-                            // Calculate how much we need to save to get to zero, then to the target
                             monthlySavingsTarget = (Math.abs(currentNetAmount) + futureNetAmount) / monthsDiff;
                         }
-                        // If futureNetAmount >= currentNetAmount and both positive, no additional savings needed
                     }
                 }
-                
+
                 document.getElementById('monthly-savings-target').textContent = formatCurrency(monthlySavingsTarget);
-                document.getElementById('monthly-savings-target').style.color = monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b'; // purple-600 or slate-500
+                document.getElementById('monthly-savings-target').style.color = monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b';
             };
 
-            // --- MONTHLY ALLOCATION LOGIC ---
             const calculateMonthlyAllocation = () => {
                 const availableMoney = parseFloat(availableMoneyInput.value) || 0;
                 const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
                 const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
                 const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
-                
-                // Get the monthly savings target from the summary
+
                 const monthlySavingsTarget = parseFloat(document.getElementById('monthly-savings-target').textContent.replace(/[R\s,]/g, '')) || 0;
-                
-                // Calculate total percentage
+
                 const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
-                
-                // Validate percentages
+
                 if (totalPercentage > 100) {
                     alert('Total percentage cannot exceed 100%. Please adjust your percentages.');
                     return;
                 }
-                
+
                 if (totalPercentage === 0) {
                     alert('Please enter at least one percentage allocation.');
                     return;
                 }
-                
-                // Calculate remaining money after savings
+
                 const remainingMoney = availableMoney - monthlySavingsTarget;
-                
+
                 if (remainingMoney < 0) {
                     alert('Available money is less than required monthly savings. You need to increase your available money or reduce your financial commitments.');
                     return;
                 }
-                
-                // Calculate allocations based on percentages of remaining money
+
                 const mortgageAmount = (remainingMoney * mortgagePercentage) / 100;
                 const eftAmount = (remainingMoney * eftPercentage) / 100;
                 const cryptoAmount = (remainingMoney * cryptoPercentage) / 100;
-                
+
                 const totalAllocated = monthlySavingsTarget + mortgageAmount + eftAmount + cryptoAmount;
-                
-                // Update the results display
+
                 document.getElementById('allocation-savings').textContent = formatCurrency(monthlySavingsTarget);
                 document.getElementById('allocation-mortgage').textContent = formatCurrency(mortgageAmount);
                 document.getElementById('allocation-eft').textContent = formatCurrency(eftAmount);
                 document.getElementById('allocation-crypto').textContent = formatCurrency(cryptoAmount);
                 document.getElementById('allocation-total').textContent = formatCurrency(totalAllocated);
-                
-                // Show the results
+
                 allocationResults.classList.remove('hidden');
             };
 
-            // --- EVENT HANDLERS ---
             const handleListChange = (e, list) => {
                 const target = e.target;
                 const itemDiv = target.closest('[data-id]');
@@ -548,7 +775,7 @@
                     const index = list.findIndex(i => i.id === id);
                     if (index > -1) {
                         list.splice(index, 1);
-                        renderAll();
+                        renderBudget();
                     }
                 } else if (target.classList.contains('description-input')) {
                     item.description = target.value;
@@ -559,50 +786,48 @@
                 }
                 calculateAndDisplaySummary();
             };
-            
+
             addDebtBtn.addEventListener('click', () => {
-                data.debts.push({ id: generateId(), description: '', amount: '' });
-                renderAll();
+                budgetData.debts.push({ id: generateId(), description: '', amount: '' });
+                renderBudget();
             });
-            
+
             addProvisionBtn.addEventListener('click', () => {
-                data.provisions.push({ id: generateId(), description: '', amount: '', date: '' });
-                renderAll();
+                budgetData.provisions.push({ id: generateId(), description: '', amount: '', date: '' });
+                renderBudget();
             });
-            
+
             addFutureCostBtn.addEventListener('click', () => {
-                data.futureCosts.push({ id: generateId(), description: '', amount: '', date: '' });
-                renderAll();
+                budgetData.futureCosts.push({ id: generateId(), description: '', amount: '', date: '' });
+                renderBudget();
             });
 
             savingsInput.addEventListener('input', (e) => {
-                data.savings = e.target.value;
+                budgetData.savings = e.target.value;
                 calculateAndDisplaySummary();
             });
-            
+
             futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 
-            debtList.addEventListener('input', (e) => handleListChange(e, data.debts));
-            provisionList.addEventListener('input', (e) => handleListChange(e, data.provisions));
-            futureCostList.addEventListener('input', (e) => handleListChange(e, data.futureCosts));
-            
-            debtList.addEventListener('click', (e) => handleListChange(e, data.debts));
-            provisionList.addEventListener('click', (e) => handleListChange(e, data.provisions));
-            futureCostList.addEventListener('click', (e) => handleListChange(e, data.futureCosts));
+            debtList.addEventListener('input', (e) => handleListChange(e, budgetData.debts));
+            provisionList.addEventListener('input', (e) => handleListChange(e, budgetData.provisions));
+            futureCostList.addEventListener('input', (e) => handleListChange(e, budgetData.futureCosts));
 
-            // Monthly allocation event handlers
+            debtList.addEventListener('click', (e) => handleListChange(e, budgetData.debts));
+            provisionList.addEventListener('click', (e) => handleListChange(e, budgetData.provisions));
+            futureCostList.addEventListener('click', (e) => handleListChange(e, budgetData.futureCosts));
+
             calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 
-            // --- CSV HANDLING ---
-            const parseCSV = (text) => {
+            const parseBudgetCSV = (text) => {
                 const newData = { savings: 0, debts: [], provisions: [], futureCosts: [] };
                 const rows = text.split('\n').filter(row => row.trim() !== '');
-                const contentRows = rows.slice(1); // Skip header
+                const contentRows = rows.slice(1);
 
                 contentRows.forEach(row => {
                     const [type, description, amount, date] = row.split(',').map(s => s.trim());
                     const item = { id: generateId(), description, amount: parseFloat(amount) || 0, date };
-                    
+
                     switch (type) {
                         case 'savings':
                             newData.savings = parseFloat(amount) || 0;
@@ -620,44 +845,52 @@
                 });
                 return newData;
             };
-            
-            const generateCSV = () => {
+
+            const generateBudgetCSV = () => {
                 const header = 'type,description,amount,date\n';
                 let csvContent = header;
 
-                csvContent += `savings,,${data.savings || 0},\n`;
-                data.debts.forEach(d => csvContent += `debt,${d.description || ''},${d.amount || 0},\n`);
-                data.provisions.forEach(p => csvContent += `provision,${p.description || ''},${p.amount || 0},${p.date || ''}\n`);
-                data.futureCosts.forEach(c => csvContent += `costfuturecost,${c.description || ''},${c.amount || 0},${c.date || ''}\n`);
-                
+                csvContent += `savings,,${budgetData.savings || 0},\n`;
+                budgetData.debts.forEach(d => csvContent += `debt,${d.description || ''},${d.amount || 0},\n`);
+                budgetData.provisions.forEach(p => csvContent += `provision,${p.description || ''},${p.amount || 0},${p.date || ''}\n`);
+                budgetData.futureCosts.forEach(c => csvContent += `costfuturecost,${c.description || ''},${c.amount || 0},${c.date || ''}\n`);
+
                 return csvContent;
             };
 
-            // File System Access API support for saving to the same CSV without download
-            let csvFileHandle = null;
-            const saveToSameCSVFile = async () => {
-                const csvData = generateCSV();
+            const loadBudgetCSVFromServer = async () => {
+                const response = await fetch('calulator_data.csv', { cache: 'no-store' });
+                if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
+                const text = await response.text();
+                budgetData = parseBudgetCSV(text);
+                if (!futureDateInput.value) {
+                    const today = new Date();
+                    const oneYearFromToday = new Date(today);
+                    oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
+                    const yyyy = oneYearFromToday.getFullYear();
+                    const mm = String(oneYearFromToday.getMonth() + 1).padStart(2, '0');
+                    const dd = String(oneYearFromToday.getDate()).padStart(2, '0');
+                    futureDateInput.value = `${yyyy}-${mm}-${dd}`;
+                }
+                renderBudget();
+            };
+
+            let budgetFileHandle = null;
+            const saveBudgetCSV = async () => {
+                const csvData = generateBudgetCSV();
                 try {
-                    // Request file handle if we don't have one yet
-                    if (!csvFileHandle) {
+                    if (!budgetFileHandle) {
                         if (!window.showOpenFilePicker) {
                             alert('Direct file saving is not supported in this browser. Please use Chrome/Edge.');
                             return;
                         }
-                        
                         try {
                             const [handle] = await window.showOpenFilePicker({
                                 multiple: false,
-                                types: [
-                                    {
-                                        description: 'CSV Files',
-                                        accept: { 'text/csv': ['.csv'] }
-                                    }
-                                ],
+                                types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
                                 excludeAcceptAllOption: false
                             });
-                            csvFileHandle = handle;
-                            console.log('File handle obtained successfully');
+                            budgetFileHandle = handle;
                         } catch (pickerErr) {
                             console.error('File picker error:', pickerErr);
                             alert('Please select calulator_data.csv to enable saving.');
@@ -665,21 +898,19 @@
                         }
                     }
 
-                    // Verify we can write
-                    const permission = await csvFileHandle.queryPermission({ mode: 'readwrite' });
+                    const permission = await budgetFileHandle.queryPermission({ mode: 'readwrite' });
                     if (permission !== 'granted') {
-                        const request = await csvFileHandle.requestPermission({ mode: 'readwrite' });
+                        const request = await budgetFileHandle.requestPermission({ mode: 'readwrite' });
                         if (request !== 'granted') {
                             alert('Permission denied to write to the CSV file.');
                             return;
                         }
                     }
 
-                    const writable = await csvFileHandle.createWritable();
+                    const writable = await budgetFileHandle.createWritable();
                     await writable.write(csvData);
                     await writable.close();
-                    
-                    // Show success feedback
+
                     const saveBtn = document.getElementById('save-csv');
                     const originalText = saveBtn.innerHTML;
                     saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><polyline points="20 6 9 17 4 12"></polyline></svg>Saved!';
@@ -694,109 +925,384 @@
                 }
             };
 
-            saveCsvBtn.addEventListener('click', () => {
-                // Save directly to the same file (no download) using File System Access API
-                saveToSameCSVFile();
-            });
+            saveCsvBtn.addEventListener('click', saveBudgetCSV);
 
-            // Server control panel event handlers
-            copyUrlBtn.addEventListener('click', () => {
-                const url = window.location.href;
-                navigator.clipboard.writeText(url).then(() => {
-                    copyUrlBtn.textContent = 'Copied!';
-                    setTimeout(() => {
-                        copyUrlBtn.textContent = 'Copy URL';
-                    }, 2000);
-                }).catch(() => {
-                    alert('Could not copy URL. Please copy manually: ' + url);
-                });
-            });
 
-            showInstructionsBtn.addEventListener('click', () => {
-                const instructions = `
-🚀 SERVER INSTRUCTIONS
-
-START SERVER:
-• Open Terminal/Command Prompt
-• Navigate to project folder: cd /Users/sanderwiersma/Documents/dev_projects/budget_calculator
-• Run: python3 -m http.server 8000
-• Or: npx http-server -p 8000
-
-STOP SERVER:
-• Press Ctrl+C in the terminal
-
-ACCESS APP:
-• Open browser to: http://localhost:8000/budget_calculator.html
-
-ALTERNATIVE SERVERS:
-• Node.js: npx http-server -p 8000
-• PHP: php -S localhost:8000
-• Python 2: python -m SimpleHTTPServer 8000
-
-The server must be running for the database to work!
-                `;
-                alert(instructions);
-            });
-
-            // --- INITIALIZATION ---
-            const initializeEmptyState = () => {
-                // Set data to a clean, empty state.
-                data = {
-                    savings: '',
-                    debts: [],
-                    provisions: [],
-                    futureCosts: []
-                };
-                
-                // Set the future date input to today + 365 days by default.
-                const today = new Date();
-                const oneYearFromToday = new Date(today);
-                oneYearFromToday.setDate(oneYearFromToday.getDate() + 365);
-                const yyyy = oneYearFromToday.getFullYear();
-                const mm = String(oneYearFromToday.getMonth() + 1).padStart(2, '0');
-                const dd = String(oneYearFromToday.getDate()).padStart(2, '0');
-                futureDateInput.value = `${yyyy}-${mm}-${dd}`;
-
-                // Render the empty state. The user will then load their CSV.
-                renderAll();
-            };
-
-            // Attempt to automatically load default CSV from the same directory
-            const loadDatabase = async () => {
-                try {
-                    // Load from project root
-                    const response = await fetch('/calulator_data.csv', { cache: 'no-store' });
-                    if (!response.ok) {
-                        dbStatus.textContent = 'Not Found';
-                        dbStatus.className = 'text-sm px-2 py-1 rounded-full bg-red-100 text-red-700';
-                        serverStatus.textContent = 'Server Error';
-                        serverStatus.className = 'text-sm px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium';
-                        return; // Keep empty state if missing
-                    }
-                    const text = await response.text();
-                    data = parseCSV(text);
-                    renderAll();
-                    dbStatus.textContent = 'Loaded';
-                    dbStatus.className = 'text-sm px-2 py-1 rounded-full bg-green-100 text-green-700';
-                    serverStatus.textContent = 'Running';
-                    serverStatus.className = 'text-sm px-2 py-1 rounded-full bg-green-100 text-green-700 font-medium';
-                    
-                    // Note: File handle will be requested on first save attempt
-                    console.log('Database loaded successfully');
-                } catch (err) {
-                    // Likely running from file:// or server has no CSV; ignore
-                    console.warn('Could not auto-load calulator_data.csv:', err);
-                    dbStatus.textContent = 'Error';
-                    dbStatus.className = 'text-sm px-2 py-1 rounded-full bg-red-100 text-red-700';
-                    serverStatus.textContent = 'Not Running';
-                    serverStatus.className = 'text-sm px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium';
+            // --- INVESTMENT TRACKER LOGIC ---
+            let investmentData = {
+                transactions: [],
+                currentValues: {
+                    Discretionary: 0,
+                    TFSA: 0,
+                    Crypto: 0
                 }
             };
 
-            // Initialize with database load
-            initializeEmptyState();
-            loadDatabase();
+            const transactionList = document.getElementById('transaction-list');
+            const addTransactionBtn = document.getElementById('add-transaction');
+            const loadInvCsvBtn = document.getElementById('load-inv-csv');
+            const saveInvCsvBtn = document.getElementById('save-inv-csv');
+
+            // Inputs for current values
+            const valDiscretionary = document.getElementById('val-discretionary');
+            const valTfsa = document.getElementById('val-tfsa');
+            const valCrypto = document.getElementById('val-crypto');
+
+            const updatePerformanceDisplay = () => {
+                calculatePerformance('Discretionary', investmentData.currentValues.Discretionary, 'inv-discretionary', 'gain-discretionary', 'ann-discretionary');
+                calculatePerformance('TFSA', investmentData.currentValues.TFSA, 'inv-tfsa', 'gain-tfsa', 'ann-tfsa');
+                calculatePerformance('Crypto', investmentData.currentValues.Crypto, 'inv-crypto', 'gain-crypto', 'ann-crypto');
+            };
+
+            const renderTransactions = () => {
+                transactionList.innerHTML = '';
+                if (investmentData.transactions.length === 0) {
+                    transactionList.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No transactions added yet.</p>`;
+                } else {
+                    investmentData.transactions.forEach(t => transactionList.appendChild(createTransactionItem(t)));
+                }
+            };
+
+            const renderFullInvestmentUI = () => {
+                // Update Inputs from State
+                valDiscretionary.value = investmentData.currentValues.Discretionary || '';
+                valTfsa.value = investmentData.currentValues.TFSA || '';
+                valCrypto.value = investmentData.currentValues.Crypto || '';
+
+                renderTransactions();
+                updatePerformanceDisplay();
+            };
+
+            const createTransactionItem = (item) => {
+                const div = document.createElement('div');
+                div.className = 'grid gap-2 items-center';
+                div.style.gridTemplateColumns = '1fr 2fr 1fr 1fr auto';
+                div.dataset.id = item.id;
+
+                // Date
+                const dateInput = document.createElement('input');
+                dateInput.type = 'date';
+                dateInput.value = item.date;
+                dateInput.className = 'input-field date-input text-xs';
+                div.appendChild(dateInput);
+
+                // Description
+                const descInput = document.createElement('input');
+                descInput.type = 'text';
+                descInput.value = item.description;
+                descInput.placeholder = 'Description';
+                descInput.className = 'input-field description-input text-xs';
+                div.appendChild(descInput);
+
+                // Amount
+                const amountDiv = document.createElement('div');
+                amountDiv.className = 'relative';
+                const amountPrefix = document.createElement('span');
+                amountPrefix.className = 'currency-prefix text-xs';
+                amountPrefix.textContent = 'R';
+                const amountInput = document.createElement('input');
+                amountInput.type = 'number';
+                amountInput.value = item.amount;
+                amountInput.placeholder = '0.00';
+                amountInput.className = 'input-field amount-input text-xs';
+                amountDiv.append(amountPrefix, amountInput);
+                div.appendChild(amountDiv);
+
+                // Account Type
+                const typeSelect = document.createElement('select');
+                typeSelect.className = 'input-field type-input text-xs';
+                ['Discretionary', 'TFSA', 'Crypto'].forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.textContent = opt;
+                    if (item.type === opt) option.selected = true;
+                    typeSelect.appendChild(option);
+                });
+                div.appendChild(typeSelect);
+
+                // Remove
+                const removeBtn = document.createElement('button');
+                removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
+                removeBtn.className = 'btn btn-danger remove-btn p-1.5';
+                div.appendChild(removeBtn);
+
+                return div;
+            };
+
+            const calculatePerformance = (type, currentValueStr, invId, gainId, annId) => {
+                const currentValue = parseFloat(currentValueStr) || 0;
+
+                // Filter transactions for this type
+                const txs = investmentData.transactions.filter(t => t.type === type);
+                const totalInvested = txs.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
+                const invEl = document.getElementById(invId);
+                if (invEl) invEl.textContent = formatCurrency(totalInvested);
+
+                const gainEl = document.getElementById(gainId);
+                const annEl = document.getElementById(annId);
+
+                if (!gainEl || !annEl) return;
+
+                if (totalInvested === 0) {
+                    gainEl.textContent = '0.00%';
+                    gainEl.className = 'font-bold text-slate-800';
+                    annEl.textContent = '0.00%';
+                    annEl.className = 'font-bold text-slate-800';
+                    return;
+                }
+
+                // Absolute Gain/Loss %
+                const absoluteReturn = currentValue - totalInvested;
+                const percentageReturn = (absoluteReturn / totalInvested) * 100;
+
+                gainEl.textContent = `${percentageReturn >= 0 ? '+' : ''}${percentageReturn.toFixed(2)}%`;
+                gainEl.className = `font-bold ${percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                // Annualized Return (Approximate Time-Weighted)
+                const today = new Date();
+                let weightedAgeSum = 0;
+                let validTxCount = 0;
+
+                txs.forEach(t => {
+                    const amount = parseFloat(t.amount) || 0;
+                    if (amount > 0 && t.date) {
+                        const txDate = new Date(t.date);
+                        const ageInDays = (today - txDate) / (1000 * 60 * 60 * 24);
+                        if (ageInDays > 0) {
+                            weightedAgeSum += amount * ageInDays;
+                            validTxCount++;
+                        }
+                    }
+                });
+
+                if (validTxCount > 0 && weightedAgeSum > 0) {
+                    const averageAgeDays = weightedAgeSum / totalInvested;
+                    const yearsHeld = averageAgeDays / 365.25;
+
+                    if (yearsHeld > 0.1) {
+                        // Annualized Return Formula: ((Current / Invested) ^ (1 / Years)) - 1
+                        const ratio = currentValue / totalInvested;
+                        // Handle case where ratio is negative (total loss) or 0
+                        if (ratio > 0) {
+                            const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
+                            annEl.textContent = `${annualizedReturn >= 0 ? '+' : ''}${annualizedReturn.toFixed(2)}%`;
+                            annEl.className = `font-bold ${annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                        } else {
+                            annEl.textContent = '-100.00%';
+                            annEl.className = 'font-bold text-red-600';
+                        }
+                    } else {
+                        annEl.textContent = 'N/A';
+                        annEl.className = 'font-bold text-slate-400';
+                    }
+                } else {
+                    annEl.textContent = 'N/A';
+                    annEl.className = 'font-bold text-slate-400';
+                }
+            };
+
+            // Investment Event Handlers
+            addTransactionBtn.addEventListener('click', () => {
+                const today = new Date().toISOString().split('T')[0];
+                investmentData.transactions.push({
+                    id: generateId(),
+                    date: today,
+                    description: '',
+                    amount: '',
+                    type: 'Discretionary'
+                });
+                renderTransactions();
+                updatePerformanceDisplay();
+            });
+
+            transactionList.addEventListener('input', (e) => {
+                const target = e.target;
+                const itemDiv = target.closest('[data-id]');
+                if (!itemDiv) return;
+                const id = itemDiv.dataset.id;
+                const item = investmentData.transactions.find(i => i.id === id);
+                if (!item) return;
+
+                if (target.classList.contains('description-input')) item.description = target.value;
+                else if (target.classList.contains('amount-input')) item.amount = target.value;
+                else if (target.classList.contains('date-input')) item.date = target.value;
+                else if (target.classList.contains('type-input')) item.type = target.value;
+
+                updatePerformanceDisplay();
+            });
+
+            transactionList.addEventListener('click', (e) => {
+                if (e.target.closest('.remove-btn')) {
+                    const itemDiv = e.target.closest('[data-id]');
+                    const id = itemDiv.dataset.id;
+                    const index = investmentData.transactions.findIndex(i => i.id === id);
+                    if (index > -1) {
+                        investmentData.transactions.splice(index, 1);
+                        renderTransactions();
+                        updatePerformanceDisplay();
+                    }
+                }
+            });
+
+            [valDiscretionary, valTfsa, valCrypto].forEach(input => {
+                input.addEventListener('input', (e) => {
+                    const id = e.target.id;
+                    if (id === 'val-discretionary') investmentData.currentValues.Discretionary = e.target.value;
+                    if (id === 'val-tfsa') investmentData.currentValues.TFSA = e.target.value;
+                    if (id === 'val-crypto') investmentData.currentValues.Crypto = e.target.value;
+                    updatePerformanceDisplay();
+                });
+            });
+
+            // Investment CSV Handling
+            const parseInvestmentCSV = (text) => {
+                const rows = text.split('\n').filter(row => row.trim() !== '');
+                // Header: Date,Description,amount,account type
+                const contentRows = rows.slice(1);
+                const transactions = [];
+                const currentValues = { Discretionary: 0, TFSA: 0, Crypto: 0 };
+
+                contentRows.forEach(row => {
+                    const cols = row.split(',').map(s => s.trim());
+
+                    if (cols[0] === 'current_value') {
+                        // Format: current_value,AccountType,Amount,
+                        const type = cols[1];
+                        const amount = parseFloat(cols[2]) || 0;
+                        if (currentValues.hasOwnProperty(type)) {
+                            currentValues[type] = amount;
+                        }
+                    } else {
+                        // Handle potential date format differences (DD-MM-YYYY vs YYYY-MM-DD)
+                        let dateStr = cols[0];
+                        if (dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
+                            // Assume DD-MM-YYYY -> Convert to YYYY-MM-DD for input[type=date]
+                            const [dd, mm, yyyy] = dateStr.split('-');
+                            dateStr = `${yyyy}-${mm}-${dd}`;
+                        }
+
+                        transactions.push({
+                            id: generateId(),
+                            date: dateStr,
+                            description: cols[1],
+                            amount: parseFloat(cols[2]) || 0,
+                            type: cols[3]
+                        });
+                    }
+                });
+                return { transactions, currentValues };
+            };
+
+            const generateInvestmentCSV = () => {
+                let csv = 'Date,Description,amount,account type\n';
+
+                // Transactions
+                investmentData.transactions.forEach(t => {
+                    let dateStr = t.date;
+                    if (dateStr && dateStr.includes('-')) {
+                        const [yyyy, mm, dd] = dateStr.split('-');
+                        dateStr = `${dd}-${mm}-${yyyy}`;
+                    }
+                    csv += `${dateStr},${t.description},${t.amount},${t.type}\n`;
+                });
+
+                // Current Values
+                Object.keys(investmentData.currentValues).forEach(type => {
+                    csv += `current_value,${type},${investmentData.currentValues[type]},\n`;
+                });
+
+                return csv;
+            };
+
+            let invFileHandle = null;
+
+            // Try to auto-load investments.csv if available
+            const loadInvestmentCSVFromServer = async () => {
+                try {
+                    const response = await fetch('investments.csv', { cache: 'no-store' });
+                    if (response.ok) {
+                        const text = await response.text();
+                        const parsed = parseInvestmentCSV(text);
+                        investmentData.transactions = parsed.transactions;
+                        investmentData.currentValues = parsed.currentValues;
+                        renderFullInvestmentUI();
+                    }
+                } catch (e) {
+                    console.log('Could not auto-load investments.csv');
+                }
+            };
+
+            const saveInvestmentCSV = async () => {
+                const csvData = generateInvestmentCSV();
+                try {
+                    if (!invFileHandle) {
+                        if (!window.showOpenFilePicker) {
+                            alert('Direct file saving is not supported. Use Chrome/Edge.');
+                            return;
+                        }
+                        try {
+                            const [handle] = await window.showOpenFilePicker({
+                                multiple: false,
+                                types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
+                                excludeAcceptAllOption: false
+                            });
+                            invFileHandle = handle;
+                        } catch (err) {
+                            alert('Please select investments.csv');
+                            return;
+                        }
+                    }
+                    const writable = await invFileHandle.createWritable();
+                    await writable.write(csvData);
+                    await writable.close();
+
+                    const btn = document.getElementById('save-inv-csv');
+                    const original = btn.innerHTML;
+                    btn.innerHTML = 'Saved!';
+                    setTimeout(() => btn.innerHTML = original, 2000);
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to save investments.');
+                }
+            };
+
+            loadInvCsvBtn.addEventListener('click', async () => {
+                if (!window.showOpenFilePicker) return;
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        multiple: false,
+                        types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
+                    });
+                    invFileHandle = handle;
+                    const file = await handle.getFile();
+                    const text = await file.text();
+                    const parsed = parseInvestmentCSV(text);
+                    investmentData.transactions = parsed.transactions;
+                    investmentData.currentValues = parsed.currentValues;
+                    renderFullInvestmentUI();
+                } catch (err) {
+                    console.error(err);
+                }
+            });
+
+            saveInvCsvBtn.addEventListener('click', saveInvestmentCSV);
+
+
+            // --- INITIALIZATION ---
+            (async () => {
+                try {
+                    await loadBudgetCSVFromServer();
+                } catch (err) {
+                    console.warn('Automatic Budget CSV load failed.', err);
+                    // initializeEmptyState(); // Already empty by default
+                    renderBudget();
+                }
+
+                await loadInvestmentCSVFromServer();
+            })();
         });
     </script>
 </body>
+
 </html>
