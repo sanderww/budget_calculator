@@ -643,8 +643,8 @@
                                     <div>
                                         <label class="block text-sm font-medium text-slate-700 mb-1">Next Payment
                                             Date</label>
-                                        <input type="date" id="debt-next-payment" class="input-field"
-                                            value="2025-12-25">
+                                        <input type="date" id="debt-next-payment"
+                                            class="input-field bg-slate-50 cursor-not-allowed" readonly>
                                     </div>
                                 </div>
                             </div>
@@ -792,6 +792,20 @@
 
             const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+            const getUpcoming25th = () => {
+                const today = new Date();
+                let year = today.getFullYear();
+                let month = today.getMonth();
+                if (today.getDate() > 25) {
+                    month++;
+                }
+                const targetDate = new Date(year, month, 25);
+                const yyyy = targetDate.getFullYear();
+                const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+                const dd = '25';
+                return `${yyyy}-${mm}-${dd}`;
+            };
+
             const renderBudget = () => {
                 savingsInput.value = budgetData.savings || '';
                 renderList(debtList, budgetData.debts, createDebtItem);
@@ -910,8 +924,10 @@
                     }
                 }
 
-                document.getElementById('monthly-savings-target').textContent = formatCurrency(monthlySavingsTarget);
-                document.getElementById('monthly-savings-target').style.color = monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b';
+                const monthlySavingsTargetEl = document.getElementById('monthly-savings-target');
+                monthlySavingsTargetEl.textContent = formatCurrency(monthlySavingsTarget);
+                monthlySavingsTargetEl.dataset.value = monthlySavingsTarget;
+                monthlySavingsTargetEl.style.color = monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b';
             };
 
             const calculateMonthlyAllocation = () => {
@@ -920,7 +936,7 @@
                 const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
                 const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
 
-                const monthlySavingsTarget = parseFloat(document.getElementById('monthly-savings-target').textContent.replace(/[R\s,]/g, '')) || 0;
+                const monthlySavingsTarget = parseFloat(document.getElementById('monthly-savings-target').dataset.value) || 0;
 
                 const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
 
@@ -1153,7 +1169,18 @@
                 if (investmentData.transactions.length === 0) {
                     transactionList.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No transactions added yet.</p>`;
                 } else {
-                    investmentData.transactions.forEach(t => transactionList.appendChild(createTransactionItem(t)));
+                    // Sort by date descending (latest on top), then by ID (creation time) descending
+                    const sorted = [...investmentData.transactions].sort((a, b) => {
+                        const dateA = new Date(a.date);
+                        const dateB = new Date(b.date);
+                        if (dateA > dateB) return -1;
+                        if (dateA < dateB) return 1;
+                        // If dates are equal, sort by ID descending (assuming ID contains timestamp)
+                        if (a.id > b.id) return -1;
+                        if (a.id < b.id) return 1;
+                        return 0;
+                    });
+                    sorted.forEach(t => transactionList.appendChild(createTransactionItem(t)));
                 }
             };
 
@@ -1533,7 +1560,7 @@
 
                 if (effectiveRepayment <= (currentPrincipal * monthlyRate)) {
                     debtSavedAmountEl.textContent = 'N/A';
-                    debtNewTermEl.textContent = 'Never';
+                    debtTimeReducedEl.textContent = 'Never';
                     debtNewEndDateEl.textContent = 'Never';
                     debtOriginalEndDateEl.textContent = 'Original: Never';
                     return;
@@ -1661,7 +1688,7 @@
                 debtSavedAmountEl.className = moneySaved >= 0 ? 'text-lg font-bold text-green-600' : 'text-lg font-bold text-red-600';
 
                 // Net Return (Cash)
-                const netReturn = moneySaved - totalExtra;
+                const netReturn = moneySaved;
                 debtNetReturnEl.textContent = formatCurrency(netReturn);
                 debtNetReturnEl.className = netReturn >= 0 ? 'text-lg font-bold text-indigo-600' : 'text-lg font-bold text-orange-600';
 
@@ -1759,8 +1786,17 @@
                 if (debtData.repayments.length === 0) {
                     repaymentList.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No extra repayments added.</p>`;
                 } else {
-                    // Sort by date ascending
-                    const sorted = [...debtData.repayments].sort((a, b) => new Date(a.date) - new Date(b.date));
+                    // Sort by date descending (latest on top)
+                    const sorted = [...debtData.repayments].sort((a, b) => {
+                        const dateA = new Date(a.date);
+                        const dateB = new Date(b.date);
+                        if (dateA > dateB) return -1;
+                        if (dateA < dateB) return 1;
+                        // If dates are equal, sort by ID descending (newest added first)
+                        if (a.id > b.id) return -1;
+                        if (a.id < b.id) return 1;
+                        return 0;
+                    });
                     sorted.forEach(item => {
                         const div = document.createElement('div');
                         div.className = 'grid gap-2 items-center';
@@ -1918,7 +1954,9 @@
                         if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
                         if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
                         if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
-                        if (parsed.params.next_payment) debtNextPaymentInput.value = parsed.params.next_payment;
+
+                        // Always use the upcoming 25th
+                        debtNextPaymentInput.value = getUpcoming25th();
 
                         renderRepayments();
                     } else {
@@ -1936,6 +1974,7 @@
                             { id: generateId(), date: '2025-07-01', description: 'Extra Repayment', amount: 4000 },
                             { id: generateId(), date: '2025-05-31', description: 'Extra Repayment', amount: 4000 }
                         ];
+                        debtNextPaymentInput.value = getUpcoming25th();
                         renderRepayments();
                     }
                 } catch (e) {
@@ -1994,7 +2033,9 @@
                     if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
                     if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
                     if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
-                    if (parsed.params.next_payment) debtNextPaymentInput.value = parsed.params.next_payment;
+
+                    // Always use the upcoming 25th
+                    debtNextPaymentInput.value = getUpcoming25th();
 
                     renderRepayments();
                 } catch (err) {
