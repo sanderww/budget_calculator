@@ -1,7 +1,7 @@
 PID_FILE = .server.pid
 LOG_FILE = server.log
 
-.PHONY: start stop restart status
+.PHONY: start stop restart status commit-remote
 
 start:
 	@if [ -f $(PID_FILE) ]; then \
@@ -28,3 +28,14 @@ status:
 	else \
 		echo "Server is not running"; \
 	fi
+
+commit-remote:
+	@git checkout dev
+	@git add .
+	@echo "Enter commit message: "; \
+	read msg; \
+	git commit -m "$$msg"
+	@git checkout main
+	@git merge dev
+	@git push origin main
+	@git checkout dev
