@@ -159,7 +159,7 @@
                                     </svg>
                                     <span class="font-medium text-slate-700 text-sm">Database</span>
                                 </div>
-                                <div class="text-xs text-slate-600 mb-3">calulator_data.csv</div>
+                                <div class="text-xs text-slate-600 mb-3">db/calulator_data.csv</div>
                                 <button id="save-csv" class="btn btn-primary text-xs w-full">
                                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                                         fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -405,7 +405,7 @@
                                     </svg>
                                     <span class="font-medium text-slate-700 text-sm">Database</span>
                                 </div>
-                                <div class="text-xs text-slate-600 mb-3">investments.csv</div>
+                                <div class="text-xs text-slate-600 mb-3">db/investments.csv</div>
                                 <button id="load-inv-csv" class="btn btn-secondary text-xs w-full mb-2">
                                     Load Investments
                                 </button>
@@ -490,7 +490,14 @@
 
                                 <!-- Crypto -->
                                 <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                    <h3 class="font-semibold text-slate-700 mb-2">Crypto</h3>
+                                    <div class="flex justify-between items-start mb-2">
+                                        <h3 class="font-semibold text-slate-700">Crypto</h3>
+                                        <div class="text-right">
+                                            <div class="text-[10px] uppercase text-slate-400 font-bold">Total BTC</div>
+                                            <div id="total-crypto-value" class="text-xs font-bold text-slate-600">
+                                                0.00000000</div>
+                                        </div>
+                                    </div>
                                     <div class="mb-2">
                                         <label class="text-xs text-slate-500">Current Value</label>
                                         <div class="relative">
@@ -531,6 +538,7 @@
                                 <div>Date</div>
                                 <div>Description</div>
                                 <div>Amount</div>
+                                <div>BTC</div>
                                 <div>Account</div>
                                 <div></div>
                             </div>
@@ -578,7 +586,7 @@
                                     </svg>
                                     <span class="font-medium text-slate-700 text-sm">Database</span>
                                 </div>
-                                <div class="text-xs text-slate-600 mb-3">debt.csv</div>
+                                <div class="text-xs text-slate-600 mb-3">db/debt.csv</div>
                                 <button id="load-debt-csv" class="btn btn-secondary text-xs w-full mb-2">
                                     Load Debt Data
                                 </button>
@@ -1069,7 +1077,7 @@
             };
 
             const loadBudgetCSVFromServer = async () => {
-                const response = await fetch('calulator_data.csv', { cache: 'no-store' });
+                const response = await fetch('db/calulator_data.csv', { cache: 'no-store' });
                 if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
                 const text = await response.text();
                 budgetData = parseBudgetCSV(text);
@@ -1197,7 +1205,7 @@
             const createTransactionItem = (item) => {
                 const div = document.createElement('div');
                 div.className = 'grid gap-2 items-center';
-                div.style.gridTemplateColumns = '1fr 2fr 1fr 1fr auto';
+                div.style.gridTemplateColumns = '1fr 2fr 1fr 0.8fr 1fr auto';
                 div.dataset.id = item.id;
 
                 // Date
@@ -1228,6 +1236,17 @@
                 amountInput.className = 'input-field amount-input text-xs';
                 amountDiv.append(amountPrefix, amountInput);
                 div.appendChild(amountDiv);
+
+                // Crypto Value (BTC)
+                const cryptoValDiv = document.createElement('div');
+                cryptoValDiv.className = `relative ${item.type === 'Crypto' ? '' : 'invisible'}`;
+                const cryptoValInput = document.createElement('input');
+                cryptoValInput.type = 'number';
+                cryptoValInput.value = item.cryptoValue || '';
+                cryptoValInput.placeholder = 'BTC';
+                cryptoValInput.className = 'input-field crypto-value-input text-xs';
+                cryptoValDiv.appendChild(cryptoValInput);
+                div.appendChild(cryptoValDiv);
 
                 // Account Type
                 const typeSelect = document.createElement('select');
@@ -1260,17 +1279,25 @@
                 const invEl = document.getElementById(invId);
                 if (invEl) invEl.textContent = formatCurrency(totalInvested);
 
+                if (type === 'Crypto') {
+                    const totalCryptoValue = txs.reduce((sum, t) => sum + (parseFloat(t.cryptoValue) || 0), 0);
+                    const cryptoValEl = document.getElementById('total-crypto-value');
+                    if (cryptoValEl) cryptoValEl.textContent = totalCryptoValue.toFixed(8);
+                }
+
                 const gainEl = document.getElementById(gainId);
                 const annEl = document.getElementById(annId);
                 const moneyGainEl = document.getElementById(moneyGainId);
 
-                if (!gainEl || !annEl) return;
+                if (!gainEl) return;
 
                 if (totalInvested === 0) {
                     gainEl.textContent = '0.00%';
                     gainEl.className = 'font-bold text-slate-800';
-                    annEl.textContent = '0.00%';
-                    annEl.className = 'font-bold text-slate-800';
+                    if (annEl) {
+                        annEl.textContent = '0.00%';
+                        annEl.className = 'font-bold text-slate-800';
+                    }
                     if (moneyGainEl) {
                         moneyGainEl.textContent = 'R 0.00';
                         moneyGainEl.className = 'font-bold text-slate-800';
@@ -1317,19 +1344,27 @@
                         // Handle case where ratio is negative (total loss) or 0
                         if (ratio > 0) {
                             const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
-                            annEl.textContent = `${annualizedReturn >= 0 ? '+' : ''}${annualizedReturn.toFixed(2)}%`;
-                            annEl.className = `font-bold ${annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                            if (annEl) {
+                                annEl.textContent = `${annualizedReturn >= 0 ? '+' : ''}${annualizedReturn.toFixed(2)}%`;
+                                annEl.className = `font-bold ${annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                            }
                         } else {
-                            annEl.textContent = '-100.00%';
-                            annEl.className = 'font-bold text-red-600';
+                            if (annEl) {
+                                annEl.textContent = '-100.00%';
+                                annEl.className = 'font-bold text-red-600';
+                            }
                         }
                     } else {
+                        if (annEl) {
+                            annEl.textContent = 'N/A';
+                            annEl.className = 'font-bold text-slate-400';
+                        }
+                    }
+                } else {
+                    if (annEl) {
                         annEl.textContent = 'N/A';
                         annEl.className = 'font-bold text-slate-400';
                     }
-                } else {
-                    annEl.textContent = 'N/A';
-                    annEl.className = 'font-bold text-slate-400';
                 }
             };
 
@@ -1341,6 +1376,7 @@
                     date: today,
                     description: '',
                     amount: '',
+                    cryptoValue: '',
                     type: 'Discretionary'
                 });
                 renderTransactions();
@@ -1358,7 +1394,19 @@
                 if (target.classList.contains('description-input')) item.description = target.value;
                 else if (target.classList.contains('amount-input')) item.amount = target.value;
                 else if (target.classList.contains('date-input')) item.date = target.value;
-                else if (target.classList.contains('type-input')) item.type = target.value;
+                else if (target.classList.contains('type-input')) {
+                    item.type = target.value;
+                    const cryptoInputDiv = itemDiv.querySelector('.crypto-value-input').parentElement;
+                    if (item.type === 'Crypto') {
+                        cryptoInputDiv.classList.remove('invisible');
+                    } else {
+                        cryptoInputDiv.classList.add('invisible');
+                        item.cryptoValue = '';
+                        cryptoInputDiv.querySelector('input').value = '';
+                    }
+                } else if (target.classList.contains('crypto-value-input')) {
+                    item.cryptoValue = target.value;
+                }
 
                 updatePerformanceDisplay();
             });
@@ -1389,7 +1437,7 @@
             // Investment CSV Handling
             const parseInvestmentCSV = (text) => {
                 const rows = text.split('\n').filter(row => row.trim() !== '');
-                // Header: Date,Description,amount,account type
+                // Header: Date,Description,amount,account type,crypto_value
                 const contentRows = rows.slice(1);
                 const transactions = [];
                 const currentValues = { Discretionary: 0, TFSA: 0, Crypto: 0 };
@@ -1418,7 +1466,8 @@
                             date: dateStr,
                             description: cols[1],
                             amount: parseFloat(cols[2]) || 0,
-                            type: cols[3]
+                            type: cols[3],
+                            cryptoValue: cols[4] || ''
                         });
                     }
                 });
@@ -1426,7 +1475,7 @@
             };
 
             const generateInvestmentCSV = () => {
-                let csv = 'Date,Description,amount,account type\n';
+                let csv = 'Date,Description,amount,account type,crypto_value\n';
 
                 // Transactions
                 investmentData.transactions.forEach(t => {
@@ -1435,7 +1484,7 @@
                         const [yyyy, mm, dd] = dateStr.split('-');
                         dateStr = `${dd}-${mm}-${yyyy}`;
                     }
-                    csv += `${dateStr},${t.description},${t.amount},${t.type}\n`;
+                    csv += `${dateStr},${t.description},${t.amount},${t.type},${t.cryptoValue || ''}\n`;
                 });
 
                 // Current Values
@@ -1451,7 +1500,7 @@
             // Try to auto-load investments.csv if available
             const loadInvestmentCSVFromServer = async () => {
                 try {
-                    const response = await fetch('investments.csv', { cache: 'no-store' });
+                    const response = await fetch('db/investments.csv', { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = parseInvestmentCSV(text);
@@ -1943,7 +1992,7 @@
 
             const loadDebtCSVFromServer = async () => {
                 try {
-                    const response = await fetch('debt.csv', { cache: 'no-store' });
+                    const response = await fetch('db/debt.csv', { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = parseDebtCSV(text);
