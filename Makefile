@@ -32,10 +32,18 @@ status:
 commit-remote:
 	@git checkout dev
 	@git add .
-	@echo "Enter commit message: "; \
-	read msg; \
-	git commit -m "$$msg"
-	@git checkout main
-	@git merge dev
-	@git push origin main
-	@git checkout dev
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "Enter commit message: "; \
+		read msg; \
+		git commit -m "$$msg"; \
+		git checkout main; \
+		git merge dev; \
+		git push origin main; \
+		git checkout dev; \
+	else \
+		echo "Nothing to commit on dev. Checking sync status of main..."; \
+		git checkout main; \
+		git fetch origin main; \
+		git status -uno; \
+		git checkout dev; \
+	fi
