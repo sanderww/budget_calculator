@@ -1,0 +1,7 @@
+Date,Description,amount,account type,crypto_value
+01-01-2025,Example ETF,5000,TFSA,
+15-01-2025,Example Stock,2000,Discretionary,
+20-01-2025,Example Crypto,1000,Crypto,0.025
+current_value,Discretionary,2050.00,
+current_value,TFSA,5100.00,
+current_value,Crypto,950,

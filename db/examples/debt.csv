@@ -1,0 +1,8 @@
+Date,Description,Amount
+param,principal,100000.00
+param,repayment,1000.00
+param,service_fee,50.00
+param,interest_rate,7.50
+param,next_payment,2026-01-25
+2025-11-25,Extra Repayment,500
+2025-10-25,Extra Repayment,1000
