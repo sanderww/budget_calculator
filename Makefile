@@ -7,7 +7,7 @@ start:
 	@if [ -f $(PID_FILE) ]; then \
 		echo "Server is already running with PID $$(cat $(PID_FILE))"; \
 	else \
-		nohup python3 -m http.server > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE); \
+		nohup python3 server.py > $(LOG_FILE) 2>&1 & echo $$! > $(PID_FILE); \
 		echo "Server started with PID $$(cat $(PID_FILE)). Logs in $(LOG_FILE)"; \
 	fi
 

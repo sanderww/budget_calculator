@@ -765,6 +765,35 @@
             tabInvestment.addEventListener('click', () => switchTab('investment'));
             tabDebt.addEventListener('click', () => switchTab('debt'));
 
+            // --- SERVER SAVE HELPERS ---
+            const _saveTimers = {};
+            const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
+                clearTimeout(_saveTimers[name]);
+                _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn, btnId), delayMs);
+            };
+
+            const saveToServer = async (name, csvFn, btnId) => {
+                const csv = csvFn();
+                try {
+                    const res = await fetch(`/api/save/${name}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'text/csv' },
+                        body: csv
+                    });
+                    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+                    if (btnId) {
+                        const btn = document.getElementById(btnId);
+                        if (btn) {
+                            const orig = btn.innerHTML;
+                            btn.innerHTML = 'Saved!';
+                            setTimeout(() => btn.innerHTML = orig, 1500);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Failed to save ${name}:`, err);
+                }
+            };
+
             // --- BUDGET CALCULATOR LOGIC ---
             // (Existing Logic Wrapped)
             let budgetData = {
@@ -1008,32 +1037,36 @@
             addDebtBtn.addEventListener('click', () => {
                 budgetData.debts.push({ id: generateId(), description: '', amount: '' });
                 renderBudget();
+                debouncedSave('budget', generateBudgetCSV, 'save-csv');
             });
 
             addProvisionBtn.addEventListener('click', () => {
                 budgetData.provisions.push({ id: generateId(), description: '', amount: '', date: '' });
                 renderBudget();
+                debouncedSave('budget', generateBudgetCSV, 'save-csv');
             });
 
             addFutureCostBtn.addEventListener('click', () => {
                 budgetData.futureCosts.push({ id: generateId(), description: '', amount: '', date: '' });
                 renderBudget();
+                debouncedSave('budget', generateBudgetCSV, 'save-csv');
             });
 
             savingsInput.addEventListener('input', (e) => {
                 budgetData.savings = e.target.value;
                 calculateAndDisplaySummary();
+                debouncedSave('budget', generateBudgetCSV, 'save-csv');
             });
 
             futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 
-            debtList.addEventListener('input', (e) => handleListChange(e, budgetData.debts));
-            provisionList.addEventListener('input', (e) => handleListChange(e, budgetData.provisions));
-            futureCostList.addEventListener('input', (e) => handleListChange(e, budgetData.futureCosts));
+            debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
+            provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
+            futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
 
-            debtList.addEventListener('click', (e) => handleListChange(e, budgetData.debts));
-            provisionList.addEventListener('click', (e) => handleListChange(e, budgetData.provisions));
-            futureCostList.addEventListener('click', (e) => handleListChange(e, budgetData.futureCosts));
+            debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
+            provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
+            futureCostList.addEventListener('click', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
 
             calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 
@@ -1093,55 +1126,7 @@
                 renderBudget();
             };
 
-            let budgetFileHandle = null;
-            const saveBudgetCSV = async () => {
-                const csvData = generateBudgetCSV();
-                try {
-                    if (!budgetFileHandle) {
-                        if (!window.showOpenFilePicker) {
-                            alert('Direct file saving is not supported in this browser. Please use Chrome/Edge.');
-                            return;
-                        }
-                        try {
-                            const [handle] = await window.showOpenFilePicker({
-                                multiple: false,
-                                types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
-                                excludeAcceptAllOption: false
-                            });
-                            budgetFileHandle = handle;
-                        } catch (pickerErr) {
-                            console.error('File picker error:', pickerErr);
-                            alert('Please select calulator_data.csv to enable saving.');
-                            return;
-                        }
-                    }
-
-                    const permission = await budgetFileHandle.queryPermission({ mode: 'readwrite' });
-                    if (permission !== 'granted') {
-                        const request = await budgetFileHandle.requestPermission({ mode: 'readwrite' });
-                        if (request !== 'granted') {
-                            alert('Permission denied to write to the CSV file.');
-                            return;
-                        }
-                    }
-
-                    const writable = await budgetFileHandle.createWritable();
-                    await writable.write(csvData);
-                    await writable.close();
-
-                    const saveBtn = document.getElementById('save-csv');
-                    const originalText = saveBtn.innerHTML;
-                    saveBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><polyline points="20 6 9 17 4 12"></polyline></svg>Saved!';
-                    saveBtn.className = 'btn text-xs w-full bg-green-600 hover:bg-green-700 text-white';
-                    setTimeout(() => {
-                        saveBtn.innerHTML = originalText;
-                        saveBtn.className = 'btn btn-primary text-xs w-full';
-                    }, 2000);
-                } catch (err) {
-                    console.error('Failed to save CSV:', err);
-                    alert('Could not save to the CSV file. Please ensure you have write access to calulator_data.csv.');
-                }
-            };
+            const saveBudgetCSV = () => saveToServer('budget', generateBudgetCSV, 'save-csv');
 
             saveCsvBtn.addEventListener('click', saveBudgetCSV);
 
@@ -1381,6 +1366,7 @@
                 });
                 renderTransactions();
                 updatePerformanceDisplay();
+                debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
             });
 
             transactionList.addEventListener('input', (e) => {
@@ -1409,6 +1395,7 @@
                 }
 
                 updatePerformanceDisplay();
+                debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
             });
 
             transactionList.addEventListener('click', (e) => {
@@ -1420,6 +1407,7 @@
                         investmentData.transactions.splice(index, 1);
                         renderTransactions();
                         updatePerformanceDisplay();
+                        debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
                     }
                 }
             });
@@ -1431,6 +1419,7 @@
                     if (id === 'val-tfsa') investmentData.currentValues.TFSA = e.target.value;
                     if (id === 'val-crypto') investmentData.currentValues.Crypto = e.target.value;
                     updatePerformanceDisplay();
+                    debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
                 });
             });
 
@@ -1495,8 +1484,6 @@
                 return csv;
             };
 
-            let invFileHandle = null;
-
             // Try to auto-load investments.csv if available
             const loadInvestmentCSVFromServer = async () => {
                 try {
@@ -1513,39 +1500,7 @@
                 }
             };
 
-            const saveInvestmentCSV = async () => {
-                const csvData = generateInvestmentCSV();
-                try {
-                    if (!invFileHandle) {
-                        if (!window.showOpenFilePicker) {
-                            alert('Direct file saving is not supported. Use Chrome/Edge.');
-                            return;
-                        }
-                        try {
-                            const [handle] = await window.showOpenFilePicker({
-                                multiple: false,
-                                types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
-                                excludeAcceptAllOption: false
-                            });
-                            invFileHandle = handle;
-                        } catch (err) {
-                            alert('Please select investments.csv');
-                            return;
-                        }
-                    }
-                    const writable = await invFileHandle.createWritable();
-                    await writable.write(csvData);
-                    await writable.close();
-
-                    const btn = document.getElementById('save-inv-csv');
-                    const original = btn.innerHTML;
-                    btn.innerHTML = 'Saved!';
-                    setTimeout(() => btn.innerHTML = original, 2000);
-                } catch (err) {
-                    console.error(err);
-                    alert('Failed to save investments.');
-                }
-            };
+            const saveInvestmentCSV = () => saveToServer('investments', generateInvestmentCSV, 'save-inv-csv');
 
             loadInvCsvBtn.addEventListener('click', async () => {
                 if (!window.showOpenFilePicker) return;
@@ -1554,7 +1509,6 @@
                         multiple: false,
                         types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
                     });
-                    invFileHandle = handle;
                     const file = await handle.getFile();
                     const text = await file.text();
                     const parsed = parseInvestmentCSV(text);
@@ -1903,6 +1857,7 @@
                     amount: ''
                 });
                 renderRepayments();
+                debouncedSave('debt', generateDebtCSV, null);
             });
 
             repaymentList.addEventListener('input', (e) => {
@@ -1918,6 +1873,7 @@
                 else if (target.classList.contains('date-input')) item.date = target.value;
 
                 calculateDebtProjection();
+                debouncedSave('debt', generateDebtCSV, null);
             });
 
             repaymentList.addEventListener('click', (e) => {
@@ -1928,12 +1884,16 @@
                     if (index > -1) {
                         debtData.repayments.splice(index, 1);
                         renderRepayments();
+                        debouncedSave('debt', generateDebtCSV, null);
                     }
                 }
             });
 
             [debtAmountInput, debtRepaymentInput, debtServiceFeeInput, debtInterestRateInput, debtNextPaymentInput].forEach(input => {
-                input.addEventListener('input', calculateDebtProjection);
+                input.addEventListener('input', (e) => {
+                    calculateDebtProjection();
+                    debouncedSave('debt', generateDebtCSV, null);
+                });
             });
 
             // CSV Handling
@@ -1988,8 +1948,6 @@
                 return csv;
             };
 
-            let debtFileHandle = null;
-
             const loadDebtCSVFromServer = async () => {
                 try {
                     const response = await fetch('db/debt.csv', { cache: 'no-store' });
@@ -2031,39 +1989,7 @@
                 }
             };
 
-            const saveDebtCSV = async () => {
-                const csvData = generateDebtCSV();
-                try {
-                    if (!debtFileHandle) {
-                        if (!window.showOpenFilePicker) {
-                            alert('Direct file saving is not supported. Use Chrome/Edge.');
-                            return;
-                        }
-                        try {
-                            const [handle] = await window.showOpenFilePicker({
-                                multiple: false,
-                                types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
-                                excludeAcceptAllOption: false
-                            });
-                            debtFileHandle = handle;
-                        } catch (err) {
-                            alert('Please select debt.csv');
-                            return;
-                        }
-                    }
-                    const writable = await debtFileHandle.createWritable();
-                    await writable.write(csvData);
-                    await writable.close();
-
-                    const btn = saveDebtCsvBtn;
-                    const original = btn.innerHTML;
-                    btn.innerHTML = 'Saved!';
-                    setTimeout(() => btn.innerHTML = original, 2000);
-                } catch (err) {
-                    console.error(err);
-                    alert('Failed to save debt data.');
-                }
-            };
+            const saveDebtCSV = () => saveToServer('debt', generateDebtCSV, null);
 
             loadDebtCsvBtn.addEventListener('click', async () => {
                 if (!window.showOpenFilePicker) return;
@@ -2072,7 +1998,6 @@
                         multiple: false,
                         types: [{ description: 'CSV Files', accept: { 'text/csv': ['.csv'] } }],
                     });
-                    debtFileHandle = handle;
                     const file = await handle.getFile();
                     const text = await file.text();
                     const parsed = parseDebtCSV(text);

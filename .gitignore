@@ -12,3 +12,6 @@ server.log
 
 # MacOS
 .DS_Store
+
+# ignore to_do.md
+to_do.md
