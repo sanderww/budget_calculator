@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>South African Budget Calculator</title>
+    <link rel="icon" type="image/png" href="assets/favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -459,6 +460,16 @@
                                             <div id="ann-discretionary" class="font-bold text-slate-800">0.00%</div>
                                         </div>
                                     </div>
+                                    <div class="mt-2 pt-2 border-t border-slate-200 space-y-0.5">
+                                        <div class="flex justify-between text-xs text-slate-400">
+                                            <span>6% savings would be</span>
+                                            <span id="savings-gain-discretionary">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Net vs savings</span>
+                                            <span id="net-savings-discretionary" class="font-medium">R 0.00</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- TFSA -->
@@ -484,6 +495,16 @@
                                         <div class="text-right">
                                             <div class="text-xs text-slate-500">Annualized</div>
                                             <div id="ann-tfsa" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 pt-2 border-t border-slate-200 space-y-0.5">
+                                        <div class="flex justify-between text-xs text-slate-400">
+                                            <span>6% savings would be</span>
+                                            <span id="savings-gain-tfsa">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Net vs savings</span>
+                                            <span id="net-savings-tfsa" class="font-medium">R 0.00</span>
                                         </div>
                                     </div>
                                 </div>
@@ -518,6 +539,16 @@
                                         <div class="text-right">
                                             <div class="text-xs text-slate-500">Annualized</div>
                                             <div id="ann-crypto" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 pt-2 border-t border-slate-200 space-y-0.5">
+                                        <div class="flex justify-between text-xs text-slate-400">
+                                            <span>6% savings would be</span>
+                                            <span id="savings-gain-crypto">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Net vs savings</span>
+                                            <span id="net-savings-crypto" class="font-medium">R 0.00</span>
                                         </div>
                                     </div>
                                 </div>
@@ -1287,6 +1318,11 @@
                         moneyGainEl.textContent = 'R 0.00';
                         moneyGainEl.className = 'font-bold text-slate-800';
                     }
+                    const typeKey0 = type.toLowerCase();
+                    const sg0 = document.getElementById(`savings-gain-${typeKey0}`);
+                    const ns0 = document.getElementById(`net-savings-${typeKey0}`);
+                    if (sg0) sg0.textContent = 'R 0.00';
+                    if (ns0) { ns0.textContent = 'R 0.00'; ns0.className = 'font-medium'; }
                     return;
                 }
 
@@ -1302,8 +1338,32 @@
                     moneyGainEl.className = `font-bold ${absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
                 }
 
-                // Annualized Return (Approximate Time-Weighted)
+                // Savings account comparison (6% p.a. compound, per transaction age)
                 const today = new Date();
+                let savingsGain = 0;
+                txs.forEach(t => {
+                    const amount = parseFloat(t.amount) || 0;
+                    if (amount > 0 && t.date) {
+                        const txDate = new Date(t.date);
+                        const ageInDays = (today - txDate) / (1000 * 60 * 60 * 24);
+                        if (ageInDays > 0) {
+                            savingsGain += amount * (Math.pow(1.06, ageInDays / 365.25) - 1);
+                        }
+                    }
+                });
+                const netVsSavings = absoluteReturn - savingsGain;
+                const typeKey = type.toLowerCase();
+                const savingsGainEl = document.getElementById(`savings-gain-${typeKey}`);
+                const netSavingsEl = document.getElementById(`net-savings-${typeKey}`);
+                if (savingsGainEl) {
+                    savingsGainEl.textContent = `+${formatCurrency(savingsGain)}`;
+                }
+                if (netSavingsEl) {
+                    netSavingsEl.textContent = `${netVsSavings >= 0 ? '+' : ''}${formatCurrency(netVsSavings)}`;
+                    netSavingsEl.className = `font-medium ${netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
+                }
+
+                // Annualized Return (Approximate Time-Weighted)
                 let weightedAgeSum = 0;
                 let validTxCount = 0;
 
