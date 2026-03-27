@@ -816,17 +816,19 @@
             const tabBudget = document.getElementById('tab-budget');
             const tabInvestment = document.getElementById('tab-investment');
             const tabDebt = document.getElementById('tab-debt');
+            const tabHistory = document.getElementById('tab-history');
             const contentBudget = document.getElementById('budget-content');
             const contentInvestment = document.getElementById('investment-content');
             const contentDebt = document.getElementById('debt-content');
+            const contentHistory = document.getElementById('history-content');
 
             const switchTab = (tab) => {
                 // Reset all tabs
-                [tabBudget, tabInvestment, tabDebt].forEach(t => {
+                [tabBudget, tabInvestment, tabDebt, tabHistory].forEach(t => {
                     t.classList.remove('border-indigo-500', 'text-indigo-600');
                     t.classList.add('border-transparent', 'text-slate-500');
                 });
-                [contentBudget, contentInvestment, contentDebt].forEach(c => c.classList.add('hidden'));
+                [contentBudget, contentInvestment, contentDebt, contentHistory].forEach(c => c.classList.add('hidden'));
 
                 // Activate selected tab
                 if (tab === 'budget') {
@@ -841,12 +843,18 @@
                     tabDebt.classList.add('border-indigo-500', 'text-indigo-600');
                     tabDebt.classList.remove('border-transparent', 'text-slate-500');
                     contentDebt.classList.remove('hidden');
+                } else if (tab === 'history') {
+                    tabHistory.classList.add('border-indigo-500', 'text-indigo-600');
+                    tabHistory.classList.remove('border-transparent', 'text-slate-500');
+                    contentHistory.classList.remove('hidden');
+                    renderHistory();
                 }
             };
 
             tabBudget.addEventListener('click', () => switchTab('budget'));
             tabInvestment.addEventListener('click', () => switchTab('investment'));
             tabDebt.addEventListener('click', () => switchTab('debt'));
+            tabHistory.addEventListener('click', () => switchTab('history'));
 
             document.getElementById('refresh-budget').addEventListener('click', (e) => {
                 e.stopPropagation();
