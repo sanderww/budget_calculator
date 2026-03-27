@@ -838,6 +838,27 @@
             tabInvestment.addEventListener('click', () => switchTab('investment'));
             tabDebt.addEventListener('click', () => switchTab('debt'));
 
+            document.getElementById('refresh-budget').addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchTab('budget');
+                calculateAndDisplaySummary();
+                renderBudget();
+            });
+
+            document.getElementById('refresh-investment').addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchTab('investment');
+                renderFullInvestmentUI();
+                updatePerformanceDisplay();
+            });
+
+            document.getElementById('refresh-debt').addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchTab('debt');
+                calculateDebtProjection();
+                renderRepayments();
+            });
+
             // --- SERVER SAVE HELPERS ---
             const _saveTimers = {};
             const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
