@@ -698,12 +698,19 @@
                             <h2 class="text-xl font-semibold text-slate-800 mb-4">Mortgage Details</h2>
                             <div class="space-y-4">
                                 <div>
-                                    <label class="block text-sm font-medium text-slate-700 mb-1">Total Loan
-                                        Amount</label>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Total Loan Amount</label>
                                     <div class="relative">
                                         <span class="currency-prefix">R</span>
                                         <input type="number" id="debt-amount" class="input-field amount-input"
                                             value="1709333.93">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-700 mb-1">Current Outstanding Balance</label>
+                                    <div class="relative">
+                                        <span class="currency-prefix">R</span>
+                                        <input type="number" id="debt-current-balance" class="input-field amount-input"
+                                            value="1549467">
                                     </div>
                                 </div>
                                 <div>
@@ -736,6 +743,16 @@
                                             Date</label>
                                         <input type="date" id="debt-next-payment"
                                             class="input-field bg-slate-50 cursor-not-allowed" readonly>
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Loan Start Date</label>
+                                        <input type="date" id="debt-loan-start" class="input-field" value="2024-12-14">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-slate-700 mb-1">Original Term (months)</label>
+                                        <input type="number" id="debt-original-term" class="input-field" value="185">
                                     </div>
                                 </div>
                             </div>
@@ -781,6 +798,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                <p class="text-xs text-slate-400 mt-1">Uses monthly compounding (9.26%÷12). Your bank calculates interest daily, so projections may differ slightly.</p>
                             </div>
                         </div>
 
@@ -1676,10 +1694,13 @@
 
             // Inputs
             const debtAmountInput = document.getElementById('debt-amount');
+            const debtCurrentBalanceInput = document.getElementById('debt-current-balance');
             const debtRepaymentInput = document.getElementById('debt-repayment');
             const debtServiceFeeInput = document.getElementById('debt-service-fee');
             const debtInterestRateInput = document.getElementById('debt-interest-rate');
             const debtNextPaymentInput = document.getElementById('debt-next-payment');
+            const debtLoanStartInput = document.getElementById('debt-loan-start');
+            const debtOriginalTermInput = document.getElementById('debt-original-term');
 
             // Results
             const debtSavedAmountEl = document.getElementById('debt-saved-amount');
@@ -1691,7 +1712,7 @@
             const debtOriginalEndDateEl = document.getElementById('debt-original-end-date');
 
             const calculateDebtProjection = () => {
-                const currentPrincipal = parseFloat(debtAmountInput.value) || 0;
+                const currentPrincipal = parseFloat(debtCurrentBalanceInput.value) || parseFloat(debtAmountInput.value) || 0;
                 const totalRepayment = parseFloat(debtRepaymentInput.value) || 0;
                 const serviceFee = parseFloat(debtServiceFeeInput.value) || 0;
                 const interestRate = parseFloat(debtInterestRateInput.value) || 0;
@@ -1699,10 +1720,16 @@
 
                 if (currentPrincipal <= 0 || totalRepayment <= 0 || !nextPaymentDateStr) return;
 
-                const monthlyRate = (interestRate / 100) / 12;
-                const effectiveRepayment = totalRepayment - serviceFee; // Logic: Principal + Interest part
+                const dailyRate = (interestRate / 100) / 365;
+                const monthlyInterestFactor = (year, month) => {
+                    const days = new Date(year, month + 1, 0).getDate();
+                    return Math.pow(1 + dailyRate, days) - 1;
+                };
+                const effectiveRepayment = totalRepayment - serviceFee;
 
-                if (effectiveRepayment <= (currentPrincipal * monthlyRate)) {
+                const nextPaymentDate = new Date(nextPaymentDateStr);
+                const guardFactor = monthlyInterestFactor(nextPaymentDate.getFullYear(), nextPaymentDate.getMonth());
+                if (effectiveRepayment <= (currentPrincipal * guardFactor)) {
                     debtSavedAmountEl.textContent = 'N/A';
                     debtTimeReducedEl.textContent = 'Never';
                     debtNewEndDateEl.textContent = 'Never';
@@ -1710,60 +1737,40 @@
                     return;
                 }
 
-                // 1. Determine Simulation Start Date
+                // Back-calculate from current balance to the earliest extra repayment date,
+                // undoing past extras to find the "clean" starting balance before any extras were applied.
+                // This lets us compare: baseline (no extras ever) vs actual (with all extras).
+                const repayments = debtData.repayments;
+
                 let startDate = new Date(nextPaymentDateStr);
-                // Adjust to 1st of month for consistency
                 startDate.setDate(1);
 
-                // Check for earlier transactions
-                const repayments = debtData.repayments;
                 if (repayments.length > 0) {
                     const dates = repayments.map(r => new Date(r.date));
                     const earliest = new Date(Math.min.apply(null, dates));
                     earliest.setDate(1);
-                    if (earliest < startDate) {
-                        startDate = earliest;
-                    }
+                    if (earliest < startDate) startDate = earliest;
                 }
 
-                // 2. Back-Calculate Start Balance
-                // We know Current Balance at NextPaymentDate.
-                // We need Balance at StartDate.
-                // Formula: Balance_Start = (Balance_End + Payment) / (1 + r)
-
+                // Back-calculate: undo each month's extras + regular payment to find balance at startDate
                 let simulatedBalance = currentPrincipal;
-                let currentDate = new Date(nextPaymentDateStr);
-                currentDate.setDate(1);
-
-                // We simulate backwards from CurrentDate to StartDate
-                // NOTE: This is an estimation. Exact bank math varies.
-
-                // Create a working date for iteration
-                let iterDate = new Date(currentDate);
+                let iterDate = new Date(nextPaymentDateStr);
+                iterDate.setDate(1);
 
                 while (iterDate > startDate) {
-                    // Move back one month
                     iterDate.setMonth(iterDate.getMonth() - 1);
-
-                    // Identify extra repayments in this month
-                    const currentMonthStr = iterDate.toISOString().slice(0, 7);
+                    const monthStr = iterDate.toISOString().slice(0, 7);
                     let monthlyExtra = 0;
                     repayments.forEach(rep => {
-                        if (rep.date && rep.date.startsWith(currentMonthStr)) {
+                        if (rep.date && rep.date.startsWith(monthStr)) {
                             monthlyExtra += (parseFloat(rep.amount) || 0);
                         }
                     });
-
-                    // Reverse the loan formula
-                    // Forward: End = Start * (1+r) - P_std - P_extra
-                    // Reverse: Start = (End + P_std + P_extra) / (1+r)
-
-                    simulatedBalance = (simulatedBalance + effectiveRepayment + monthlyExtra) / (1 + monthlyRate);
+                    const factor = monthlyInterestFactor(iterDate.getFullYear(), iterDate.getMonth());
+                    simulatedBalance = (simulatedBalance + effectiveRepayment + monthlyExtra) / (1 + factor);
                 }
 
                 const startPrincipal = simulatedBalance;
-
-                // 3. Simulate Forward Scenarios
 
                 const simulateForward = (withExtras) => {
                     let balance = startPrincipal;
@@ -1771,18 +1778,14 @@
                     let totalFees = 0;
                     let months = 0;
                     let simDate = new Date(startDate);
-                    let today = new Date(); // For term calculation
 
-                    while (balance > 10 && months < 1200) { // 100 years cap
-                        // Fees
+                    while (balance > 10 && months < 1200) {
                         totalFees += serviceFee;
 
-                        // Interest
-                        const interest = balance * monthlyRate;
+                        const interest = balance * monthlyInterestFactor(simDate.getFullYear(), simDate.getMonth());
                         totalInterest += interest;
                         balance += interest;
 
-                        // Repayment
                         let payment = effectiveRepayment;
 
                         if (withExtras) {
@@ -1794,10 +1797,7 @@
                             });
                         }
 
-                        if (balance < payment) {
-                            payment = balance;
-                        }
-
+                        if (balance < payment) payment = balance;
                         balance -= payment;
                         months++;
                         simDate.setMonth(simDate.getMonth() + 1);
@@ -1806,8 +1806,8 @@
                     return { totalInterest, totalFees, endDate: simDate, months };
                 };
 
-                const baseline = simulateForward(false); // No extras
-                const actual = simulateForward(true);    // With extras
+                const baseline = simulateForward(false); // No extras — original end date
+                const actual = simulateForward(true);    // All extras (past + future)
 
                 // 4. Calculate Results
                 const totalCostBaseline = baseline.totalInterest + baseline.totalFees;
@@ -1824,8 +1824,8 @@
 
                 const moneySaved = totalCostBaseline - totalCostActual;
 
-                // Calculate Total Extra Paid
-                const totalExtra = debtData.repayments.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+                // Total of all extra repayments (past + future)
+                const totalExtra = repayments.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
                 debtTotalExtraEl.textContent = formatCurrency(totalExtra);
 
                 debtSavedAmountEl.textContent = formatCurrency(moneySaved);
@@ -1855,8 +1855,8 @@
 
                 const cashFlows = [];
 
-                // Outflows: Extra Repayments
-                debtData.repayments.forEach(rep => {
+                // Outflows: All extra repayments (past and future) as dated cash outflows
+                repayments.forEach(rep => {
                     if (rep.amount > 0 && rep.date) {
                         cashFlows.push({ amount: -parseFloat(rep.amount), date: new Date(rep.date) });
                     }
@@ -1922,7 +1922,16 @@
 
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
                 debtNewEndDateEl.textContent = actual.endDate.toLocaleDateString('en-ZA', options);
-                debtOriginalEndDateEl.textContent = `Original: ${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
+                // Original end date = contractual loan start + original term (not simulation-derived)
+                const loanStartStr = debtLoanStartInput.value;
+                const originalTerm = parseInt(debtOriginalTermInput.value) || 0;
+                if (loanStartStr && originalTerm > 0) {
+                    const origEnd = new Date(loanStartStr);
+                    origEnd.setMonth(origEnd.getMonth() + originalTerm);
+                    debtOriginalEndDateEl.textContent = `Original: ${origEnd.toLocaleDateString('en-ZA', options)}`;
+                } else {
+                    debtOriginalEndDateEl.textContent = `Original: ${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
+                }
             };
 
             const renderRepayments = () => {
@@ -2030,7 +2039,7 @@
                 }
             });
 
-            [debtAmountInput, debtRepaymentInput, debtServiceFeeInput, debtInterestRateInput, debtNextPaymentInput].forEach(input => {
+            [debtAmountInput, debtCurrentBalanceInput, debtRepaymentInput, debtServiceFeeInput, debtInterestRateInput, debtNextPaymentInput, debtLoanStartInput, debtOriginalTermInput].forEach(input => {
                 input.addEventListener('input', (e) => {
                     calculateDebtProjection();
                     debouncedSave('debt', generateDebtCSV, null);
@@ -2076,10 +2085,13 @@
 
                 // Save Parameters
                 csv += `param,principal,${debtAmountInput.value}\n`;
+                csv += `param,current_balance,${debtCurrentBalanceInput.value}\n`;
                 csv += `param,repayment,${debtRepaymentInput.value}\n`;
                 csv += `param,service_fee,${debtServiceFeeInput.value}\n`;
                 csv += `param,interest_rate,${debtInterestRateInput.value}\n`;
                 csv += `param,next_payment,${debtNextPaymentInput.value}\n`;
+                csv += `param,loan_start,${debtLoanStartInput.value}\n`;
+                csv += `param,original_term,${debtOriginalTermInput.value}\n`;
 
                 // Save Repayments
                 debtData.repayments.forEach(r => {
@@ -2099,9 +2111,12 @@
 
                         // Load params if exist
                         if (parsed.params.principal) debtAmountInput.value = parsed.params.principal;
+                        if (parsed.params.current_balance) debtCurrentBalanceInput.value = parsed.params.current_balance;
                         if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
                         if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
                         if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
+                        if (parsed.params.loan_start) debtLoanStartInput.value = parsed.params.loan_start;
+                        if (parsed.params.original_term) debtOriginalTermInput.value = parsed.params.original_term;
 
                         // Always use the upcoming 25th
                         debtNextPaymentInput.value = getUpcoming25th();
@@ -2145,9 +2160,12 @@
                     debtData.repayments = parsed.repayments;
 
                     if (parsed.params.principal) debtAmountInput.value = parsed.params.principal;
+                    if (parsed.params.current_balance) debtCurrentBalanceInput.value = parsed.params.current_balance;
                     if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
                     if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
                     if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
+                    if (parsed.params.loan_start) debtLoanStartInput.value = parsed.params.loan_start;
+                    if (parsed.params.original_term) debtOriginalTermInput.value = parsed.params.original_term;
 
                     // Always use the upcoming 25th
                     debtNextPaymentInput.value = getUpcoming25th();
