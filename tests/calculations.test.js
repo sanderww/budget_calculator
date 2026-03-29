@@ -104,6 +104,36 @@ describe('calculateBudgetSummary', () => {
     });
 });
 
+describe('calculateMonthlyAllocation', () => {
+    it('splits available money into buckets correctly', () => {
+        const result = calculateMonthlyAllocation(10000, 2000, 30, 20, 10);
+        expect(result.remainingMoney).toBe(8000);
+        expect(result.mortgageAmount).toBe(2400);
+        expect(result.eftAmount).toBe(1600);
+        expect(result.cryptoAmount).toBe(800);
+        expect(result.totalAllocated).toBe(6800);
+        expect(result.leftover).toBe(3200);
+    });
+
+    it('passes the full amount through when savings target is zero', () => {
+        const result = calculateMonthlyAllocation(5000, 0, 50, 0, 0);
+        expect(result.remainingMoney).toBe(5000);
+        expect(result.mortgageAmount).toBe(2500);
+        expect(result.eftAmount).toBe(0);
+        expect(result.cryptoAmount).toBe(0);
+    });
+
+    it('returns zero leftover when percentages sum to 100', () => {
+        const result = calculateMonthlyAllocation(10000, 0, 40, 40, 20);
+        expect(result.leftover).toBeCloseTo(0, 5);
+    });
+
+    it('correctly handles fractional percentages', () => {
+        const result = calculateMonthlyAllocation(1000, 0, 33.33, 33.33, 33.34);
+        expect(result.totalAllocated).toBeCloseTo(1000, 2);
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');

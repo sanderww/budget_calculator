@@ -53,7 +53,15 @@ export function calculateBudgetSummary(savings, debts, provisions, futureCosts, 
 
     return { totalDebts, totalProvisions, currentNetAmount, relevantFutureCosts, futureNetAmount, monthsDiff, monthlySavingsTarget };
 }
-export function calculateMonthlyAllocation() { return {}; }
+export function calculateMonthlyAllocation(availableMoney, monthlySavingsTarget, mortgagePercentage, eftPercentage, cryptoPercentage) {
+    const remainingMoney = availableMoney - monthlySavingsTarget;
+    const mortgageAmount = (remainingMoney * mortgagePercentage) / 100;
+    const eftAmount = (remainingMoney * eftPercentage) / 100;
+    const cryptoAmount = (remainingMoney * cryptoPercentage) / 100;
+    const totalAllocated = monthlySavingsTarget + mortgageAmount + eftAmount + cryptoAmount;
+    const leftover = availableMoney - totalAllocated;
+    return { remainingMoney, mortgageAmount, eftAmount, cryptoAmount, totalAllocated, leftover };
+}
 export function calculateInvestmentPerformance() { return {}; }
 export function monthlyInterestFactor() { return 0; }
 export function simulateDebt() { return {}; }
