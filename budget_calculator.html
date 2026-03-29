@@ -836,7 +836,23 @@
 
     </div>
 
-    <script>
+    <script type="module">
+        import {
+            getUpcoming25th as _getUpcoming25th,
+            calculateBudgetSummary as _calculateBudgetSummary,
+            calculateMonthlyAllocation as _calcMonthlyAllocation,
+            calculateInvestmentPerformance as _calculateInvestmentPerformance,
+            monthlyInterestFactor as _monthlyInterestFactor,
+            calculateDebtResults as _calculateDebtResults,
+            xirr as _xirr,
+            parseBudgetCSV as _parseBudgetCSV,
+            generateBudgetCSV as _generateBudgetCSV,
+            parseInvestmentCSV as _parseInvestmentCSV,
+            generateInvestmentCSV as _generateInvestmentCSV,
+            parseDebtCSV as _parseDebtCSV,
+            generateDebtCSV as _generateDebtCSV,
+        } from './calculations.js';
+
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
             const tabBudget = document.getElementById('tab-budget');
@@ -974,19 +990,7 @@
 
             const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-            const getUpcoming25th = () => {
-                const today = new Date();
-                let year = today.getFullYear();
-                let month = today.getMonth();
-                if (today.getDate() > 25) {
-                    month++;
-                }
-                const targetDate = new Date(year, month, 25);
-                const yyyy = targetDate.getFullYear();
-                const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
-                const dd = '25';
-                return `${yyyy}-${mm}-${dd}`;
-            };
+            const getUpcoming25th = () => _getUpcoming25th(new Date());
 
             const renderBudget = () => {
                 savingsInput.value = budgetData.savings || '';
@@ -1053,63 +1057,35 @@
             const createFutureCostItem = (item) => createGenericItem(item, true);
 
             const calculateAndDisplaySummary = () => {
-                const totalDebts = budgetData.debts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-                const totalProvisions = budgetData.provisions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-                const totalFutureCosts = budgetData.futureCosts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
                 const savings = parseFloat(budgetData.savings) || 0;
-
-                const currentNetAmount = savings - totalDebts - totalProvisions;
-
                 const futureDate = futureDateInput.value ? new Date(futureDateInput.value) : null;
-                const relevantFutureCosts = futureDate
-                    ? budgetData.futureCosts.reduce((sum, item) => {
-                        const itemDate = item.date ? new Date(item.date) : null;
-                        if (itemDate && itemDate <= futureDate) {
-                            return sum + (parseFloat(item.amount) || 0);
-                        }
-                        return sum;
-                    }, 0)
-                    : 0;
 
-                const futureNetAmount = currentNetAmount - relevantFutureCosts;
+                const r = _calculateBudgetSummary(
+                    savings,
+                    budgetData.debts,
+                    budgetData.provisions,
+                    budgetData.futureCosts,
+                    futureDate,
+                    new Date()
+                );
 
-                document.getElementById('current-net-amount').textContent = formatCurrency(currentNetAmount);
-                document.getElementById('current-net-amount').style.color = currentNetAmount >= 0 ? '#16a34a' : '#ef4444';
+                document.getElementById('current-net-amount').textContent = formatCurrency(r.currentNetAmount);
+                document.getElementById('current-net-amount').style.color = r.currentNetAmount >= 0 ? '#16a34a' : '#ef4444';
 
-                document.getElementById('future-net-amount').textContent = formatCurrency(futureNetAmount);
-                document.getElementById('future-net-amount').style.color = futureNetAmount >= 0 ? '#4f46e5' : '#ef4444';
+                document.getElementById('future-net-amount').textContent = formatCurrency(r.futureNetAmount);
+                document.getElementById('future-net-amount').style.color = r.futureNetAmount >= 0 ? '#4f46e5' : '#ef4444';
 
                 document.getElementById('summary-savings').textContent = formatCurrency(savings);
-                document.getElementById('summary-debts').textContent = `- ${formatCurrency(totalDebts)}`;
-                document.getElementById('summary-provisions').textContent = `- ${formatCurrency(totalProvisions)}`;
-                document.getElementById('summary-future-costs').textContent = formatCurrency(totalFutureCosts);
-
-                let monthlySavingsTarget = 0;
-                if (futureDate) {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    const targetDate = new Date(futureDate);
-                    targetDate.setHours(0, 0, 0, 0);
-
-                    const timeDiff = targetDate - today;
-                    const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-                    const monthsDiff = Math.max(1, Math.ceil(daysDiff / 30));
-
-                    if (daysDiff > 0) {
-                        if (futureNetAmount < 0) {
-                            monthlySavingsTarget = Math.abs(futureNetAmount) / monthsDiff;
-                        } else if (futureNetAmount < currentNetAmount) {
-                            monthlySavingsTarget = (currentNetAmount - futureNetAmount) / monthsDiff;
-                        } else if (currentNetAmount < 0 && futureNetAmount >= 0) {
-                            monthlySavingsTarget = (Math.abs(currentNetAmount) + futureNetAmount) / monthsDiff;
-                        }
-                    }
-                }
+                document.getElementById('summary-debts').textContent = `- ${formatCurrency(r.totalDebts)}`;
+                document.getElementById('summary-provisions').textContent = `- ${formatCurrency(r.totalProvisions)}`;
+                document.getElementById('summary-future-costs').textContent = formatCurrency(
+                    budgetData.futureCosts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
+                );
 
                 const monthlySavingsTargetEl = document.getElementById('monthly-savings-target');
-                monthlySavingsTargetEl.textContent = formatCurrency(monthlySavingsTarget);
-                monthlySavingsTargetEl.dataset.value = monthlySavingsTarget;
-                monthlySavingsTargetEl.style.color = monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b';
+                monthlySavingsTargetEl.textContent = formatCurrency(r.monthlySavingsTarget);
+                monthlySavingsTargetEl.dataset.value = r.monthlySavingsTarget;
+                monthlySavingsTargetEl.style.color = r.monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b';
             };
 
             const calculateMonthlyAllocation = () => {
@@ -1117,7 +1093,6 @@
                 const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
                 const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
                 const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
-
                 const monthlySavingsTarget = parseFloat(document.getElementById('monthly-savings-target').dataset.value) || 0;
 
                 const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
@@ -1126,30 +1101,23 @@
                     alert('Total percentage cannot exceed 100%. Please adjust your percentages.');
                     return;
                 }
-
                 if (totalPercentage === 0) {
                     alert('Please enter at least one percentage allocation.');
                     return;
                 }
 
-                const remainingMoney = availableMoney - monthlySavingsTarget;
+                const r = _calcMonthlyAllocation(availableMoney, monthlySavingsTarget, mortgagePercentage, eftPercentage, cryptoPercentage);
 
-                if (remainingMoney < 0) {
+                if (r.remainingMoney < 0) {
                     alert('Available money is less than required monthly savings. You need to increase your available money or reduce your financial commitments.');
                     return;
                 }
 
-                const mortgageAmount = (remainingMoney * mortgagePercentage) / 100;
-                const eftAmount = (remainingMoney * eftPercentage) / 100;
-                const cryptoAmount = (remainingMoney * cryptoPercentage) / 100;
-
-                const totalAllocated = monthlySavingsTarget + mortgageAmount + eftAmount + cryptoAmount;
-
                 document.getElementById('allocation-savings').textContent = formatCurrency(monthlySavingsTarget);
-                document.getElementById('allocation-mortgage').textContent = formatCurrency(mortgageAmount);
-                document.getElementById('allocation-eft').textContent = formatCurrency(eftAmount);
-                document.getElementById('allocation-crypto').textContent = formatCurrency(cryptoAmount);
-                document.getElementById('allocation-total').textContent = formatCurrency(totalAllocated);
+                document.getElementById('allocation-mortgage').textContent = formatCurrency(r.mortgageAmount);
+                document.getElementById('allocation-eft').textContent = formatCurrency(r.eftAmount);
+                document.getElementById('allocation-crypto').textContent = formatCurrency(r.cryptoAmount);
+                document.getElementById('allocation-total').textContent = formatCurrency(r.totalAllocated);
 
                 allocationResults.classList.remove('hidden');
             };
@@ -1215,44 +1183,8 @@
 
             calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 
-            const parseBudgetCSV = (text) => {
-                const newData = { savings: 0, debts: [], provisions: [], futureCosts: [] };
-                const rows = text.split('\n').filter(row => row.trim() !== '');
-                const contentRows = rows.slice(1);
-
-                contentRows.forEach(row => {
-                    const [type, description, amount, date] = row.split(',').map(s => s.trim());
-                    const item = { id: generateId(), description, amount: parseFloat(amount) || 0, date };
-
-                    switch (type) {
-                        case 'savings':
-                            newData.savings = parseFloat(amount) || 0;
-                            break;
-                        case 'debt':
-                            newData.debts.push(item);
-                            break;
-                        case 'provision':
-                            newData.provisions.push(item);
-                            break;
-                        case 'costfuturecost':
-                            newData.futureCosts.push(item);
-                            break;
-                    }
-                });
-                return newData;
-            };
-
-            const generateBudgetCSV = () => {
-                const header = 'type,description,amount,date\n';
-                let csvContent = header;
-
-                csvContent += `savings,,${budgetData.savings || 0},\n`;
-                budgetData.debts.forEach(d => csvContent += `debt,${d.description || ''},${d.amount || 0},\n`);
-                budgetData.provisions.forEach(p => csvContent += `provision,${p.description || ''},${p.amount || 0},${p.date || ''}\n`);
-                budgetData.futureCosts.forEach(c => csvContent += `costfuturecost,${c.description || ''},${c.amount || 0},${c.date || ''}\n`);
-
-                return csvContent;
-            };
+            const parseBudgetCSV = (text) => _parseBudgetCSV(text);
+            const generateBudgetCSV = () => _generateBudgetCSV(budgetData);
 
             const loadBudgetCSVFromServer = async () => {
                 const response = await fetch(dbPath('calulator_data.csv'), { cache: 'no-store' });
@@ -1401,18 +1333,16 @@
 
             const calculatePerformance = (type, currentValueStr, invId, gainId, annId, moneyGainId) => {
                 const currentValue = parseFloat(currentValueStr) || 0;
-
-                // Filter transactions for this type
                 const txs = investmentData.transactions.filter(t => t.type === type);
-                const totalInvested = txs.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+
+                const r = _calculateInvestmentPerformance(txs, currentValue, new Date());
 
                 const invEl = document.getElementById(invId);
-                if (invEl) invEl.textContent = formatCurrency(totalInvested);
+                if (invEl) invEl.textContent = formatCurrency(r.totalInvested);
 
                 if (type === 'Crypto') {
-                    const totalCryptoValue = txs.reduce((sum, t) => sum + (parseFloat(t.cryptoValue) || 0), 0);
                     const cryptoValEl = document.getElementById('total-crypto-value');
-                    if (cryptoValEl) cryptoValEl.textContent = totalCryptoValue.toFixed(8);
+                    if (cryptoValEl) cryptoValEl.textContent = r.totalCryptoValue.toFixed(8);
                 }
 
                 const gainEl = document.getElementById(gainId);
@@ -1421,17 +1351,11 @@
 
                 if (!gainEl) return;
 
-                if (totalInvested === 0) {
+                if (r.totalInvested === 0) {
                     gainEl.textContent = '0.00%';
                     gainEl.className = 'font-bold text-slate-800';
-                    if (annEl) {
-                        annEl.textContent = '0.00%';
-                        annEl.className = 'font-bold text-slate-800';
-                    }
-                    if (moneyGainEl) {
-                        moneyGainEl.textContent = 'R 0.00';
-                        moneyGainEl.className = 'font-bold text-slate-800';
-                    }
+                    if (annEl) { annEl.textContent = '0.00%'; annEl.className = 'font-bold text-slate-800'; }
+                    if (moneyGainEl) { moneyGainEl.textContent = 'R 0.00'; moneyGainEl.className = 'font-bold text-slate-800'; }
                     const typeKey0 = type.toLowerCase();
                     const sg0 = document.getElementById(`savings-gain-${typeKey0}`);
                     const ns0 = document.getElementById(`net-savings-${typeKey0}`);
@@ -1440,89 +1364,29 @@
                     return;
                 }
 
-                // Absolute Gain/Loss %
-                const absoluteReturn = currentValue - totalInvested;
-                const percentageReturn = (absoluteReturn / totalInvested) * 100;
-
-                gainEl.textContent = `${percentageReturn >= 0 ? '+' : ''}${percentageReturn.toFixed(2)}%`;
-                gainEl.className = `font-bold ${percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                gainEl.textContent = `${r.percentageReturn >= 0 ? '+' : ''}${r.percentageReturn.toFixed(2)}%`;
+                gainEl.className = `font-bold ${r.percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
 
                 if (moneyGainEl) {
-                    moneyGainEl.textContent = `${absoluteReturn >= 0 ? '+' : ''}${formatCurrency(absoluteReturn)}`;
-                    moneyGainEl.className = `font-bold ${absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                    moneyGainEl.textContent = `${r.absoluteReturn >= 0 ? '+' : ''}${formatCurrency(r.absoluteReturn)}`;
+                    moneyGainEl.className = `font-bold ${r.absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
                 }
 
-                // Savings account comparison (6% p.a. compound, per transaction age)
-                const today = new Date();
-                let savingsGain = 0;
-                txs.forEach(t => {
-                    const amount = parseFloat(t.amount) || 0;
-                    if (amount > 0 && t.date) {
-                        const txDate = new Date(t.date);
-                        const ageInDays = (today - txDate) / (1000 * 60 * 60 * 24);
-                        if (ageInDays > 0) {
-                            savingsGain += amount * (Math.pow(1.06, ageInDays / 365.25) - 1);
-                        }
-                    }
-                });
-                const netVsSavings = absoluteReturn - savingsGain;
                 const typeKey = type.toLowerCase();
                 const savingsGainEl = document.getElementById(`savings-gain-${typeKey}`);
                 const netSavingsEl = document.getElementById(`net-savings-${typeKey}`);
-                if (savingsGainEl) {
-                    savingsGainEl.textContent = `+${formatCurrency(savingsGain)}`;
-                }
+                if (savingsGainEl) savingsGainEl.textContent = `+${formatCurrency(r.savingsGain)}`;
                 if (netSavingsEl) {
-                    netSavingsEl.textContent = `${netVsSavings >= 0 ? '+' : ''}${formatCurrency(netVsSavings)}`;
-                    netSavingsEl.className = `font-medium ${netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
+                    netSavingsEl.textContent = `${r.netVsSavings >= 0 ? '+' : ''}${formatCurrency(r.netVsSavings)}`;
+                    netSavingsEl.className = `font-medium ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
                 }
 
-                // Annualized Return (Approximate Time-Weighted)
-                let weightedAgeSum = 0;
-                let validTxCount = 0;
-
-                txs.forEach(t => {
-                    const amount = parseFloat(t.amount) || 0;
-                    if (amount > 0 && t.date) {
-                        const txDate = new Date(t.date);
-                        const ageInDays = (today - txDate) / (1000 * 60 * 60 * 24);
-                        if (ageInDays > 0) {
-                            weightedAgeSum += amount * ageInDays;
-                            validTxCount++;
-                        }
-                    }
-                });
-
-                if (validTxCount > 0 && weightedAgeSum > 0) {
-                    const averageAgeDays = weightedAgeSum / totalInvested;
-                    const yearsHeld = averageAgeDays / 365.25;
-
-                    if (yearsHeld > 0.1) {
-                        // Annualized Return Formula: ((Current / Invested) ^ (1 / Years)) - 1
-                        const ratio = currentValue / totalInvested;
-                        // Handle case where ratio is negative (total loss) or 0
-                        if (ratio > 0) {
-                            const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
-                            if (annEl) {
-                                annEl.textContent = `${annualizedReturn >= 0 ? '+' : ''}${annualizedReturn.toFixed(2)}%`;
-                                annEl.className = `font-bold ${annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-                            }
-                        } else {
-                            if (annEl) {
-                                annEl.textContent = '-100.00%';
-                                annEl.className = 'font-bold text-red-600';
-                            }
-                        }
-                    } else {
-                        if (annEl) {
-                            annEl.textContent = 'N/A';
-                            annEl.className = 'font-bold text-slate-400';
-                        }
-                    }
+                if (r.annualizedReturn === null) {
+                    if (annEl) { annEl.textContent = 'N/A'; annEl.className = 'font-bold text-slate-400'; }
                 } else {
                     if (annEl) {
-                        annEl.textContent = 'N/A';
-                        annEl.className = 'font-bold text-slate-400';
+                        annEl.textContent = `${r.annualizedReturn >= 0 ? '+' : ''}${r.annualizedReturn.toFixed(2)}%`;
+                        annEl.className = `font-bold ${r.annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
                     }
                 }
             };
@@ -1598,65 +1462,8 @@
             });
 
             // Investment CSV Handling
-            const parseInvestmentCSV = (text) => {
-                const rows = text.split('\n').filter(row => row.trim() !== '');
-                // Header: Date,Description,amount,account type,crypto_value
-                const contentRows = rows.slice(1);
-                const transactions = [];
-                const currentValues = { Discretionary: 0, TFSA: 0, Crypto: 0 };
-
-                contentRows.forEach(row => {
-                    const cols = row.split(',').map(s => s.trim());
-
-                    if (cols[0] === 'current_value') {
-                        // Format: current_value,AccountType,Amount,
-                        const type = cols[1];
-                        const amount = parseFloat(cols[2]) || 0;
-                        if (currentValues.hasOwnProperty(type)) {
-                            currentValues[type] = amount;
-                        }
-                    } else {
-                        // Handle potential date format differences (DD-MM-YYYY vs YYYY-MM-DD)
-                        let dateStr = cols[0];
-                        if (dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
-                            // Assume DD-MM-YYYY -> Convert to YYYY-MM-DD for input[type=date]
-                            const [dd, mm, yyyy] = dateStr.split('-');
-                            dateStr = `${yyyy}-${mm}-${dd}`;
-                        }
-
-                        transactions.push({
-                            id: generateId(),
-                            date: dateStr,
-                            description: cols[1],
-                            amount: parseFloat(cols[2]) || 0,
-                            type: cols[3],
-                            cryptoValue: cols[4] || ''
-                        });
-                    }
-                });
-                return { transactions, currentValues };
-            };
-
-            const generateInvestmentCSV = () => {
-                let csv = 'Date,Description,amount,account type,crypto_value\n';
-
-                // Transactions
-                investmentData.transactions.forEach(t => {
-                    let dateStr = t.date;
-                    if (dateStr && dateStr.includes('-')) {
-                        const [yyyy, mm, dd] = dateStr.split('-');
-                        dateStr = `${dd}-${mm}-${yyyy}`;
-                    }
-                    csv += `${dateStr},${t.description},${t.amount},${t.type},${t.cryptoValue || ''}\n`;
-                });
-
-                // Current Values
-                Object.keys(investmentData.currentValues).forEach(type => {
-                    csv += `current_value,${type},${investmentData.currentValues[type]},\n`;
-                });
-
-                return csv;
-            };
+            const parseInvestmentCSV = (text) => _parseInvestmentCSV(text);
+            const generateInvestmentCSV = () => _generateInvestmentCSV(investmentData);
 
             // Try to auto-load investments.csv if available
             const loadInvestmentCSVFromServer = async () => {
@@ -1736,14 +1543,11 @@
                 if (currentPrincipal <= 0 || totalRepayment <= 0 || !nextPaymentDateStr) return;
 
                 const dailyRate = (interestRate / 100) / 365;
-                const monthlyInterestFactor = (year, month) => {
-                    const days = new Date(year, month + 1, 0).getDate();
-                    return Math.pow(1 + dailyRate, days) - 1;
-                };
                 const effectiveRepayment = totalRepayment - serviceFee;
 
-                const nextPaymentDate = new Date(nextPaymentDateStr);
-                const guardFactor = monthlyInterestFactor(nextPaymentDate.getFullYear(), nextPaymentDate.getMonth());
+                // Guard: repayment must exceed one month's interest
+                const npd = new Date(nextPaymentDateStr);
+                const guardFactor = _monthlyInterestFactor(dailyRate, npd.getFullYear(), npd.getMonth());
                 if (effectiveRepayment <= (currentPrincipal * guardFactor)) {
                     debtSavedAmountEl.textContent = 'N/A';
                     debtTimeReducedEl.textContent = 'Never';
@@ -1752,107 +1556,19 @@
                     return;
                 }
 
-                // Back-calculate from current balance to the earliest extra repayment date,
-                // undoing past extras to find the "clean" starting balance before any extras were applied.
-                // This lets us compare: baseline (no extras ever) vs actual (with all extras).
-                const repayments = debtData.repayments;
+                const { moneySaved, diffMonths, totalExtra, baseline, actual } = _calculateDebtResults({
+                    currentPrincipal, totalRepayment, serviceFee, interestRate,
+                    nextPaymentDateStr, repayments: debtData.repayments,
+                });
 
-                let startDate = new Date(nextPaymentDateStr);
-                startDate.setDate(1);
-
-                if (repayments.length > 0) {
-                    const dates = repayments.map(r => new Date(r.date));
-                    const earliest = new Date(Math.min.apply(null, dates));
-                    earliest.setDate(1);
-                    if (earliest < startDate) startDate = earliest;
-                }
-
-                // Back-calculate: undo each month's extras + regular payment to find balance at startDate
-                let simulatedBalance = currentPrincipal;
-                let iterDate = new Date(nextPaymentDateStr);
-                iterDate.setDate(1);
-
-                while (iterDate > startDate) {
-                    iterDate.setMonth(iterDate.getMonth() - 1);
-                    const monthStr = iterDate.toISOString().slice(0, 7);
-                    let monthlyExtra = 0;
-                    repayments.forEach(rep => {
-                        if (rep.date && rep.date.startsWith(monthStr)) {
-                            monthlyExtra += (parseFloat(rep.amount) || 0);
-                        }
-                    });
-                    const factor = monthlyInterestFactor(iterDate.getFullYear(), iterDate.getMonth());
-                    simulatedBalance = (simulatedBalance + effectiveRepayment + monthlyExtra) / (1 + factor);
-                }
-
-                const startPrincipal = simulatedBalance;
-
-                const simulateForward = (withExtras) => {
-                    let balance = startPrincipal;
-                    let totalInterest = 0;
-                    let totalFees = 0;
-                    let months = 0;
-                    let simDate = new Date(startDate);
-
-                    while (balance > 10 && months < 1200) {
-                        totalFees += serviceFee;
-
-                        const interest = balance * monthlyInterestFactor(simDate.getFullYear(), simDate.getMonth());
-                        totalInterest += interest;
-                        balance += interest;
-
-                        let payment = effectiveRepayment;
-
-                        if (withExtras) {
-                            const currentMonthStr = simDate.toISOString().slice(0, 7);
-                            repayments.forEach(rep => {
-                                if (rep.date && rep.date.startsWith(currentMonthStr)) {
-                                    payment += (parseFloat(rep.amount) || 0);
-                                }
-                            });
-                        }
-
-                        if (balance < payment) payment = balance;
-                        balance -= payment;
-                        months++;
-                        simDate.setMonth(simDate.getMonth() + 1);
-                    }
-
-                    return { totalInterest, totalFees, endDate: simDate, months };
-                };
-
-                const baseline = simulateForward(false); // No extras — original end date
-                const actual = simulateForward(true);    // All extras (past + future)
-
-                // 4. Calculate Results
-                const totalCostBaseline = baseline.totalInterest + baseline.totalFees;
-                const totalCostActual = actual.totalInterest + actual.totalFees;
-
-                // Savings is the reduction in COST (Interest + Fees)
-                // BUT we also simulated the extra repayments as "Payments".
-                // Does "Money Saved" include the principal paid earlier? 
-                // Usually "Money Saved" = "Difference in Interest Paid".
-                // If I pay R10k extra, I save interest on that R10k.
-                // The Principal is the same in both cases (eventually paid off).
-                // So Savings = (InterestOriginal + FeesOriginal) - (InterestNew + FeesNew).
-                // This seems correct.
-
-                const moneySaved = totalCostBaseline - totalCostActual;
-
-                // Total of all extra repayments (past + future)
-                const totalExtra = repayments.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
                 debtTotalExtraEl.textContent = formatCurrency(totalExtra);
 
                 debtSavedAmountEl.textContent = formatCurrency(moneySaved);
                 debtSavedAmountEl.className = moneySaved >= 0 ? 'text-lg font-bold text-green-600' : 'text-lg font-bold text-red-600';
 
-                // Net Return (Cash)
-                const netReturn = moneySaved;
-                debtNetReturnEl.textContent = formatCurrency(netReturn);
-                debtNetReturnEl.className = netReturn >= 0 ? 'text-lg font-bold text-indigo-600' : 'text-lg font-bold text-orange-600';
+                debtNetReturnEl.textContent = formatCurrency(moneySaved);
+                debtNetReturnEl.className = moneySaved >= 0 ? 'text-lg font-bold text-indigo-600' : 'text-lg font-bold text-orange-600';
 
-                // Time Reduced
-                const diffMonths = baseline.months - actual.months;
                 if (diffMonths > 0) {
                     const diffY = Math.floor(diffMonths / 12);
                     const diffM = diffMonths % 12;
@@ -1861,69 +1577,27 @@
                     debtTimeReducedEl.textContent = '0 Months';
                 }
 
-                // XIRR Calculation
-                // Cash Flows:
-                // - Extra Repayments (Dates provided)
-                // + Monthly Savings (From ActualEndDate to BaselineEndDate)
-                // NOTE: "Monthly Savings" means we STOP paying the repyament earlier.
-                // So the "Inflow" is the repayment amount we DON'T pay each month.
-
+                // XIRR: build cash flows and compute yield
                 const cashFlows = [];
-
-                // Outflows: All extra repayments (past and future) as dated cash outflows
-                repayments.forEach(rep => {
+                debtData.repayments.forEach(rep => {
                     if (rep.amount > 0 && rep.date) {
                         cashFlows.push({ amount: -parseFloat(rep.amount), date: new Date(rep.date) });
                     }
                 });
 
-                // Inflows: Saved Repayments
                 if (cashFlows.length > 0 && diffMonths > 0) {
                     let flowDate = new Date(actual.endDate);
-                    // Add 1 month to start the "saved" period
                     flowDate.setMonth(flowDate.getMonth() + 1);
-
                     const endDate = new Date(baseline.endDate);
-
                     while (flowDate <= endDate) {
                         cashFlows.push({ amount: totalRepayment, date: new Date(flowDate) });
                         flowDate.setMonth(flowDate.getMonth() + 1);
                     }
-
-                    // XIRR Solver
-                    const xirr = (values, guess = 0.1) => {
-                        const xnpv = (rate) => {
-                            return values.reduce((sum, item) => {
-                                const days = (item.date - values[0].date) / (1000 * 60 * 60 * 24);
-                                return sum + item.amount / Math.pow(1 + rate, days / 365);
-                            }, 0);
-                        };
-
-                        let rate = guess;
-                        for (let i = 0; i < 20; i++) { // 20 iterations
-                            const fValue = xnpv(rate);
-                            if (Math.abs(fValue) < 1) break; // Precision
-
-                            // Derivative
-                            const derivative = values.reduce((sum, item) => {
-                                const days = (item.date - values[0].date) / (1000 * 60 * 60 * 24);
-                                return sum - (days / 365) * item.amount / Math.pow(1 + rate, (days / 365) + 1);
-                            }, 0);
-
-                            const newRate = rate - fValue / derivative;
-                            if (Math.abs(newRate - rate) < 0.0001) { rate = newRate; break; }
-                            rate = newRate;
-                        }
-                        return rate;
-                    };
-
                     try {
-                        // Sort by date required for XIRR? 
                         cashFlows.sort((a, b) => a.date - b.date);
                         if (cashFlows.length > 0) {
-                            const rate = xirr(cashFlows);
-                            const percent = rate * 100;
-                            debtYieldEl.textContent = `${percent.toFixed(2)}%`;
+                            const rate = _xirr(cashFlows);
+                            debtYieldEl.textContent = `${(rate * 100).toFixed(2)}%`;
                         } else {
                             debtYieldEl.textContent = '0.00%';
                         }
@@ -1934,10 +1608,8 @@
                     debtYieldEl.textContent = '0.00%';
                 }
 
-
                 const options = { year: 'numeric', month: 'long', day: 'numeric' };
                 debtNewEndDateEl.textContent = actual.endDate.toLocaleDateString('en-ZA', options);
-                // Original end date = contractual loan start + original term (not simulation-derived)
                 const loanStartStr = debtLoanStartInput.value;
                 const originalTerm = parseInt(debtOriginalTermInput.value) || 0;
                 if (loanStartStr && originalTerm > 0) {
@@ -2062,58 +1734,19 @@
             });
 
             // CSV Handling
-            const parseDebtCSV = (text) => {
-                const rows = text.split('\n').filter(row => row.trim() !== '');
-                // Expected Header: Date,Description,Amount
-                // But we also need to store the loan details?
-                // The prompt says "All the amounts need to be persisted in csv file like for investments and budget"
-                // It doesn't explicitly say to save the loan parameters, but it's good practice.
-                // However, for simplicity and consistency with other tabs, let's just save the transactions for now,
-                // OR we can use a key-value format for parameters like in investment tab (current_value).
-
-                const repayments = [];
-                const params = {};
-
-                rows.forEach(row => {
-                    const cols = row.split(',').map(s => s.trim());
-                    if (cols[0] === 'param') {
-                        params[cols[1]] = cols[2];
-                    } else if (cols[0] !== 'Date' && cols[0] !== 'type') { // Skip header
-                        // Check if it's a transaction
-                        // Format: Date,Description,Amount
-                        // Let's assume standard format: Date,Description,Amount
-                        if (cols.length >= 3 && !isNaN(parseFloat(cols[2]))) {
-                            repayments.push({
-                                id: generateId(),
-                                date: cols[0],
-                                description: cols[1],
-                                amount: parseFloat(cols[2])
-                            });
-                        }
-                    }
-                });
-                return { repayments, params };
-            };
-
+            const parseDebtCSV = (text) => _parseDebtCSV(text);
             const generateDebtCSV = () => {
-                let csv = 'Date,Description,Amount\n';
-
-                // Save Parameters
-                csv += `param,principal,${debtAmountInput.value}\n`;
-                csv += `param,current_balance,${debtCurrentBalanceInput.value}\n`;
-                csv += `param,repayment,${debtRepaymentInput.value}\n`;
-                csv += `param,service_fee,${debtServiceFeeInput.value}\n`;
-                csv += `param,interest_rate,${debtInterestRateInput.value}\n`;
-                csv += `param,next_payment,${debtNextPaymentInput.value}\n`;
-                csv += `param,loan_start,${debtLoanStartInput.value}\n`;
-                csv += `param,original_term,${debtOriginalTermInput.value}\n`;
-
-                // Save Repayments
-                debtData.repayments.forEach(r => {
-                    csv += `${r.date},${r.description},${r.amount}\n`;
-                });
-
-                return csv;
+                const params = {
+                    principal: debtAmountInput.value,
+                    current_balance: debtCurrentBalanceInput.value,
+                    repayment: debtRepaymentInput.value,
+                    service_fee: debtServiceFeeInput.value,
+                    interest_rate: debtInterestRateInput.value,
+                    next_payment: debtNextPaymentInput.value,
+                    loan_start: debtLoanStartInput.value,
+                    original_term: debtOriginalTermInput.value,
+                };
+                return _generateDebtCSV(debtData.repayments, params);
             };
 
             const loadDebtCSVFromServer = async () => {
