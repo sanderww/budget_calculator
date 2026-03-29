@@ -325,6 +325,33 @@ describe('calculateDebtResults', () => {
     });
 });
 
+describe('xirr', () => {
+    it('converges to ~10% for a simple 1-year investment', () => {
+        const cashFlows = [
+            { amount: -10000, date: new Date(2025, 0, 1) },
+            { amount: 11000,  date: new Date(2026, 0, 1) },
+        ];
+        expect(xirr(cashFlows)).toBeCloseTo(0.10, 2);
+    });
+
+    it('converges to ~9.54% for a 2-year 20% total return', () => {
+        const cashFlows = [
+            { amount: -10000, date: new Date(2024, 0, 1) },
+            { amount: 12000,  date: new Date(2026, 0, 1) },
+        ];
+        // (1.2)^(1/2) - 1 ≈ 0.0954
+        expect(xirr(cashFlows)).toBeCloseTo(0.0954, 2);
+    });
+
+    it('accepts a custom initial guess', () => {
+        const cashFlows = [
+            { amount: -10000, date: new Date(2025, 0, 1) },
+            { amount: 11000,  date: new Date(2026, 0, 1) },
+        ];
+        expect(xirr(cashFlows, 0.5)).toBeCloseTo(0.10, 2);
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');
