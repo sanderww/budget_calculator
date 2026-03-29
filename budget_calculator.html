@@ -2305,8 +2305,8 @@
                 updateTestModeUI();
                 await Promise.all([
                     loadBudgetCSVFromServer().catch(() => {}),
-                    loadInvestmentCSVFromServer(),
-                    loadDebtCSVFromServer(),
+                    loadInvestmentCSVFromServer().catch(() => {}),
+                    loadDebtCSVFromServer().catch(() => {}),
                 ]);
             });
 
