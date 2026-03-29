@@ -1737,7 +1737,7 @@
                     debtSavedAmountEl.textContent = 'N/A';
                     debtTimeReducedEl.textContent = 'Never';
                     debtNewEndDateEl.textContent = 'Never';
-                    debtOriginalEndDateEl.textContent = 'Never';
+                    debtOriginalEndDateEl.textContent = 'Original: Never';
                     return;
                 }
 
@@ -1932,9 +1932,9 @@
                 if (loanStartStr && originalTerm > 0) {
                     const origEnd = new Date(loanStartStr);
                     origEnd.setMonth(origEnd.getMonth() + originalTerm);
-                    debtOriginalEndDateEl.textContent = `${origEnd.toLocaleDateString('en-ZA', options)}`;
+                    debtOriginalEndDateEl.textContent = `Original: ${origEnd.toLocaleDateString('en-ZA', options)}`;
                 } else {
-                    debtOriginalEndDateEl.textContent = `${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
+                    debtOriginalEndDateEl.textContent = `Original: ${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
                 }
             };
 
