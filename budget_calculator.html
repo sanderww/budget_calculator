@@ -918,9 +918,11 @@
             const saveToServer = async (name, csvFn, btnId) => {
                 const csv = csvFn();
                 try {
+                    const headers = { 'Content-Type': 'text/csv' };
+                    if (testMode) headers['X-Test-Mode'] = 'true';
                     const res = await fetch(`/api/save/${saveKey(name)}`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'text/csv' },
+                        headers,
                         body: csv
                     });
                     if (!res.ok) throw new Error(`Save failed: ${res.status}`);

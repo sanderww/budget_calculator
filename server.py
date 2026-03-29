@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-import http.server, socketserver, os
+import http.server, socketserver, os, shutil
+from datetime import datetime
 
 PORT = 8000
 FILE_MAP = {
@@ -10,6 +11,17 @@ FILE_MAP = {
     'test_investments': 'db/test/investments.csv',
     'test_debt':        'db/test/debt.csv',
 }
+REAL_KEYS = {'budget', 'investments', 'debt'}
+BACKUP_DIR = '/Users/sanderwiersma/Documents/budget_backups'
+
+def backup_file(filepath, name):
+    """Create a timestamped backup before overwriting a real data file."""
+    if not os.path.exists(filepath):
+        return
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    ts = datetime.now().strftime('%Y%m%d_%H%M%S')
+    backup_path = os.path.join(BACKUP_DIR, f'{name}_{ts}.csv')
+    shutil.copy2(filepath, backup_path)
 
 class Handler(http.server.SimpleHTTPRequestHandler):
     def do_POST(self):
@@ -17,9 +29,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             name = self.path[len('/api/save/'):]
             if name not in FILE_MAP:
                 self.send_response(400); self.end_headers(); return
+            # Block writes to real keys when test mode header is set
+            if name in REAL_KEYS and self.headers.get('X-Test-Mode') == 'true':
+                self.send_response(403)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"error":"cannot write to real data in test mode"}')
+                return
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length).decode('utf-8')
             filepath = FILE_MAP[name]
+            # Backup real data files before overwriting
+            if name in REAL_KEYS:
+                backup_file(filepath, name)
             os.makedirs(os.path.dirname(filepath), exist_ok=True)
             with open(filepath, 'w') as f:
                 f.write(body)
