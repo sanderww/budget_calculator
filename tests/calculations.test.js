@@ -134,6 +134,66 @@ describe('calculateMonthlyAllocation', () => {
     });
 });
 
+describe('calculateInvestmentPerformance', () => {
+    it('returns zero/null result when no transactions', () => {
+        const result = calculateInvestmentPerformance([], 0, new Date(2026, 0, 1));
+        expect(result.totalInvested).toBe(0);
+        expect(result.absoluteReturn).toBe(0);
+        expect(result.percentageReturn).toBe(0);
+        expect(result.annualizedReturn).toBeNull();
+    });
+
+    it('calculates absolute return and percentage return', () => {
+        const txs = [{ amount: 10000, date: '2024-01-01', type: 'Discretionary' }];
+        const result = calculateInvestmentPerformance(txs, 12000, new Date(2026, 0, 1));
+        expect(result.totalInvested).toBe(10000);
+        expect(result.absoluteReturn).toBe(2000);
+        expect(result.percentageReturn).toBeCloseTo(20, 5);
+    });
+
+    it('calculates savings comparison at 6% compound per transaction', () => {
+        const txDate = new Date('2024-01-01'); // match implementation's new Date(t.date)
+        const today = new Date(2026, 0, 1);
+        const txs = [{ amount: 10000, date: '2024-01-01', type: 'Discretionary' }];
+        const result = calculateInvestmentPerformance(txs, 12000, today);
+        const ageInDays = (today - txDate) / (1000 * 60 * 60 * 24);
+        const expectedGain = 10000 * (Math.pow(1.06, ageInDays / 365.25) - 1);
+        expect(result.savingsGain).toBeCloseTo(expectedGain, 2);
+        expect(result.netVsSavings).toBeCloseTo(result.absoluteReturn - expectedGain, 2);
+    });
+
+    it('returns null for annualizedReturn when ratio is zero', () => {
+        const txs = [{ amount: 10000, date: '2023-01-01', type: 'Discretionary' }];
+        const result = calculateInvestmentPerformance(txs, 0, new Date(2026, 0, 1));
+        expect(result.annualizedReturn).toBeNull();
+    });
+
+    it('returns null for annualizedReturn when yearsHeld <= 0.1', () => {
+        const txs = [{ amount: 10000, date: '2026-01-01', type: 'Discretionary' }];
+        const result = calculateInvestmentPerformance(txs, 10500, new Date(2026, 0, 6));
+        expect(result.annualizedReturn).toBeNull();
+    });
+
+    it('computes annualizedReturn correctly for a known input', () => {
+        const txs = [{ amount: 10000, date: '2024-01-01', type: 'TFSA' }];
+        const today = new Date(2026, 0, 1);
+        const result = calculateInvestmentPerformance(txs, 12000, today);
+        const ageInDays = (today - new Date(2024, 0, 1)) / (1000 * 60 * 60 * 24);
+        const yearsHeld = ageInDays / 365.25;
+        const expectedAnn = (Math.pow(1.2, 1 / yearsHeld) - 1) * 100;
+        expect(result.annualizedReturn).toBeCloseTo(expectedAnn, 1);
+    });
+
+    it('sums totalCryptoValue from cryptoValue fields', () => {
+        const txs = [
+            { amount: 5000, date: '2024-01-01', type: 'Crypto', cryptoValue: '0.5' },
+            { amount: 3000, date: '2024-06-01', type: 'Crypto', cryptoValue: '0.25' },
+        ];
+        const result = calculateInvestmentPerformance(txs, 9000, new Date(2026, 0, 1));
+        expect(result.totalCryptoValue).toBeCloseTo(0.75, 5);
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');

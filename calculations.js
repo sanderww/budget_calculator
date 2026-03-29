@@ -62,7 +62,55 @@ export function calculateMonthlyAllocation(availableMoney, monthlySavingsTarget,
     const leftover = availableMoney - totalAllocated;
     return { remainingMoney, mortgageAmount, eftAmount, cryptoAmount, totalAllocated, leftover };
 }
-export function calculateInvestmentPerformance() { return {}; }
+export function calculateInvestmentPerformance(transactions, currentValue, today = new Date()) {
+    const totalInvested = transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    const totalCryptoValue = transactions.reduce((sum, t) => sum + (parseFloat(t.cryptoValue) || 0), 0);
+
+    if (totalInvested === 0) {
+        return { totalInvested: 0, totalCryptoValue: 0, absoluteReturn: 0, percentageReturn: 0, savingsGain: 0, netVsSavings: 0, averageAgeDays: null, yearsHeld: null, annualizedReturn: null };
+    }
+
+    const absoluteReturn = currentValue - totalInvested;
+    const percentageReturn = (absoluteReturn / totalInvested) * 100;
+
+    let savingsGain = 0;
+    let weightedAgeSum = 0;
+    let validTxCount = 0;
+
+    transactions.forEach(t => {
+        const amount = parseFloat(t.amount) || 0;
+        if (amount > 0 && t.date) {
+            const txDate = new Date(t.date);
+            const ageInDays = (today - txDate) / (1000 * 60 * 60 * 24);
+            if (ageInDays > 0) {
+                savingsGain += amount * (Math.pow(1.06, ageInDays / 365.25) - 1);
+                weightedAgeSum += amount * ageInDays;
+                validTxCount++;
+            }
+        }
+    });
+
+    const netVsSavings = absoluteReturn - savingsGain;
+
+    if (validTxCount === 0 || weightedAgeSum === 0) {
+        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays: null, yearsHeld: null, annualizedReturn: null };
+    }
+
+    const averageAgeDays = weightedAgeSum / totalInvested;
+    const yearsHeld = averageAgeDays / 365.25;
+
+    if (yearsHeld <= 0.1) {
+        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn: null };
+    }
+
+    const ratio = currentValue / totalInvested;
+    if (ratio <= 0) {
+        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn: null };
+    }
+
+    const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
+    return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn };
+}
 export function monthlyInterestFactor() { return 0; }
 export function simulateDebt() { return {}; }
 export function calculateDebtResults() { return {}; }
