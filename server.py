@@ -3,9 +3,12 @@ import http.server, socketserver, os
 
 PORT = 8000
 FILE_MAP = {
-    'budget':      'db/calulator_data.csv',
-    'investments': 'db/investments.csv',
-    'debt':        'db/debt.csv',
+    'budget':           'db/calulator_data.csv',
+    'investments':      'db/investments.csv',
+    'debt':             'db/debt.csv',
+    'test_budget':      'db/test/calulator_data.csv',
+    'test_investments': 'db/test/investments.csv',
+    'test_debt':        'db/test/debt.csv',
 }
 
 class Handler(http.server.SimpleHTTPRequestHandler):
