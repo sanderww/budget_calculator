@@ -114,9 +114,18 @@
 
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <header class="mb-6">
-            <h1 class="text-3xl font-bold text-slate-800">Personal Finance Dashboard</h1>
-            <p class="text-slate-500 mt-1">Manage your budget and track your investments.</p>
+        <header class="mb-6 flex items-start justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-800">Personal Finance Dashboard</h1>
+                <p class="text-slate-500 mt-1">Manage your budget and track your investments.</p>
+                <p id="test-mode-label" class="hidden text-xs text-amber-600 mt-1 font-medium tracking-wide">SAMPLE DATA</p>
+            </div>
+            <button id="test-mode-btn"
+                class="mt-1 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors border-slate-200 text-slate-400 hover:text-slate-500 hover:border-slate-300"
+                title="Switch between real and sample data">
+                <span id="test-mode-dot" class="w-1.5 h-1.5 rounded-full bg-slate-300 transition-colors"></span>
+                Test Mode
+            </button>
         </header>
 
         <!-- Tab Navigation -->
