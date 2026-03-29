@@ -212,9 +212,124 @@ export function xirr(cashFlows, guess = 0.1) {
     }
     return rate;
 }
-export function parseBudgetCSV() { return {}; }
-export function generateBudgetCSV() { return ''; }
-export function parseInvestmentCSV() { return {}; }
-export function generateInvestmentCSV() { return ''; }
-export function parseDebtCSV() { return {}; }
-export function generateDebtCSV() { return ''; }
+export function parseBudgetCSV(text) {
+    const newData = { savings: 0, debts: [], provisions: [], futureCosts: [] };
+    const rows = text.split('\n').filter(row => row.trim() !== '');
+    const contentRows = rows.slice(1);
+
+    contentRows.forEach(row => {
+        const [type, description, amount, date] = row.split(',').map(s => s.trim());
+        const item = { id: _generateId(), description, amount: parseFloat(amount) || 0, date };
+
+        switch (type) {
+            case 'savings':
+                newData.savings = parseFloat(amount) || 0;
+                break;
+            case 'debt':
+                newData.debts.push(item);
+                break;
+            case 'provision':
+                newData.provisions.push(item);
+                break;
+            case 'costfuturecost':
+                newData.futureCosts.push(item);
+                break;
+        }
+    });
+    return newData;
+}
+
+export function generateBudgetCSV(data) {
+    let csv = 'type,description,amount,date\n';
+    csv += `savings,,${data.savings || 0},\n`;
+    data.debts.forEach(d => { csv += `debt,${d.description || ''},${d.amount || 0},\n`; });
+    data.provisions.forEach(p => { csv += `provision,${p.description || ''},${p.amount || 0},${p.date || ''}\n`; });
+    data.futureCosts.forEach(c => { csv += `costfuturecost,${c.description || ''},${c.amount || 0},${c.date || ''}\n`; });
+    return csv;
+}
+
+export function parseInvestmentCSV(text) {
+    const rows = text.split('\n').filter(row => row.trim() !== '');
+    const contentRows = rows.slice(1);
+    const transactions = [];
+    const currentValues = { Discretionary: 0, TFSA: 0, Crypto: 0 };
+
+    contentRows.forEach(row => {
+        const cols = row.split(',').map(s => s.trim());
+        if (cols[0] === 'current_value') {
+            const type = cols[1];
+            const amount = parseFloat(cols[2]) || 0;
+            if (Object.prototype.hasOwnProperty.call(currentValues, type)) {
+                currentValues[type] = amount;
+            }
+        } else {
+            let dateStr = cols[0];
+            if (dateStr && dateStr.includes('-') && dateStr.split('-')[0].length === 2) {
+                const [dd, mm, yyyy] = dateStr.split('-');
+                dateStr = `${yyyy}-${mm}-${dd}`;
+            }
+            transactions.push({
+                id: _generateId(),
+                date: dateStr,
+                description: cols[1],
+                amount: parseFloat(cols[2]) || 0,
+                type: cols[3],
+                cryptoValue: cols[4] || '',
+            });
+        }
+    });
+    return { transactions, currentValues };
+}
+
+export function generateInvestmentCSV(data) {
+    let csv = 'Date,Description,amount,account type,crypto_value\n';
+    data.transactions.forEach(t => {
+        let dateStr = t.date;
+        if (dateStr && dateStr.includes('-')) {
+            const [yyyy, mm, dd] = dateStr.split('-');
+            dateStr = `${dd}-${mm}-${yyyy}`;
+        }
+        csv += `${dateStr},${t.description},${t.amount},${t.type},${t.cryptoValue || ''}\n`;
+    });
+    Object.keys(data.currentValues).forEach(type => {
+        csv += `current_value,${type},${data.currentValues[type]},\n`;
+    });
+    return csv;
+}
+
+export function parseDebtCSV(text) {
+    const rows = text.split('\n').filter(row => row.trim() !== '');
+    const repayments = [];
+    const params = {};
+
+    rows.forEach(row => {
+        const cols = row.split(',').map(s => s.trim());
+        if (cols[0] === 'param') {
+            params[cols[1]] = cols[2];
+        } else if (cols[0] !== 'Date' && cols[0] !== 'type') {
+            if (cols.length >= 3 && !isNaN(parseFloat(cols[2]))) {
+                repayments.push({
+                    id: _generateId(),
+                    date: cols[0],
+                    description: cols[1],
+                    amount: parseFloat(cols[2]),
+                });
+            }
+        }
+    });
+    return { repayments, params };
+}
+
+export function generateDebtCSV(repayments, params) {
+    let csv = 'Date,Description,Amount\n';
+    csv += `param,principal,${params.principal || ''}\n`;
+    csv += `param,current_balance,${params.current_balance || ''}\n`;
+    csv += `param,repayment,${params.repayment || ''}\n`;
+    csv += `param,service_fee,${params.service_fee || ''}\n`;
+    csv += `param,interest_rate,${params.interest_rate || ''}\n`;
+    csv += `param,next_payment,${params.next_payment || ''}\n`;
+    csv += `param,loan_start,${params.loan_start || ''}\n`;
+    csv += `param,original_term,${params.original_term || ''}\n`;
+    repayments.forEach(r => { csv += `${r.date},${r.description},${r.amount}\n`; });
+    return csv;
+}

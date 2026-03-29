@@ -352,6 +352,94 @@ describe('xirr', () => {
     });
 });
 
+describe('CSV round-trips', () => {
+    describe('budget', () => {
+        it('round-trips budget data without data loss', () => {
+            const data = {
+                savings: 15000,
+                debts: [{ id: 'x1', description: 'Car loan', amount: 3000, date: '' }],
+                provisions: [{ id: 'x2', description: 'Holiday', amount: 2000, date: '2026-12-01' }],
+                futureCosts: [{ id: 'x3', description: 'Laptop', amount: 1500, date: '2026-06-01' }],
+            };
+            const csv = generateBudgetCSV(data);
+            const parsed = parseBudgetCSV(csv);
+            expect(parsed.savings).toBe(15000);
+            expect(parsed.debts).toHaveLength(1);
+            expect(parsed.debts[0].description).toBe('Car loan');
+            expect(parsed.debts[0].amount).toBe(3000);
+            expect(parsed.provisions[0].date).toBe('2026-12-01');
+            expect(parsed.futureCosts[0].amount).toBe(1500);
+        });
+
+        it('handles items with no date', () => {
+            const csv = 'type,description,amount,date\ndebt,Test debt,500,\n';
+            const parsed = parseBudgetCSV(csv);
+            expect(parsed.debts).toHaveLength(1);
+            expect(parsed.debts[0].amount).toBe(500);
+        });
+
+        it('skips unknown row types silently', () => {
+            const csv = 'type,description,amount,date\nunknown,foo,100,\nsavings,,5000,\n';
+            const parsed = parseBudgetCSV(csv);
+            expect(parsed.savings).toBe(5000);
+            expect(parsed.debts).toHaveLength(0);
+        });
+    });
+
+    describe('investments', () => {
+        it('round-trips investment transactions and current values', () => {
+            const data = {
+                transactions: [{
+                    id: 'x1', date: '2024-06-15', description: 'Buy ETF',
+                    amount: 5000, type: 'TFSA', cryptoValue: ''
+                }],
+                currentValues: { Discretionary: 1000, TFSA: 6500, Crypto: 0 },
+            };
+            const csv = generateInvestmentCSV(data);
+            const parsed = parseInvestmentCSV(csv);
+            expect(parsed.transactions).toHaveLength(1);
+            expect(parsed.transactions[0].description).toBe('Buy ETF');
+            expect(parsed.transactions[0].amount).toBe(5000);
+            expect(parsed.transactions[0].type).toBe('TFSA');
+            expect(parsed.transactions[0].date).toBe('2024-06-15');
+            expect(parsed.currentValues.TFSA).toBe(6500);
+            expect(parsed.currentValues.Discretionary).toBe(1000);
+        });
+
+        it('converts DD-MM-YYYY dates to YYYY-MM-DD on parse', () => {
+            const csv = 'Date,Description,amount,account type,crypto_value\n15-06-2024,Buy,5000,TFSA,\n';
+            const parsed = parseInvestmentCSV(csv);
+            expect(parsed.transactions[0].date).toBe('2024-06-15');
+        });
+    });
+
+    describe('debt', () => {
+        it('round-trips debt repayments and params', () => {
+            const repayments = [{ id: 'x1', date: '2026-02-15', description: 'Bonus', amount: 5000 }];
+            const params = {
+                principal: '500000', current_balance: '450000', repayment: '4500',
+                service_fee: '69', interest_rate: '11.25', next_payment: '2026-02-25',
+                loan_start: '2020-01-01', original_term: '240',
+            };
+            const csv = generateDebtCSV(repayments, params);
+            const parsed = parseDebtCSV(csv);
+            expect(parsed.params.principal).toBe('500000');
+            expect(parsed.params.interest_rate).toBe('11.25');
+            expect(parsed.params.original_term).toBe('240');
+            expect(parsed.repayments).toHaveLength(1);
+            expect(parsed.repayments[0].amount).toBe(5000);
+            expect(parsed.repayments[0].description).toBe('Bonus');
+        });
+
+        it('handles empty repayments list', () => {
+            const csv = generateDebtCSV([], { principal: '100000', current_balance: '', repayment: '', service_fee: '', interest_rate: '', next_payment: '', loan_start: '', original_term: '' });
+            const parsed = parseDebtCSV(csv);
+            expect(parsed.repayments).toHaveLength(0);
+            expect(parsed.params.principal).toBe('100000');
+        });
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');
