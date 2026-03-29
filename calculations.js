@@ -12,7 +12,47 @@ export function getUpcoming25th(today = new Date()) {
     const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
     return `${yyyy}-${mm}-25`;
 }
-export function calculateBudgetSummary() { return {}; }
+export function calculateBudgetSummary(savings, debts, provisions, futureCosts, futureDate, today = new Date()) {
+    const totalDebts = debts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const totalProvisions = provisions.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+    const currentNetAmount = savings - totalDebts - totalProvisions;
+
+    const relevantFutureCosts = futureDate
+        ? futureCosts.reduce((sum, item) => {
+            const itemDate = item.date ? new Date(item.date) : null;
+            if (itemDate && itemDate <= futureDate) {
+                return sum + (parseFloat(item.amount) || 0);
+            }
+            return sum;
+        }, 0)
+        : 0;
+
+    const futureNetAmount = currentNetAmount - relevantFutureCosts;
+
+    let monthlySavingsTarget = 0;
+    let monthsDiff = 0;
+
+    if (futureDate) {
+        const t = new Date(today);
+        t.setHours(0, 0, 0, 0);
+        const fd = new Date(futureDate);
+        fd.setHours(0, 0, 0, 0);
+        const daysDiff = Math.ceil((fd - t) / (1000 * 60 * 60 * 24));
+        monthsDiff = Math.max(1, Math.ceil(daysDiff / 30));
+
+        if (daysDiff > 0) {
+            if (futureNetAmount < 0) {
+                monthlySavingsTarget = Math.abs(futureNetAmount) / monthsDiff;
+            } else if (futureNetAmount < currentNetAmount) {
+                monthlySavingsTarget = (currentNetAmount - futureNetAmount) / monthsDiff;
+            } else if (currentNetAmount < 0 && futureNetAmount >= 0) {
+                monthlySavingsTarget = (Math.abs(currentNetAmount) + futureNetAmount) / monthsDiff;
+            }
+        }
+    }
+
+    return { totalDebts, totalProvisions, currentNetAmount, relevantFutureCosts, futureNetAmount, monthsDiff, monthlySavingsTarget };
+}
 export function calculateMonthlyAllocation() { return {}; }
 export function calculateInvestmentPerformance() { return {}; }
 export function monthlyInterestFactor() { return 0; }
