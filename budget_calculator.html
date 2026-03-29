@@ -894,6 +894,11 @@
                 renderRepayments();
             });
 
+            // --- TEST MODE ---
+            let testMode = false;
+            const dbPath = (filename) => testMode ? `db/test/${filename}` : `db/${filename}`;
+            const saveKey = (name) => testMode ? `test_${name}` : name;
+
             // --- SERVER SAVE HELPERS ---
             const _saveTimers = {};
             const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
@@ -904,7 +909,7 @@
             const saveToServer = async (name, csvFn, btnId) => {
                 const csv = csvFn();
                 try {
-                    const res = await fetch(`/api/save/${name}`, {
+                    const res = await fetch(`/api/save/${saveKey(name)}`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'text/csv' },
                         body: csv
@@ -1732,7 +1737,7 @@
                     debtSavedAmountEl.textContent = 'N/A';
                     debtTimeReducedEl.textContent = 'Never';
                     debtNewEndDateEl.textContent = 'Never';
-                    debtOriginalEndDateEl.textContent = 'Original: Never';
+                    debtOriginalEndDateEl.textContent = 'Never';
                     return;
                 }
 
@@ -1927,9 +1932,9 @@
                 if (loanStartStr && originalTerm > 0) {
                     const origEnd = new Date(loanStartStr);
                     origEnd.setMonth(origEnd.getMonth() + originalTerm);
-                    debtOriginalEndDateEl.textContent = `Original: ${origEnd.toLocaleDateString('en-ZA', options)}`;
+                    debtOriginalEndDateEl.textContent = `${origEnd.toLocaleDateString('en-ZA', options)}`;
                 } else {
-                    debtOriginalEndDateEl.textContent = `Original: ${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
+                    debtOriginalEndDateEl.textContent = `${baseline.endDate.toLocaleDateString('en-ZA', options)}`;
                 }
             };
 
