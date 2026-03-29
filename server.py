@@ -19,7 +19,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 self.send_response(400); self.end_headers(); return
             length = int(self.headers.get('Content-Length', 0))
             body = self.rfile.read(length).decode('utf-8')
-            with open(FILE_MAP[name], 'w') as f:
+            filepath = FILE_MAP[name]
+            os.makedirs(os.path.dirname(filepath), exist_ok=True)
+            with open(filepath, 'w') as f:
                 f.write(body)
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
