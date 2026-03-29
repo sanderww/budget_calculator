@@ -14,7 +14,7 @@ import {
     generateInvestmentCSV,
     parseDebtCSV,
     generateDebtCSV,
-} from '../calculations.js';
+} from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
     it('returns the 25th of the current month when today is before the 25th', () => {
