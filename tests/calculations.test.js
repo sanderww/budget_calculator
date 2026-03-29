@@ -266,6 +266,65 @@ describe('simulateDebt', () => {
     });
 });
 
+describe('calculateDebtResults', () => {
+    it('returns zero moneySaved and diffMonths with no extras and no interest', () => {
+        const result = calculateDebtResults({
+            currentPrincipal: 100000,
+            totalRepayment: 10000,
+            serviceFee: 0,
+            interestRate: 0,
+            nextPaymentDateStr: '2026-02-01',
+            repayments: [],
+        });
+        expect(result.moneySaved).toBeCloseTo(0, 2);
+        expect(result.diffMonths).toBe(0);
+        expect(result.totalExtra).toBe(0);
+    });
+
+    it('reports positive moneySaved when extra repayments reduce interest paid', () => {
+        const result = calculateDebtResults({
+            currentPrincipal: 100000,
+            totalRepayment: 5000,
+            serviceFee: 0,
+            interestRate: 12,
+            nextPaymentDateStr: '2026-02-01',
+            repayments: [{ date: '2026-02-15', amount: 10000 }],
+        });
+        expect(result.moneySaved).toBeGreaterThan(0);
+        expect(result.diffMonths).toBeGreaterThan(0);
+        expect(result.totalExtra).toBe(10000);
+    });
+
+    it('returns baseline and actual simulation objects', () => {
+        const result = calculateDebtResults({
+            currentPrincipal: 50000,
+            totalRepayment: 4000,
+            serviceFee: 0,
+            interestRate: 10,
+            nextPaymentDateStr: '2026-02-01',
+            repayments: [],
+        });
+        expect(result.baseline).toBeDefined();
+        expect(result.actual).toBeDefined();
+        expect(typeof result.baseline.months).toBe('number');
+        expect(typeof result.baseline.endDate).toBe('object');
+    });
+
+    it('moneySaved equals difference in total costs between baseline and actual', () => {
+        const result = calculateDebtResults({
+            currentPrincipal: 100000,
+            totalRepayment: 5000,
+            serviceFee: 100,
+            interestRate: 12,
+            nextPaymentDateStr: '2026-02-01',
+            repayments: [{ date: '2026-03-15', amount: 20000 }],
+        });
+        const baselineCost = result.baseline.totalInterest + result.baseline.totalFees;
+        const actualCost = result.actual.totalInterest + result.actual.totalFees;
+        expect(result.moneySaved).toBeCloseTo(baselineCost - actualCost, 5);
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');

@@ -148,7 +148,48 @@ export function simulateDebt(startPrincipal, startDate, effectiveRepayment, serv
 
     return { totalInterest, totalFees, endDate: simDate, months };
 }
-export function calculateDebtResults() { return {}; }
+export function calculateDebtResults({ currentPrincipal, totalRepayment, serviceFee, interestRate, nextPaymentDateStr, repayments }) {
+    const dailyRate = (interestRate / 100) / 365;
+    const effectiveRepayment = totalRepayment - serviceFee;
+
+    let startDate = new Date(nextPaymentDateStr);
+    startDate.setDate(1);
+
+    if (repayments.length > 0) {
+        const dates = repayments.map(r => new Date(r.date));
+        const earliest = new Date(Math.min.apply(null, dates));
+        earliest.setDate(1);
+        if (earliest < startDate) startDate = earliest;
+    }
+
+    // Back-calculate to find the starting balance at startDate
+    let simulatedBalance = currentPrincipal;
+    let iterDate = new Date(nextPaymentDateStr);
+    iterDate.setDate(1);
+
+    while (iterDate > startDate) {
+        iterDate.setMonth(iterDate.getMonth() - 1);
+        const monthStr = `${iterDate.getFullYear()}-${String(iterDate.getMonth() + 1).padStart(2, '0')}`;
+        let monthlyExtra = 0;
+        repayments.forEach(rep => {
+            if (rep.date && rep.date.startsWith(monthStr)) {
+                monthlyExtra += (parseFloat(rep.amount) || 0);
+            }
+        });
+        const factor = monthlyInterestFactor(dailyRate, iterDate.getFullYear(), iterDate.getMonth());
+        simulatedBalance = (simulatedBalance + effectiveRepayment + monthlyExtra) / (1 + factor);
+    }
+
+    const startPrincipal = simulatedBalance;
+    const baseline = simulateDebt(startPrincipal, startDate, effectiveRepayment, serviceFee, dailyRate, repayments, false);
+    const actual = simulateDebt(startPrincipal, startDate, effectiveRepayment, serviceFee, dailyRate, repayments, true);
+
+    const moneySaved = (baseline.totalInterest + baseline.totalFees) - (actual.totalInterest + actual.totalFees);
+    const diffMonths = baseline.months - actual.months;
+    const totalExtra = repayments.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+
+    return { moneySaved, diffMonths, totalExtra, baseline, actual };
+}
 export function xirr() { return 0; }
 export function parseBudgetCSV() { return {}; }
 export function generateBudgetCSV() { return ''; }
