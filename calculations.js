@@ -1,7 +1,17 @@
 // Internal helper used by CSV parsers (not exported)
 const _generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-export function getUpcoming25th(today = new Date()) { return ''; }
+export function getUpcoming25th(today = new Date()) {
+    let year = today.getFullYear();
+    let month = today.getMonth();
+    if (today.getDate() > 25) {
+        month++;
+    }
+    const targetDate = new Date(year, month, 25);
+    const yyyy = targetDate.getFullYear();
+    const mm = String(targetDate.getMonth() + 1).padStart(2, '0');
+    return `${yyyy}-${mm}-25`;
+}
 export function calculateBudgetSummary() { return {}; }
 export function calculateMonthlyAllocation() { return {}; }
 export function calculateInvestmentPerformance() { return {}; }
