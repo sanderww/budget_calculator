@@ -115,7 +115,39 @@ export function monthlyInterestFactor(dailyRate, year, month) {
     const days = new Date(year, month + 1, 0).getDate();
     return Math.pow(1 + dailyRate, days) - 1;
 }
-export function simulateDebt() { return {}; }
+export function simulateDebt(startPrincipal, startDate, effectiveRepayment, serviceFee, dailyRate, repayments, withExtras) {
+    let balance = startPrincipal;
+    let totalInterest = 0;
+    let totalFees = 0;
+    let months = 0;
+    let simDate = new Date(startDate);
+
+    while (balance > 10 && months < 1200) {
+        totalFees += serviceFee;
+
+        const interest = balance * monthlyInterestFactor(dailyRate, simDate.getFullYear(), simDate.getMonth());
+        totalInterest += interest;
+        balance += interest;
+
+        let payment = effectiveRepayment;
+
+        if (withExtras) {
+            const currentMonthStr = `${simDate.getFullYear()}-${String(simDate.getMonth() + 1).padStart(2, '0')}`;
+            repayments.forEach(rep => {
+                if (rep.date && rep.date.startsWith(currentMonthStr)) {
+                    payment += (parseFloat(rep.amount) || 0);
+                }
+            });
+        }
+
+        if (balance < payment) payment = balance;
+        balance -= payment;
+        months++;
+        simDate.setMonth(simDate.getMonth() + 1);
+    }
+
+    return { totalInterest, totalFees, endDate: simDate, months };
+}
 export function calculateDebtResults() { return {}; }
 export function xirr() { return 0; }
 export function parseBudgetCSV() { return {}; }

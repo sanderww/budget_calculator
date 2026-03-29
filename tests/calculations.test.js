@@ -223,6 +223,49 @@ describe('monthlyInterestFactor', () => {
     });
 });
 
+describe('simulateDebt', () => {
+    it('pays off a zero-interest loan in exactly the right number of months', () => {
+        const result = simulateDebt(
+            100000,
+            new Date(2026, 0, 1),
+            10000, // effectiveRepayment
+            0,     // serviceFee
+            0,     // dailyRate
+            [],
+            false
+        );
+        expect(result.months).toBe(10);
+        expect(result.totalInterest).toBeCloseTo(0, 5);
+        expect(result.totalFees).toBe(0);
+    });
+
+    it('accumulates service fees at rate of one fee per month', () => {
+        const result = simulateDebt(100000, new Date(2026, 0, 1), 10000, 100, 0, [], false);
+        expect(result.totalFees).toBe(result.months * 100);
+    });
+
+    it('applies extra repayments only in the matching month, reducing total months', () => {
+        // R10000 extra in month 3 cuts a full month: 3 months (80k→60k) + 6 months (60k→0) = 9 vs 10
+        const repayments = [{ date: '2026-03-15', amount: 10000 }];
+        const withExtras = simulateDebt(100000, new Date(2026, 0, 1), 10000, 0, 0, repayments, true);
+        const withoutExtras = simulateDebt(100000, new Date(2026, 0, 1), 10000, 0, 0, repayments, false);
+        expect(withExtras.months).toBe(9);
+        expect(withoutExtras.months).toBe(10);
+    });
+
+    it('does not apply extras when withExtras is false', () => {
+        const repayments = [{ date: '2026-03-15', amount: 50000 }];
+        const withExtras = simulateDebt(100000, new Date(2026, 0, 1), 10000, 0, 0, repayments, false);
+        const noExtras = simulateDebt(100000, new Date(2026, 0, 1), 10000, 0, 0, [], false);
+        expect(withExtras.months).toBe(noExtras.months);
+    });
+
+    it('stops when balance drops below 10', () => {
+        const result = simulateDebt(50, new Date(2026, 0, 1), 100, 0, 0, [], false);
+        expect(result.months).toBe(1);
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');
