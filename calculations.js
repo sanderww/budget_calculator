@@ -111,7 +111,10 @@ export function calculateInvestmentPerformance(transactions, currentValue, today
     const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
     return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn };
 }
-export function monthlyInterestFactor() { return 0; }
+export function monthlyInterestFactor(dailyRate, year, month) {
+    const days = new Date(year, month + 1, 0).getDate();
+    return Math.pow(1 + dailyRate, days) - 1;
+}
 export function simulateDebt() { return {}; }
 export function calculateDebtResults() { return {}; }
 export function xirr() { return 0; }

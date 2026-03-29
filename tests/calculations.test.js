@@ -194,6 +194,35 @@ describe('calculateInvestmentPerformance', () => {
     });
 });
 
+describe('monthlyInterestFactor', () => {
+    const annualRate = 0.12;
+    const dailyRate = annualRate / 365;
+
+    it('uses 28 days for February in a non-leap year (2025)', () => {
+        const factor = monthlyInterestFactor(dailyRate, 2025, 1);
+        expect(factor).toBeCloseTo(Math.pow(1 + dailyRate, 28) - 1, 10);
+    });
+
+    it('uses 29 days for February in a leap year (2024)', () => {
+        const factor = monthlyInterestFactor(dailyRate, 2024, 1);
+        expect(factor).toBeCloseTo(Math.pow(1 + dailyRate, 29) - 1, 10);
+    });
+
+    it('uses 31 days for January', () => {
+        const factor = monthlyInterestFactor(dailyRate, 2026, 0);
+        expect(factor).toBeCloseTo(Math.pow(1 + dailyRate, 31) - 1, 10);
+    });
+
+    it('uses 30 days for April', () => {
+        const factor = monthlyInterestFactor(dailyRate, 2026, 3);
+        expect(factor).toBeCloseTo(Math.pow(1 + dailyRate, 30) - 1, 10);
+    });
+
+    it('returns 0 when dailyRate is 0', () => {
+        expect(monthlyInterestFactor(0, 2026, 0)).toBe(0);
+    });
+});
+
 describe('smoke', () => {
     it('imports all functions', () => {
         expect(typeof getUpcoming25th).toBe('function');
