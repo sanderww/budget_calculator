@@ -1244,7 +1244,7 @@
             };
 
             const loadBudgetCSVFromServer = async () => {
-                const response = await fetch('db/calulator_data.csv', { cache: 'no-store' });
+                const response = await fetch(dbPath('calulator_data.csv'), { cache: 'no-store' });
                 if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
                 const text = await response.text();
                 budgetData = parseBudgetCSV(text);
@@ -1650,7 +1650,7 @@
             // Try to auto-load investments.csv if available
             const loadInvestmentCSVFromServer = async () => {
                 try {
-                    const response = await fetch('db/investments.csv', { cache: 'no-store' });
+                    const response = await fetch(dbPath('investments.csv'), { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = parseInvestmentCSV(text);
@@ -2107,7 +2107,7 @@
 
             const loadDebtCSVFromServer = async () => {
                 try {
-                    const response = await fetch('db/debt.csv', { cache: 'no-store' });
+                    const response = await fetch(dbPath('debt.csv'), { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = parseDebtCSV(text);
