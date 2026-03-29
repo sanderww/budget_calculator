@@ -54,6 +54,16 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def log_message(self, *args): pass  # silence request logs
 
+    def translate_path(self, path):
+        """Check src/ for files not found at project root."""
+        result = super().translate_path(path)
+        if not os.path.exists(result):
+            # Try src/ subdirectory
+            src_path = os.path.join(os.getcwd(), 'src', os.path.relpath(result, os.getcwd()))
+            if os.path.exists(src_path):
+                return src_path
+        return result
+
 with socketserver.TCPServer(("", PORT), Handler) as httpd:
     print(f"Budget Calculator running on http://localhost:{PORT}")
     httpd.serve_forever()
