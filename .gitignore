@@ -1,17 +1,14 @@
 # Ignore database CSV files
 db/*.csv
-!db/examples/
+db/backups/
+db/test/
 
-# Ignore prompts except the required spec
-prompts/*.md
-!prompts/requirement_spec_2026_01_11.md
+# MacOS
+.DS_Store
 
 # Ignore sensitive server files
 server.log
 .server.pid
-
-# MacOS
-.DS_Store
 
 # ignore to_do.md
 to_do.md
