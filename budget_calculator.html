@@ -2281,6 +2281,35 @@
                 `;
             };
 
+            const updateTestModeUI = () => {
+                const btn = document.getElementById('test-mode-btn');
+                const dot = document.getElementById('test-mode-dot');
+                const label = document.getElementById('test-mode-label');
+                if (testMode) {
+                    btn.classList.remove('border-slate-200', 'text-slate-400', 'hover:text-slate-500', 'hover:border-slate-300');
+                    btn.classList.add('border-amber-300', 'bg-amber-50', 'text-amber-700');
+                    dot.classList.remove('bg-slate-300');
+                    dot.classList.add('bg-amber-400');
+                    label.classList.remove('hidden');
+                } else {
+                    btn.classList.add('border-slate-200', 'text-slate-400', 'hover:text-slate-500', 'hover:border-slate-300');
+                    btn.classList.remove('border-amber-300', 'bg-amber-50', 'text-amber-700');
+                    dot.classList.add('bg-slate-300');
+                    dot.classList.remove('bg-amber-400');
+                    label.classList.add('hidden');
+                }
+            };
+
+            document.getElementById('test-mode-btn').addEventListener('click', async () => {
+                testMode = !testMode;
+                updateTestModeUI();
+                await Promise.all([
+                    loadBudgetCSVFromServer().catch(() => {}),
+                    loadInvestmentCSVFromServer(),
+                    loadDebtCSVFromServer(),
+                ]);
+            });
+
             // --- INITIALIZATION ---
             (async () => {
                 try {
