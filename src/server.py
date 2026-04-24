@@ -55,10 +55,11 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *args): pass  # silence request logs
 
     def translate_path(self, path):
-        """Check src/ for files not found at project root."""
+        """Serve src/budget_calculator.html for root; check src/ for other missing files."""
+        if path == '/':
+            return os.path.join(os.getcwd(), 'src', 'budget_calculator.html')
         result = super().translate_path(path)
         if not os.path.exists(result):
-            # Try src/ subdirectory
             src_path = os.path.join(os.getcwd(), 'src', os.path.relpath(result, os.getcwd()))
             if os.path.exists(src_path):
                 return src_path
