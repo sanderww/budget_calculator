@@ -1,0 +1,302 @@
+# Personal Finance Dashboard — Functional Requirements
+
+## Overview
+
+A single-page web application for personal financial management with four modules: Budget Calculator, Investment Tracker, Debt Calculator, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
+
+---
+
+## 1. Budget Calculator
+
+### 1.1 Current Savings
+
+- Single numeric input representing total liquid savings (R).
+- Changes trigger an immediate recalculation of the financial summary.
+
+### 1.2 Debts
+
+- Dynamic list of debt line items, each with:
+  - **Description** (text)
+  - **Amount** (R, numeric)
+- Users can add and remove items.
+
+### 1.3 Provisions
+
+- Dynamic list of provision line items, each with:
+  - **Description** (text)
+  - **Amount** (R, numeric)
+  - **Date** (date)
+- Users can add and remove items.
+
+### 1.4 Future Costs
+
+- Dynamic list of anticipated future costs, each with:
+  - **Description** (text)
+  - **Amount** (R, numeric)
+  - **Date** (date)
+- Users can add and remove items.
+
+### 1.5 Financial Summary
+
+Calculated in real time whenever any input changes:
+
+- **Current Net Amount** = Savings - Total Debts - Total Provisions
+  - Displayed green when >= 0, red when < 0.
+- **Future Net Amount** = Current Net Amount - sum of Future Costs whose date <= selected future date
+  - A date picker selects the target date (defaults to 1 year from today).
+  - Displayed indigo when >= 0, red when < 0.
+- **Breakdown** showing:
+  - Total Savings
+  - Total Debts
+  - Total Provisions
+  - Total Future Costs (all, regardless of date)
+- **Monthly Savings Target**: the monthly amount needed to reach the Future Net Amount by the selected date.
+  - Calculation: divides the shortfall by the number of months remaining (days / 30, minimum 1 month).
+  - Shows R 0.00 if the future net amount is already positive and >= current net amount.
+
+### 1.6 Monthly Money Allocation
+
+Splits available end-of-month money across investment categories:
+
+- **Inputs**:
+  - Available Money at End of Month (R)
+  - Mortgage Repayment (%, default 50)
+  - EFT (%, default 50)
+  - Crypto (%, default 0)
+- **Validation**:
+  - Total percentage must not exceed 100%.
+  - At least one percentage must be > 0.
+  - Available money must exceed the monthly savings target.
+- **Outputs** (shown on "Calculate Allocation" click):
+  - Required Savings (= monthly savings target from summary)
+  - Mortgage Repayment amount = (Available - Savings Target) * Mortgage%
+  - EFT amount = (Available - Savings Target) * EFT%
+  - Crypto amount = (Available - Savings Target) * Crypto%
+  - Total Allocated = Savings + Mortgage + EFT + Crypto
+
+---
+
+## 2. Investment Tracker
+
+### 2.1 Portfolio Accounts
+
+Three fixed account types:
+
+- **Discretionary**
+- **TFSA** (Tax-Free Savings Account)
+- **Crypto**
+
+Each account displays:
+
+- **Current Value** — editable numeric input (R)
+- **Total Invested** — sum of all transaction amounts for this account
+- **Gain/Loss (R)** — absolute return = Current Value - Total Invested
+- **Gain/Loss (%)** — percentage return = (absolute return / total invested) * 100
+- **Annualized Return** — compound annualized growth rate based on a weighted-average holding period per transaction:
+  - Weighted average age (days) = sum(amount * age_in_days) / total_invested
+  - Years held = average age / 365.25
+  - Annualized = ((current_value / total_invested) ^ (1 / years_held) - 1) * 100
+  - Shows "N/A" if years held <= 0.1 or data is insufficient.
+- **6% Savings Comparison** — hypothetical gain if each transaction amount had been in a 6% p.a. savings account from its transaction date to today, compounded daily: `amount * (1.06 ^ (age_days / 365.25) - 1)`.
+- **Net vs Savings** — absolute return minus the 6% savings gain.
+
+For the **Discretionary** account specifically (only):
+
+- **Marginal tax rate (%)** — editable numeric input below Current Value. Default `41`. Range `0..100`, step `1`. Persisted in `investments.csv` via the `param,marginal_rate,...` row.
+- **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown.
+- **Net vs savings (after tax)** — `Net vs Savings − Estimated Tax`. Green when ≥ 0, red when < 0.
+
+These three rows are **not** shown on the TFSA or Crypto cards.
+
+For the Crypto account specifically:
+
+- **Total BTC** — sum of all `cryptoValue` fields across Crypto transactions.
+
+### 2.2 Transactions
+
+- Dynamic list of investment transactions, each with:
+  - **Date** (date input)
+  - **Description** (text)
+  - **Amount** (R, numeric)
+  - **BTC value** (numeric, only visible when account type = Crypto)
+  - **Account Type** (dropdown: Discretionary, TFSA, Crypto)
+- Users can add and remove transactions.
+- Displayed sorted by date descending (most recent first), then by creation order descending.
+- Changing a transaction's type to/from Crypto toggles the BTC value field visibility and clears the value when switching away.
+
+---
+
+## 3. Debt Calculator (Mortgage)
+
+### 3.1 Mortgage Details
+
+Fixed set of loan parameters:
+
+| Field | Description |
+|---|---|
+| Total Loan Amount | Original principal (R) |
+| Current Outstanding Balance | Current principal (R) |
+| Total Monthly Repayment | Monthly payment amount (R) |
+| Monthly Service Fee | Fee deducted from repayment (R) |
+| Interest Rate | Annual rate (%), converted to daily rate internally: `(rate / 100) / 365` |
+| Next Payment Date | Auto-set to the upcoming 25th of the month (read-only) |
+| Loan Start Date | Date the loan originated |
+| Original Term | Loan term in months |
+
+**Upcoming 25th logic**: if today's date > 25, next payment is the 25th of next month; otherwise the 25th of the current month.
+
+### 3.2 Extra Repayments
+
+- Dynamic list of extra (additional) repayments made toward the mortgage, each with:
+  - **Date** (date)
+  - **Description** (text)
+  - **Amount** (R, numeric)
+- Users can add and remove entries.
+- Displayed sorted by date descending.
+
+### 3.3 Projection Results
+
+Simulates the loan to payoff under two scenarios:
+
+1. **Baseline** — regular monthly repayments only (no extras).
+2. **Actual** — regular repayments + all extra repayments applied in their respective months.
+
+Both simulations use **daily compounding interest** aggregated per month:
+
+- Monthly interest factor = `(1 + daily_rate) ^ days_in_month - 1`
+- Each month: balance += balance * monthly_factor, then subtract repayment.
+- Simulation runs until balance <= R 10 or 1200 months (100 years).
+
+**Back-calculation**: when extra repayments predate the next payment date, the system back-calculates the starting balance at the earliest repayment date by reversing interest and repayment operations month-by-month.
+
+**Displayed outputs**:
+
+| Metric | Calculation |
+|---|---|
+| Interest Saved | (Baseline total interest + fees) - (Actual total interest + fees) |
+| Total Extra Paid | Sum of all extra repayment amounts |
+| Net Return (Cash) | Same as Interest Saved |
+| Annualized Yield | XIRR of cash flows: extra repayments as outflows, then saved monthly repayments (after actual payoff until baseline payoff) as inflows |
+| Time Reduced | Baseline months - Actual months, displayed as "Xy Zm" |
+| New End Date | Actual simulation end date |
+| Original End Date | Loan Start Date + Original Term months (or baseline end date if not specified) |
+
+**Guard**: if the effective repayment (total repayment - service fee) does not exceed one month's interest on the current balance, results show "Never" for end dates.
+
+### 3.4 XIRR Calculation
+
+Newton-Raphson method to find the internal rate of return:
+
+- Cash flows: extra repayments as negative amounts (outflows), saved future monthly repayments as positive amounts (inflows).
+- Iterates up to 20 times, convergence threshold of 0.0001 on rate, or XNPV < 1.
+- Returns the annualized rate.
+
+---
+
+## 4. History Tab
+
+Aggregates all financial activity by year in a summary table:
+
+| Column | Source |
+|---|---|
+| Year | Extracted from transaction/repayment dates |
+| Debt Repaid | Sum of extra debt repayments for that year |
+| Investments Total | Sum of all investment transaction amounts for that year |
+| TFSA | Investment transactions of type TFSA for that year |
+| Discretionary | Investment transactions of type Discretionary for that year |
+| Crypto | Investment transactions of type Crypto for that year |
+
+- A totals row sums all columns.
+- Years are sorted ascending.
+- Empty values display as an em-dash.
+
+---
+
+## 5. Data Persistence
+
+### 5.1 CSV File Format
+
+Three separate CSV files store application state:
+
+**Budget** (`calulator_data.csv`):
+```
+type,description,amount,date
+savings,,<amount>,
+debt,<description>,<amount>,
+provision,<description>,<amount>,<date>
+costfuturecost,<description>,<amount>,<date>
+```
+
+**Investments** (`investments.csv`):
+```
+Date,Description,amount,account type,crypto_value
+<DD-MM-YYYY>,<description>,<amount>,<type>,<btc_value>
+current_value,<account_type>,<amount>,
+param,marginal_rate,<percent>,
+```
+- Transaction dates stored in `DD-MM-YYYY` format in CSV, converted to `YYYY-MM-DD` internally.
+- `current_value` rows store per-account current values (Discretionary, TFSA, Crypto).
+- `param,marginal_rate,<percent>,` stores the user's marginal income tax rate used for the Discretionary CGT estimate. Default `41` when the row is absent.
+
+**Debt** (`debt.csv`):
+```
+Date,Description,Amount
+param,principal,<value>
+param,current_balance,<value>
+param,repayment,<value>
+param,service_fee,<value>
+param,interest_rate,<value>
+param,next_payment,<value>
+param,loan_start,<value>
+param,original_term,<value>
+<date>,<description>,<amount>
+```
+
+### 5.2 Auto-Save
+
+- All data changes trigger a debounced save (800ms delay) via POST to the server.
+- Manual save buttons are also available for each module.
+- On page load, all three CSV files are fetched automatically.
+
+### 5.3 Server API
+
+| Endpoint | Method | Behavior |
+|---|---|---|
+| `/api/save/<name>` | POST | Writes request body to the mapped CSV file. Valid names: `budget`, `investments`, `debt` (and their `test_` prefixed variants). |
+| `/<path>` | GET | Serves static files; falls back to `src/` directory if not found at project root. |
+
+- Real data files are backed up (timestamped copy) before every write.
+- Returns 400 for unknown names, 403 for writes to real data when `X-Test-Mode: true` header is set.
+
+---
+
+## 6. Test Mode
+
+- Toggle button in the header switches between real data and sample data.
+- When enabled:
+  - "SAMPLE DATA" label is displayed.
+  - All CSV reads/writes use `db/test/` directory instead of `db/`.
+  - Save keys are prefixed with `test_` (e.g., `test_budget`).
+  - Server blocks writes to real data keys when `X-Test-Mode: true` header is present.
+- Toggling reloads all three datasets from the appropriate directory.
+- If the test-mode load fails, the mode reverts automatically.
+
+---
+
+## 7. Calculation Functions Reference
+
+All pure calculation logic is extracted into a separate ES module (`calculations.js`) with the following exported functions:
+
+| Function | Purpose |
+|---|---|
+| `getUpcoming25th(today?)` | Returns the next 25th as `YYYY-MM-25` |
+| `calculateBudgetSummary(savings, debts, provisions, futureCosts, futureDate, today?)` | Computes net amounts, monthly savings target |
+| `calculateMonthlyAllocation(available, savingsTarget, mortgage%, eft%, crypto%)` | Splits money across categories |
+| `calculateInvestmentPerformance(transactions, currentValue, today?)` | Returns absolute/percentage/annualized returns, savings comparison |
+| `monthlyInterestFactor(dailyRate, year, month)` | Daily rate compounded over days in a specific month |
+| `simulateDebt(startPrincipal, startDate, effectiveRepayment, serviceFee, dailyRate, repayments, withExtras)` | Runs month-by-month loan simulation |
+| `calculateDebtResults({currentPrincipal, totalRepayment, serviceFee, interestRate, nextPaymentDateStr, repayments})` | Orchestrates baseline vs actual simulation, computes savings |
+| `xirr(cashFlows, guess?)` | Newton-Raphson XIRR calculation |
+| `parseBudgetCSV(text)` / `generateBudgetCSV(data)` | Budget CSV serialization |
+| `parseInvestmentCSV(text)` / `generateInvestmentCSV(data)` | Investment CSV serialization |
+| `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |
