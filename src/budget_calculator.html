@@ -1228,7 +1228,8 @@
                     Discretionary: 0,
                     TFSA: 0,
                     Crypto: 0
-                }
+                },
+                marginalRate: 41
             };
 
             const transactionList = document.getElementById('transaction-list');
@@ -1240,6 +1241,7 @@
             const valDiscretionary = document.getElementById('val-discretionary');
             const valTfsa = document.getElementById('val-tfsa');
             const valCrypto = document.getElementById('val-crypto');
+            const marginalRateInput = document.getElementById('marginal-rate-discretionary');
 
             const updatePerformanceDisplay = () => {
                 calculatePerformance('Discretionary', investmentData.currentValues.Discretionary, 'inv-discretionary', 'gain-discretionary', 'ann-discretionary', 'gain-money-discretionary');
@@ -1272,6 +1274,7 @@
                 valDiscretionary.value = investmentData.currentValues.Discretionary || '';
                 valTfsa.value = investmentData.currentValues.TFSA || '';
                 valCrypto.value = investmentData.currentValues.Crypto || '';
+                marginalRateInput.value = (investmentData.marginalRate ?? 41);
 
                 renderTransactions();
                 updatePerformanceDisplay();
@@ -1348,7 +1351,8 @@
                 const currentValue = parseFloat(currentValueStr) || 0;
                 const txs = investmentData.transactions.filter(t => t.type === type);
 
-                const r = _calculateInvestmentPerformance(txs, currentValue, new Date());
+                const rate = (type === 'Discretionary') ? (parseFloat(investmentData.marginalRate) || 0) : 0;
+                const r = _calculateInvestmentPerformance(txs, currentValue, new Date(), rate);
 
                 const invEl = document.getElementById(invId);
                 if (invEl) invEl.textContent = formatCurrency(r.totalInvested);
@@ -1364,16 +1368,21 @@
 
                 if (!gainEl) return;
 
+                const typeKey = type.toLowerCase();
+                const taxEl = document.getElementById(`tax-${typeKey}`);
+                const netAfterTaxEl = document.getElementById(`net-savings-after-tax-${typeKey}`);
+
                 if (r.totalInvested === 0) {
                     gainEl.textContent = '0.00%';
                     gainEl.className = 'font-bold text-slate-800';
                     if (annEl) { annEl.textContent = '0.00%'; annEl.className = 'font-bold text-slate-800'; }
                     if (moneyGainEl) { moneyGainEl.textContent = 'R 0.00'; moneyGainEl.className = 'font-bold text-slate-800'; }
-                    const typeKey0 = type.toLowerCase();
-                    const sg0 = document.getElementById(`savings-gain-${typeKey0}`);
-                    const ns0 = document.getElementById(`net-savings-${typeKey0}`);
+                    const sg0 = document.getElementById(`savings-gain-${typeKey}`);
+                    const ns0 = document.getElementById(`net-savings-${typeKey}`);
                     if (sg0) sg0.textContent = 'R 0.00';
                     if (ns0) { ns0.textContent = 'R 0.00'; ns0.className = 'font-medium'; }
+                    if (taxEl) { taxEl.textContent = 'R 0.00'; taxEl.className = 'font-medium text-red-500'; }
+                    if (netAfterTaxEl) { netAfterTaxEl.textContent = 'R 0.00'; netAfterTaxEl.className = 'font-medium'; }
                     return;
                 }
 
@@ -1385,13 +1394,21 @@
                     moneyGainEl.className = `font-bold ${r.absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
                 }
 
-                const typeKey = type.toLowerCase();
                 const savingsGainEl = document.getElementById(`savings-gain-${typeKey}`);
                 const netSavingsEl = document.getElementById(`net-savings-${typeKey}`);
                 if (savingsGainEl) savingsGainEl.textContent = `+${formatCurrency(r.savingsGain)}`;
                 if (netSavingsEl) {
                     netSavingsEl.textContent = `${r.netVsSavings >= 0 ? '+' : ''}${formatCurrency(r.netVsSavings)}`;
                     netSavingsEl.className = `font-medium ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
+                }
+
+                if (taxEl) {
+                    taxEl.textContent = r.estimatedTax > 0 ? `-${formatCurrency(r.estimatedTax)}` : 'R 0.00';
+                    taxEl.className = 'font-medium text-red-500';
+                }
+                if (netAfterTaxEl) {
+                    netAfterTaxEl.textContent = `${r.netVsSavingsAfterTax >= 0 ? '+' : ''}${formatCurrency(r.netVsSavingsAfterTax)}`;
+                    netAfterTaxEl.className = `font-medium ${r.netVsSavingsAfterTax >= 0 ? 'text-green-600' : 'text-red-500'}`;
                 }
 
                 if (r.annualizedReturn === null) {
@@ -1474,6 +1491,13 @@
                 });
             });
 
+            marginalRateInput.addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                investmentData.marginalRate = Number.isNaN(v) ? 0 : v;
+                updatePerformanceDisplay();
+                debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
+            });
+
             // Investment CSV Handling
             const parseInvestmentCSV = (text) => _parseInvestmentCSV(text);
             const generateInvestmentCSV = () => _generateInvestmentCSV(investmentData);
@@ -1487,6 +1511,7 @@
                         const parsed = parseInvestmentCSV(text);
                         investmentData.transactions = parsed.transactions;
                         investmentData.currentValues = parsed.currentValues;
+                        investmentData.marginalRate = (parsed.marginalRate ?? 41);
                         renderFullInvestmentUI();
                     }
                 } catch (e) {
@@ -1508,6 +1533,7 @@
                     const parsed = parseInvestmentCSV(text);
                     investmentData.transactions = parsed.transactions;
                     investmentData.currentValues = parsed.currentValues;
+                    investmentData.marginalRate = (parsed.marginalRate ?? 41);
                     renderFullInvestmentUI();
                 } catch (err) {
                     console.error(err);
