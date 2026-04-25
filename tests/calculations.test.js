@@ -192,6 +192,47 @@ describe('calculateInvestmentPerformance', () => {
         const result = calculateInvestmentPerformance(txs, 9000, new Date(2026, 0, 1));
         expect(result.totalCryptoValue).toBeCloseTo(0.75, 5);
     });
+
+    it('returns zero estimatedTax when marginalRate is omitted', () => {
+        const txs = [{ amount: 10000, date: '2024-01-01', type: 'Discretionary' }];
+        const r = calculateInvestmentPerformance(txs, 110000, new Date('2026-04-25'));
+        expect(r.estimatedTax).toBe(0);
+        expect(r.taxableGain).toBe(0);
+        expect(r.netVsSavingsAfterTax).toBe(r.netVsSavings);
+    });
+
+    it('returns zero estimatedTax when gain is below the R40k annual exclusion', () => {
+        const txs = [{ amount: 100000, date: '2024-01-01', type: 'Discretionary' }];
+        const r = calculateInvestmentPerformance(txs, 130000, new Date('2026-04-25'), 41);
+        // gain = 30,000 < 40,000 exclusion
+        expect(r.taxableGain).toBe(0);
+        expect(r.estimatedTax).toBe(0);
+        expect(r.netVsSavingsAfterTax).toBe(r.netVsSavings);
+    });
+
+    it('calculates estimatedTax using 40% inclusion rate above the R40k exclusion', () => {
+        const txs = [{ amount: 100000, date: '2024-01-01', type: 'Discretionary' }];
+        const r = calculateInvestmentPerformance(txs, 200000, new Date('2026-04-25'), 41);
+        // gain = 100,000; taxable = 60,000; included = 24,000; tax = 24,000 * 0.41 = 9,840
+        expect(r.taxableGain).toBe(60000);
+        expect(r.estimatedTax).toBeCloseTo(9840, 6);
+        expect(r.netVsSavingsAfterTax).toBeCloseTo(r.netVsSavings - 9840, 6);
+    });
+
+    it('returns zero estimatedTax when there is a loss', () => {
+        const txs = [{ amount: 100000, date: '2024-01-01', type: 'Discretionary' }];
+        const r = calculateInvestmentPerformance(txs, 80000, new Date('2026-04-25'), 41);
+        expect(r.taxableGain).toBe(0);
+        expect(r.estimatedTax).toBe(0);
+        expect(r.netVsSavingsAfterTax).toBe(r.netVsSavings);
+    });
+
+    it('returns zero estimatedTax when totalInvested is 0', () => {
+        const r = calculateInvestmentPerformance([], 0, new Date('2026-04-25'), 41);
+        expect(r.taxableGain).toBe(0);
+        expect(r.estimatedTax).toBe(0);
+        expect(r.netVsSavingsAfterTax).toBe(0);
+    });
 });
 
 describe('monthlyInterestFactor', () => {

@@ -62,12 +62,12 @@ export function calculateMonthlyAllocation(availableMoney, monthlySavingsTarget,
     const leftover = availableMoney - totalAllocated;
     return { remainingMoney, mortgageAmount, eftAmount, cryptoAmount, totalAllocated, leftover };
 }
-export function calculateInvestmentPerformance(transactions, currentValue, today = new Date()) {
+export function calculateInvestmentPerformance(transactions, currentValue, today = new Date(), marginalRate = 0) {
     const totalInvested = transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
     const totalCryptoValue = transactions.reduce((sum, t) => sum + (parseFloat(t.cryptoValue) || 0), 0);
 
     if (totalInvested === 0) {
-        return { totalInvested: 0, totalCryptoValue: 0, absoluteReturn: 0, percentageReturn: 0, savingsGain: 0, netVsSavings: 0, averageAgeDays: null, yearsHeld: null, annualizedReturn: null };
+        return { totalInvested: 0, totalCryptoValue: 0, absoluteReturn: 0, percentageReturn: 0, savingsGain: 0, netVsSavings: 0, taxableGain: 0, estimatedTax: 0, netVsSavingsAfterTax: 0, averageAgeDays: null, yearsHeld: null, annualizedReturn: null };
     }
 
     const absoluteReturn = currentValue - totalInvested;
@@ -92,24 +92,31 @@ export function calculateInvestmentPerformance(transactions, currentValue, today
 
     const netVsSavings = absoluteReturn - savingsGain;
 
+    const ANNUAL_EXCLUSION = 40000;
+    const INCLUSION_RATE = 0.40;
+    const rate = parseFloat(marginalRate) || 0;
+    const taxableGain = (absoluteReturn > 0 && rate > 0) ? Math.max(0, absoluteReturn - ANNUAL_EXCLUSION) : 0;
+    const estimatedTax = taxableGain * INCLUSION_RATE * (rate / 100);
+    const netVsSavingsAfterTax = netVsSavings - estimatedTax;
+
     if (validTxCount === 0 || weightedAgeSum === 0) {
-        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays: null, yearsHeld: null, annualizedReturn: null };
+        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays: null, yearsHeld: null, annualizedReturn: null };
     }
 
     const averageAgeDays = weightedAgeSum / totalInvested;
     const yearsHeld = averageAgeDays / 365.25;
 
     if (yearsHeld <= 0.1) {
-        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn: null };
+        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays, yearsHeld, annualizedReturn: null };
     }
 
     const ratio = currentValue / totalInvested;
     if (ratio <= 0) {
-        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn: null };
+        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays, yearsHeld, annualizedReturn: null };
     }
 
     const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
-    return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, averageAgeDays, yearsHeld, annualizedReturn };
+    return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays, yearsHeld, annualizedReturn };
 }
 export function monthlyInterestFactor(dailyRate, year, month) {
     const days = new Date(year, month + 1, 0).getDate();
