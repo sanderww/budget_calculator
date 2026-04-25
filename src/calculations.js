@@ -307,6 +307,10 @@ export function generateInvestmentCSV(data) {
     Object.keys(data.currentValues).forEach(type => {
         csv += `current_value,${type},${data.currentValues[type]},\n`;
     });
+    const rate = (data.marginalRate === undefined || data.marginalRate === null || Number.isNaN(parseFloat(data.marginalRate)))
+        ? 41
+        : parseFloat(data.marginalRate);
+    csv += `param,marginal_rate,${rate},\n`;
     return csv;
 }
 

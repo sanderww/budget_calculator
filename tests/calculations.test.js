@@ -484,6 +484,36 @@ describe('CSV round-trips', () => {
             expect(r.transactions).toHaveLength(1);
             expect(r.transactions[0].description).toBe('Stock');
         });
+
+        it('emits a marginal_rate param row using data.marginalRate', () => {
+            const data = {
+                transactions: [],
+                currentValues: { Discretionary: 0, TFSA: 0, Crypto: 0 },
+                marginalRate: 36,
+            };
+            const csv = generateInvestmentCSV(data);
+            expect(csv).toMatch(/^param,marginal_rate,36,$/m);
+        });
+
+        it('defaults to 41 when marginalRate is missing on data', () => {
+            const data = {
+                transactions: [],
+                currentValues: { Discretionary: 0, TFSA: 0, Crypto: 0 },
+            };
+            const csv = generateInvestmentCSV(data);
+            expect(csv).toMatch(/^param,marginal_rate,41,$/m);
+        });
+
+        it('round-trips marginalRate through generate -> parse', () => {
+            const data = {
+                transactions: [{ id: 'x', date: '2025-01-15', description: 'Stock', amount: 2000, type: 'Discretionary', cryptoValue: '' }],
+                currentValues: { Discretionary: 2050, TFSA: 0, Crypto: 0 },
+                marginalRate: 31,
+            };
+            const csv = generateInvestmentCSV(data);
+            const parsed = parseInvestmentCSV(csv);
+            expect(parsed.marginalRate).toBe(31);
+        });
     });
 
     describe('debt', () => {
