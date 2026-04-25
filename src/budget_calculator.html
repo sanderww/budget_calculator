@@ -506,6 +506,11 @@
                                                 class="input-field amount-input text-sm font-bold" placeholder="0.00">
                                         </div>
                                     </div>
+                                    <div class="mb-2">
+                                        <label class="text-xs text-slate-500">Marginal tax rate (%)</label>
+                                        <input type="number" id="marginal-rate-discretionary"
+                                            class="input-field text-sm font-bold" placeholder="41" min="0" max="100" step="1">
+                                    </div>
                                     <div class="text-xs text-slate-500">Invested: <span id="inv-discretionary"
                                             class="font-medium text-slate-700">R 0.00</span></div>
                                     <div class="text-xs text-slate-500">Gain/Loss (R): <span
@@ -529,6 +534,14 @@
                                         <div class="flex justify-between text-xs text-slate-500">
                                             <span>Net vs savings</span>
                                             <span id="net-savings-discretionary" class="font-medium">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Estimated tax (CGT)</span>
+                                            <span id="tax-discretionary" class="font-medium text-red-500">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Net vs savings (after tax)</span>
+                                            <span id="net-savings-after-tax-discretionary" class="font-medium">R 0.00</span>
                                         </div>
                                     </div>
                                 </div>
