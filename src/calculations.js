@@ -260,6 +260,7 @@ export function parseInvestmentCSV(text) {
     const contentRows = rows.slice(1);
     const transactions = [];
     const currentValues = { Discretionary: 0, TFSA: 0, Crypto: 0 };
+    let marginalRate = 41;
 
     contentRows.forEach(row => {
         const cols = row.split(',').map(s => s.trim());
@@ -268,6 +269,11 @@ export function parseInvestmentCSV(text) {
             const amount = parseFloat(cols[2]) || 0;
             if (Object.prototype.hasOwnProperty.call(currentValues, type)) {
                 currentValues[type] = amount;
+            }
+        } else if (cols[0] === 'param') {
+            if (cols[1] === 'marginal_rate') {
+                const v = parseFloat(cols[2]);
+                if (!Number.isNaN(v)) marginalRate = v;
             }
         } else {
             let dateStr = cols[0];
@@ -285,7 +291,7 @@ export function parseInvestmentCSV(text) {
             });
         }
     });
-    return { transactions, currentValues };
+    return { transactions, currentValues, marginalRate };
 }
 
 export function generateInvestmentCSV(data) {
