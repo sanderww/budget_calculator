@@ -2,7 +2,7 @@
 
 ## Overview
 
-A single-page web application for personal financial management with four modules: Budget Calculator, Investment Tracker, Debt Calculator, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
+A single-page web application for personal financial management with five modules: Budget Calculator, Investment Tracker, Debt Calculator, RA, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
 
 ---
 
@@ -193,7 +193,46 @@ Newton-Raphson method to find the internal rate of return:
 
 ---
 
-## 4. History Tab
+## 4. RA Tab
+
+### 4.1 Layout
+
+A purple-accented sidebar (db/ra.csv with Load/Save buttons) and a main area with three cards:
+
+1. **RA Summary** — three columns:
+   - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
+   - Editable **Tax refund rate (%)** input (default 41) and the lifetime refund (uncapped).
+   - Editable **Nominal return (%)** input (default 10) and the estimated pot value today.
+   - When any tax-year row hits the SARS cap, a "cap hit in some year" amber pill appears under the lifetime refund.
+2. **Per tax-year refund** — table with columns: Tax year | Status | Contributions | Deductible | Refund. A totals row at the bottom. Above the table:
+   - Editable **Future years** input (default 10).
+   - Editable **Assumed monthly (R)** input + **auto** button. Auto resets to the average of the last 3 contributions; typing a value persists an explicit override.
+   - Each row showing `contributions > R 350,000` displays an amber `cap` pill in the Status column.
+3. **Contributions** — list of contribution rows (date, description, amount, delete button). Sorted by date descending. A `+ Add` button appends a new row defaulting to today's date and `"monthly repayment"` description.
+
+### 4.2 Tax-year status strings
+
+- `actual` — entirely past tax years.
+- `partial (N actual + M projected)` — the current tax year, where N is the count of actual contributions and M is the months remaining until 28/29 February.
+- `projected` — future tax years (entirely model-driven).
+
+### 4.3 Persistence
+
+- Auto-saves on any change (debounced 800ms) via POST to `/api/save/ra` (or `/api/save/test_ra` in test mode).
+- Auto-loads `db/ra.csv` (or `db/test/ra.csv`) on page open.
+- All RA settings are stored as `param,<key>,<value>,` rows alongside transactions in the same CSV.
+- The `assumed_future_monthly` param row is only written when the user has overridden the auto-derived value; the **auto** button removes the override.
+
+### 4.4 Defaults (first run, no saved file)
+
+- `tax_refund_rate_pct = 41`
+- `nominal_return_pct = 10`
+- `future_years_to_project = 10`
+- `assumed_future_monthly` = derived from last 3 contributions (or 0 if none).
+
+---
+
+## 5. History Tab
 
 Aggregates all financial activity by year in a summary table:
 
@@ -212,11 +251,11 @@ Aggregates all financial activity by year in a summary table:
 
 ---
 
-## 5. Data Persistence
+## 6. Data Persistence
 
-### 5.1 CSV File Format
+### 6.1 CSV File Format
 
-Three separate CSV files store application state:
+Four separate CSV files store application state:
 
 **Budget** (`calulator_data.csv`):
 ```
@@ -252,17 +291,30 @@ param,original_term,<value>
 <date>,<description>,<amount>
 ```
 
-### 5.2 Auto-Save
+**RA** (`ra.csv`):
+```
+<YYYY-MM-DD>,<description>,<amount>
+param,tax_refund_rate_pct,<percent>,
+param,nominal_return_pct,<percent>,
+param,future_years_to_project,<int>,
+param,assumed_future_monthly,<amount>,
+```
+- No header row.
+- Transactions and `param` rows share the file. The first column distinguishes them: an ISO date is a transaction; the literal `param` is a setting.
+- The `assumed_future_monthly` row is omitted unless the user has overridden the auto-derived value.
+- Defaults applied when a param row is missing: refund rate 41, return rate 10, future years 10.
+
+### 6.2 Auto-Save
 
 - All data changes trigger a debounced save (800ms delay) via POST to the server.
 - Manual save buttons are also available for each module.
 - On page load, all three CSV files are fetched automatically.
 
-### 5.3 Server API
+### 6.3 Server API
 
 | Endpoint | Method | Behavior |
 |---|---|---|
-| `/api/save/<name>` | POST | Writes request body to the mapped CSV file. Valid names: `budget`, `investments`, `debt` (and their `test_` prefixed variants). |
+| `/api/save/<name>` | POST | Writes request body to the mapped CSV file. Valid names: `budget`, `investments`, `debt`, `ra` (and their `test_` prefixed variants). |
 | `/<path>` | GET | Serves static files; falls back to `src/` directory if not found at project root. |
 
 - Real data files are backed up (timestamped copy) before every write.
@@ -270,7 +322,7 @@ param,original_term,<value>
 
 ---
 
-## 6. Test Mode
+## 7. Test Mode
 
 - Toggle button in the header switches between real data and sample data.
 - When enabled:
@@ -283,7 +335,7 @@ param,original_term,<value>
 
 ---
 
-## 7. Calculation Functions Reference
+## 8. Calculation Functions Reference
 
 All pure calculation logic is extracted into a separate ES module (`calculations.js`) with the following exported functions:
 
@@ -300,3 +352,8 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `parseBudgetCSV(text)` / `generateBudgetCSV(data)` | Budget CSV serialization |
 | `parseInvestmentCSV(text)` / `generateInvestmentCSV(data)` | Investment CSV serialization |
 | `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |
+| `taxYearLabel(date)` | Returns the SA tax-year bucket label `YYYY/YY` (e.g. `2026/27`) |
+| `parseRaCSV(text)` / `generateRaCSV(data)` | RA CSV serialization (transactions + param rows) |
+| `deriveAssumedFutureMonthly(transactions)` | Average of the last 3 contributions for projection default |
+| `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject}, today?)` | Per-tax-year refund table with actual/partial/projected statuses and cap handling |
+| `calculatePotValueToday(transactions, nominalReturnPct, today?)` | Monthly-compounded estimate of pot value as of today |

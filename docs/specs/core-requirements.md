@@ -295,13 +295,77 @@ Result is the annualized yield (as a decimal, e.g. 0.12 = 12%).
 
 ---
 
-## 4. History Module
+## 4. RA (Retirement Annuity) Module
 
 ### 4.1 Goal
 
+Track contributions to a South African Retirement Annuity, estimate the lifetime tax refund, and project the deductible refund per tax year (past + current + future).
+
+### 4.2 Domain Concepts
+
+| Concept | Definition |
+|---|---|
+| **Contribution** | A single deposit into the RA. Has a date, description (default: "monthly repayment"), and ZAR amount. |
+| **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. |
+| **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
+| **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
+| **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 350,000**. |
+| **Assumed future monthly** | Used for future-year projections. Defaults to the average of the last 3 contributions; user can override. |
+
+### 4.3 Total Contributed and Lifetime Refund
+
+```
+Total Contributed = sum of all contribution amounts
+Lifetime Refund (uncapped) = Total Contributed × (Refund Rate / 100)
+```
+
+The lifetime figure ignores per-year capping; the per-tax-year table is authoritative when any year exceeds the cap.
+
+### 4.4 Per-Tax-Year Refund
+
+Each contribution is bucketed into the SA tax year of its date. For each observed past tax year:
+
+```
+Year Total = sum of contributions in that tax year
+Deductible = MIN(Year Total, R 350,000)
+Refund     = Deductible × (Refund Rate / 100)
+```
+
+The **current** tax year mixes actual contributions with projected future months until year-end:
+
+```
+Months Remaining = whole calendar months between today's month and the year-end month
+Current Year Total = actual contributions so far + Assumed Future Monthly × Months Remaining
+```
+
+Each **projected** future tax year (for `Future Years to Project` years after the current year):
+
+```
+Year Total = Assumed Future Monthly × 12
+```
+
+Deductible is capped at R 350,000 in every case. A row is flagged `capHit` when its raw Year Total exceeds the cap.
+
+### 4.5 Estimated Pot Value Today
+
+Sums each contribution forward to today using monthly compounding:
+
+```
+r_m = (1 + Nominal Return / 100) ^ (1/12) − 1
+Pot Today = Σ amount × (1 + r_m) ^ months_between(contribution_date, today)
+```
+
+Future-dated contributions are treated as having grown 0 months.
+
+---
+
+## 5. History Module
+
+### 5.1 Goal
+
 Give the user a year-by-year view of capital deployed — how much went toward debt reduction and how much went into investments, broken down by investment type.
 
-### 4.2 Data Sources
+### 5.2 Data Sources
 
 | Column | Source |
 |---|---|
@@ -312,7 +376,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | **Discretionary** | Sum of Discretionary-type investment transactions for that year |
 | **Crypto** | Sum of Crypto-type investment transactions for that year |
 
-### 4.3 Rules
+### 5.3 Rules
 
 - Rows are sorted by year ascending.
 - A totals row at the bottom sums all columns.
@@ -321,7 +385,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 
 ---
 
-## 5. Hard Requirements Summary
+## 6. Hard Requirements Summary
 
 | # | Requirement |
 |---|---|
@@ -342,3 +406,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R14 | XIRR uses Newton-Raphson with ≤ 20 iterations, convergence at |Δrate| < 0.0001 or |XNPV| < 1. |
 | R15 | History is grouped by calendar year, sorted ascending, with a totals row. |
 | R16 | All calculations update in real time on any data change (no manual "calculate" step required, except for monthly allocation which is triggered explicitly). |
+| R17 | RA tax year runs 1 March → 28/29 February; bucketing label is `YYYY/YY` (e.g. `2026/27`). |
+| R18 | RA per-tax-year deductible is capped at R 350,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
+| R19 | RA current-year row mixes actual contributions to date with `Assumed Future Monthly × months_remaining`; status reads `partial (N actual + M projected)`. |
+| R20 | RA settings (refund rate, return rate, future years, optional assumed monthly override) are persisted as `param,<key>,<value>,` rows inside `db/ra.csv`. |
