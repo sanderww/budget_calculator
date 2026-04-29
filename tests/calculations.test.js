@@ -14,6 +14,7 @@ import {
     generateInvestmentCSV,
     parseDebtCSV,
     generateDebtCSV,
+    taxYearLabel,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -559,5 +560,20 @@ describe('smoke', () => {
         expect(typeof generateInvestmentCSV).toBe('function');
         expect(typeof parseDebtCSV).toBe('function');
         expect(typeof generateDebtCSV).toBe('function');
+    });
+});
+
+describe('taxYearLabel', () => {
+    it('returns YYYY/YY for a March date (start of SA tax year)', () => {
+        expect(taxYearLabel(new Date('2026-03-01'))).toBe('2026/27');
+    });
+    it('returns YYYY/YY for a February date (end of SA tax year)', () => {
+        expect(taxYearLabel(new Date('2026-02-28'))).toBe('2025/26');
+    });
+    it('returns YYYY/YY for a mid-year date', () => {
+        expect(taxYearLabel(new Date('2026-08-15'))).toBe('2026/27');
+    });
+    it('handles century rollover with leading zero', () => {
+        expect(taxYearLabel(new Date('2099-12-01'))).toBe('2099/00');
     });
 });

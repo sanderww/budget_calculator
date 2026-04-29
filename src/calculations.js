@@ -350,3 +350,15 @@ export function generateDebtCSV(repayments, params) {
     repayments.forEach(r => { csv += `${r.date},${r.description},${r.amount}\n`; });
     return csv;
 }
+
+// ============================================================================
+// RA (Retirement Annuity) Tab
+// ============================================================================
+
+export function taxYearLabel(date) {
+    const y = date.getFullYear();
+    const m = date.getMonth() + 1;
+    const startYear = m >= 3 ? y : y - 1;
+    const endYY = String((startYear + 1) % 100).padStart(2, '0');
+    return `${startYear}/${endYY}`;
+}
