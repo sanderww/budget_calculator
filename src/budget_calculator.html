@@ -1246,8 +1246,56 @@
                 renderRa();
             });
 
-            // Stub — implemented in Task 10
-            function raPersist() { /* filled in by Task 10 */ }
+            const generateRaCSVFromState = () => _generateRaCSV({
+                transactions: raTransactions,
+                params: raParams,
+            });
+
+            function raPersist() {
+                debouncedSave(saveKey('ra'), generateRaCSVFromState, 'save-ra-csv');
+            }
+
+            document.getElementById('save-ra-csv').addEventListener('click', () => {
+                saveToServer(saveKey('ra'), generateRaCSVFromState, 'save-ra-csv');
+            });
+
+            document.getElementById('load-ra-csv').addEventListener('click', () => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.csv';
+                input.onchange = (e) => {
+                    const f = e.target.files && e.target.files[0];
+                    if (!f) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                        const parsed = _parseRaCSV(ev.target.result);
+                        raTransactions = parsed.transactions;
+                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, ...parsed.params };
+                        renderRa();
+                    };
+                    reader.readAsText(f);
+                };
+                input.click();
+            });
+
+            // Initial render so the empty state is visible immediately
+            renderRa();
+
+            // Try to auto-load ra.csv if available
+            (async () => {
+                try {
+                    const response = await fetch(dbPath('ra.csv'), { cache: 'no-store' });
+                    if (response.ok) {
+                        const text = await response.text();
+                        const parsed = _parseRaCSV(text);
+                        raTransactions = parsed.transactions;
+                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, ...parsed.params };
+                        renderRa();
+                    }
+                } catch (_e) {
+                    console.log('Could not auto-load ra.csv');
+                }
+            })();
 
             // --- TEST MODE ---
             let testMode = false;
