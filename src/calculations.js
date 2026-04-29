@@ -362,3 +362,45 @@ export function taxYearLabel(date) {
     const endYY = String((startYear + 1) % 100).padStart(2, '0');
     return `${startYear}/${endYY}`;
 }
+
+export function parseRaCSV(text) {
+    const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');
+    const transactions = [];
+    const params = {};
+    rows.forEach(row => {
+        const cols = row.split(',').map(s => s.trim());
+        if (cols[0] === 'param') {
+            const v = parseFloat(cols[2]);
+            if (!Number.isNaN(v)) params[cols[1]] = v;
+            return;
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(cols[0])) return;
+        const amount = parseFloat(cols[2]);
+        if (Number.isNaN(amount)) return;
+        transactions.push({
+            id: _generateId(),
+            date: cols[0],
+            description: cols[1] || '',
+            amount,
+        });
+    });
+    return { transactions, params };
+}
+
+export function generateRaCSV(data) {
+    let csv = '';
+    (data.transactions || []).forEach(t => {
+        csv += `${t.date},${t.description},${t.amount}\n`;
+    });
+    const p = data.params || {};
+    const writeParam = (key) => {
+        if (p[key] !== undefined && p[key] !== null && p[key] !== '') {
+            csv += `param,${key},${p[key]},\n`;
+        }
+    };
+    writeParam('tax_refund_rate_pct');
+    writeParam('nominal_return_pct');
+    writeParam('future_years_to_project');
+    writeParam('assumed_future_monthly');
+    return csv;
+}

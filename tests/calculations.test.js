@@ -15,6 +15,8 @@ import {
     parseDebtCSV,
     generateDebtCSV,
     taxYearLabel,
+    parseRaCSV,
+    generateRaCSV,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -575,5 +577,90 @@ describe('taxYearLabel', () => {
     });
     it('handles century rollover with leading zero', () => {
         expect(taxYearLabel(new Date('2099-12-01'))).toBe('2099/00');
+    });
+});
+
+describe('parseRaCSV', () => {
+    it('parses transactions and params', () => {
+        const csv = `2026-03-15,monthly repayment,5000
+2026-04-15,monthly repayment,5000
+param,tax_refund_rate_pct,41,
+param,nominal_return_pct,10,
+param,future_years_to_project,10,
+param,assumed_future_monthly,6000,
+`;
+        const result = parseRaCSV(csv);
+        expect(result.transactions).toHaveLength(2);
+        expect(result.transactions[0].date).toBe('2026-03-15');
+        expect(result.transactions[0].description).toBe('monthly repayment');
+        expect(result.transactions[0].amount).toBe(5000);
+        expect(result.params.tax_refund_rate_pct).toBe(41);
+        expect(result.params.nominal_return_pct).toBe(10);
+        expect(result.params.future_years_to_project).toBe(10);
+        expect(result.params.assumed_future_monthly).toBe(6000);
+    });
+
+    it('returns empty arrays and undefined params for empty input', () => {
+        const result = parseRaCSV('');
+        expect(result.transactions).toEqual([]);
+        expect(result.params).toEqual({});
+    });
+
+    it('skips an optional header row', () => {
+        const csv = `date,description,amount
+2026-03-15,monthly repayment,5000
+`;
+        const result = parseRaCSV(csv);
+        expect(result.transactions).toHaveLength(1);
+    });
+
+    it('tolerates blank lines', () => {
+        const csv = `2026-03-15,monthly repayment,5000
+
+param,tax_refund_rate_pct,41,
+`;
+        const result = parseRaCSV(csv);
+        expect(result.transactions).toHaveLength(1);
+        expect(result.params.tax_refund_rate_pct).toBe(41);
+    });
+});
+
+describe('generateRaCSV', () => {
+    it('round-trips transactions and params', () => {
+        const data = {
+            transactions: [
+                { id: 'a', date: '2026-03-15', description: 'monthly repayment', amount: 5000 },
+                { id: 'b', date: '2026-04-15', description: 'monthly repayment', amount: 5000 },
+            ],
+            params: {
+                tax_refund_rate_pct: 41,
+                nominal_return_pct: 10,
+                future_years_to_project: 10,
+            },
+        };
+        const csv = generateRaCSV(data);
+        const parsed = parseRaCSV(csv);
+        expect(parsed.transactions).toHaveLength(2);
+        expect(parsed.transactions[0].date).toBe('2026-03-15');
+        expect(parsed.transactions[0].amount).toBe(5000);
+        expect(parsed.params.tax_refund_rate_pct).toBe(41);
+        expect(parsed.params.nominal_return_pct).toBe(10);
+        expect(parsed.params.future_years_to_project).toBe(10);
+    });
+
+    it('omits assumed_future_monthly when not set', () => {
+        const csv = generateRaCSV({
+            transactions: [],
+            params: { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10 },
+        });
+        expect(csv).not.toMatch(/assumed_future_monthly/);
+    });
+
+    it('writes assumed_future_monthly when set', () => {
+        const csv = generateRaCSV({
+            transactions: [],
+            params: { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, assumed_future_monthly: 6000 },
+        });
+        expect(csv).toMatch(/param,assumed_future_monthly,6000,/);
     });
 });
