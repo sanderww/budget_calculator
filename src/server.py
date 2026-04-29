@@ -7,11 +7,13 @@ FILE_MAP = {
     'budget':           'db/calulator_data.csv',
     'investments':      'db/investments.csv',
     'debt':             'db/debt.csv',
+    'ra':               'db/ra.csv',
     'test_budget':      'db/test/calulator_data.csv',
     'test_investments': 'db/test/investments.csv',
     'test_debt':        'db/test/debt.csv',
+    'test_ra':          'db/test/ra.csv',
 }
-REAL_KEYS = {'budget', 'investments', 'debt'}
+REAL_KEYS = {'budget', 'investments', 'debt', 'ra'}
 BACKUP_DIR = '/Users/sanderwiersma/Documents/budget_backups'
 
 def backup_file(filepath, name):
