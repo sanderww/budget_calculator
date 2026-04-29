@@ -174,6 +174,20 @@
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
+                    <button id="tab-ra"
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        RA
+                    </button>
+                    <button id="refresh-ra" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh RA calculations">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2v6h-6"/>
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+                            <path d="M3 22v-6h6"/>
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="inline-flex items-center gap-1">
                     <button id="tab-history"
                         class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
                         History
@@ -531,7 +545,7 @@
                                             <span>6% savings would be</span>
                                             <span id="savings-gain-discretionary">R 0.00</span>
                                         </div>
-                                        <div class="flex justify-between text-xs text-slate-500">
+                                        <div class="flex justify-between text-xs text-slate-400">
                                             <span>Net vs savings</span>
                                             <span id="net-savings-discretionary" class="font-medium">R 0.00</span>
                                         </div>
@@ -539,9 +553,9 @@
                                             <span>Estimated tax (CGT)</span>
                                             <span id="tax-discretionary" class="font-medium text-red-500">R 0.00</span>
                                         </div>
-                                        <div class="flex justify-between text-xs text-slate-500">
+                                        <div class="flex justify-between text-xs font-bold text-slate-700">
                                             <span>Net vs savings (after tax)</span>
-                                            <span id="net-savings-after-tax-discretionary" class="font-medium">R 0.00</span>
+                                            <span id="net-savings-after-tax-discretionary">R 0.00</span>
                                         </div>
                                     </div>
                                 </div>
@@ -840,6 +854,138 @@
                             </div>
 
                             <div id="repayment-list" class="space-y-2"></div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- RA TAB CONTENT -->
+        <div id="ra-content" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Left Sidebar -->
+                <div class="lg:col-span-1">
+                    <div class="card bg-gradient-to-b from-purple-50 to-violet-50 border-l-4 border-purple-400 sticky top-8">
+                        <div class="flex flex-col gap-4">
+                            <div class="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="text-purple-600">
+                                    <path d="M12 2v20M5 7h14M5 17h14"/>
+                                </svg>
+                                <h3 class="font-semibold text-purple-800">RA Database</h3>
+                            </div>
+
+                            <div class="pt-4 border-t border-purple-200">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="font-medium text-slate-700 text-sm">Database</span>
+                                </div>
+                                <div class="text-xs text-slate-600 mb-3">db/ra.csv</div>
+                                <button id="load-ra-csv" class="btn btn-secondary text-xs w-full mb-2">Load RA</button>
+                                <button id="save-ra-csv" class="btn btn-primary text-xs w-full">Save RA</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Content Area -->
+                <div class="lg:col-span-3">
+                    <div class="grid grid-cols-1 gap-6">
+
+                        <!-- Summary -->
+                        <div class="card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">RA Summary</h2>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <div class="text-xs text-slate-500">Total contributed</div>
+                                    <div id="ra-total-contributed" class="text-xl font-bold text-slate-800">R 0</div>
+                                    <div class="text-xs text-slate-400 mt-1">
+                                        <span id="ra-count">0</span> contributions
+                                    </div>
+                                    <div class="text-xs text-slate-400">
+                                        <span id="ra-first-date">—</span> → <span id="ra-last-date">—</span>
+                                    </div>
+                                    <div class="text-xs text-slate-500 mt-2">
+                                        Current tax year: <span id="ra-current-year-total" class="font-medium text-slate-700">R 0</span>
+                                    </div>
+                                </div>
+
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <label class="text-xs text-slate-500">Tax refund rate (%)</label>
+                                    <input type="number" id="ra-refund-rate" class="input-field text-sm font-bold" min="0" max="100" step="0.1" value="41">
+                                    <div class="text-xs text-slate-500 mt-2">Lifetime refund (uncapped):</div>
+                                    <div id="ra-lifetime-refund" class="text-xl font-bold text-green-700">R 0</div>
+                                    <div id="ra-cap-warning" class="hidden mt-2 inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">cap hit in some year</div>
+                                </div>
+
+                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                    <label class="text-xs text-slate-500">Nominal return (%)</label>
+                                    <input type="number" id="ra-return-rate" class="input-field text-sm font-bold" min="0" max="100" step="0.1" value="10">
+                                    <div class="text-xs text-slate-500 mt-2">Estimated pot value today:</div>
+                                    <div id="ra-pot-value" class="text-xl font-bold text-indigo-700">R 0</div>
+                                    <div class="text-[10px] text-slate-400 mt-1">monthly compounding</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Per tax-year projection -->
+                        <div class="card">
+                            <div class="flex justify-between items-end mb-4 flex-wrap gap-4">
+                                <h2 class="text-xl font-semibold text-slate-800">Per tax-year refund</h2>
+                                <div class="flex items-end gap-3">
+                                    <div>
+                                        <label class="block text-xs text-slate-500">Future years</label>
+                                        <input type="number" id="ra-future-years" class="input-field text-sm w-24" min="0" max="50" step="1" value="10">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-slate-500">Assumed monthly (R)</label>
+                                        <div class="flex items-center gap-1">
+                                            <input type="number" id="ra-assumed-monthly" class="input-field text-sm w-32" min="0" step="100">
+                                            <button id="ra-assumed-auto" class="btn btn-secondary text-xs" title="Reset to last 3 months' average">auto</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">
+                                        <th class="text-left py-2">Tax year</th>
+                                        <th class="text-left py-2">Status</th>
+                                        <th class="text-right py-2">Contributions</th>
+                                        <th class="text-right py-2">Deductible</th>
+                                        <th class="text-right py-2">Refund</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ra-projection-rows"></tbody>
+                                <tfoot>
+                                    <tr class="font-bold border-t border-slate-300">
+                                        <td colspan="2" class="py-2">Total</td>
+                                        <td class="text-right py-2" id="ra-total-row-contributions">R 0</td>
+                                        <td></td>
+                                        <td class="text-right py-2 text-green-700" id="ra-total-row-refund">R 0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Transactions -->
+                        <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-slate-800">Contributions</h2>
+                                <button id="ra-add-contribution" class="btn btn-secondary text-sm">+ Add</button>
+                            </div>
+
+                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                style="grid-template-columns: 1fr 2fr 1fr auto;">
+                                <div>Date</div>
+                                <div>Description</div>
+                                <div>Amount</div>
+                                <div></div>
+                            </div>
+
+                            <div id="ra-list" class="space-y-2"></div>
                         </div>
 
                     </div>
@@ -1380,9 +1526,9 @@
                     const sg0 = document.getElementById(`savings-gain-${typeKey}`);
                     const ns0 = document.getElementById(`net-savings-${typeKey}`);
                     if (sg0) sg0.textContent = 'R 0.00';
-                    if (ns0) { ns0.textContent = 'R 0.00'; ns0.className = 'font-medium'; }
+                    if (ns0) { ns0.textContent = 'R 0.00'; ns0.className = (typeKey === 'discretionary' ? 'font-medium text-slate-400' : 'font-bold text-slate-800'); }
                     if (taxEl) { taxEl.textContent = 'R 0.00'; taxEl.className = 'font-medium text-red-500'; }
-                    if (netAfterTaxEl) { netAfterTaxEl.textContent = 'R 0.00'; netAfterTaxEl.className = 'font-medium'; }
+                    if (netAfterTaxEl) { netAfterTaxEl.textContent = 'R 0.00'; netAfterTaxEl.className = 'font-bold text-slate-800'; }
                     return;
                 }
 
@@ -1399,7 +1545,11 @@
                 if (savingsGainEl) savingsGainEl.textContent = `+${formatCurrency(r.savingsGain)}`;
                 if (netSavingsEl) {
                     netSavingsEl.textContent = `${r.netVsSavings >= 0 ? '+' : ''}${formatCurrency(r.netVsSavings)}`;
-                    netSavingsEl.className = `font-medium ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
+                    if (typeKey === 'discretionary') {
+                        netSavingsEl.className = 'font-medium text-slate-400';
+                    } else {
+                        netSavingsEl.className = `font-bold ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
+                    }
                 }
 
                 if (taxEl) {
@@ -1408,7 +1558,7 @@
                 }
                 if (netAfterTaxEl) {
                     netAfterTaxEl.textContent = `${r.netVsSavingsAfterTax >= 0 ? '+' : ''}${formatCurrency(r.netVsSavingsAfterTax)}`;
-                    netAfterTaxEl.className = `font-medium ${r.netVsSavingsAfterTax >= 0 ? 'text-green-600' : 'text-red-500'}`;
+                    netAfterTaxEl.className = `font-bold ${r.netVsSavingsAfterTax >= 0 ? 'text-green-600' : 'text-red-500'}`;
                 }
 
                 if (r.annualizedReturn === null) {
