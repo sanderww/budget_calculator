@@ -19,6 +19,7 @@ import {
     generateRaCSV,
     deriveAssumedFutureMonthly,
     calculateRaProjection,
+    calculatePotValueToday,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -824,5 +825,43 @@ describe('calculateRaProjection', () => {
         }, today);
         const labels = result.rows.map(r => r.taxYear);
         expect(labels).toEqual(['2024/25', '2025/26', '2026/27', '2027/28', '2028/29']);
+    });
+});
+
+describe('calculatePotValueToday', () => {
+    it('returns 0 with no transactions', () => {
+        expect(calculatePotValueToday([], 10, new Date('2026-04-29'))).toBe(0);
+    });
+
+    it('returns the principal sum when nominal rate is 0', () => {
+        const txs = [
+            { date: '2025-04-01', amount: 5000 },
+            { date: '2026-01-01', amount: 5000 },
+        ];
+        expect(calculatePotValueToday(txs, 0, new Date('2026-04-29'))).toBe(10000);
+    });
+
+    it('compounds at the monthly rate from each contribution', () => {
+        // R10,000 made exactly 12 months ago at 12% nominal:
+        // (1+r_m)^12 = 1.12, so the value today should be 11200.
+        const today = new Date('2026-04-29');
+        const oneYearAgo = '2025-04-29';
+        const result = calculatePotValueToday(
+            [{ date: oneYearAgo, amount: 10000 }],
+            12,
+            today
+        );
+        expect(result).toBeCloseTo(11200, 0);
+    });
+
+    it('treats future-dated contributions as having grown 0 months', () => {
+        const today = new Date('2026-04-29');
+        const future = '2027-04-29';
+        const result = calculatePotValueToday(
+            [{ date: future, amount: 5000 }],
+            10,
+            today
+        );
+        expect(result).toBe(5000);
     });
 });

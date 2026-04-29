@@ -511,3 +511,17 @@ export function calculateRaProjection({
 
     return { rows, total };
 }
+
+export function calculatePotValueToday(transactions, nominalReturnPct, today = new Date()) {
+    if (!transactions || transactions.length === 0) return 0;
+    const r = Number(nominalReturnPct) || 0;
+    const r_m = Math.pow(1 + r / 100, 1 / 12) - 1;
+    const todayY = today.getUTCFullYear();
+    const todayM = today.getUTCMonth();
+    return transactions.reduce((sum, t) => {
+        const d = new Date(t.date + 'T00:00:00Z');
+        if (Number.isNaN(d.getTime())) return sum;
+        const months = Math.max(0, (todayY - d.getUTCFullYear()) * 12 + (todayM - d.getUTCMonth()));
+        return sum + (Number(t.amount) || 0) * Math.pow(1 + r_m, months);
+    }, 0);
+}
