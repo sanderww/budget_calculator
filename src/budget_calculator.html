@@ -1010,6 +1010,12 @@
             generateInvestmentCSV as _generateInvestmentCSV,
             parseDebtCSV as _parseDebtCSV,
             generateDebtCSV as _generateDebtCSV,
+            taxYearLabel as _taxYearLabel,
+            parseRaCSV as _parseRaCSV,
+            generateRaCSV as _generateRaCSV,
+            deriveAssumedFutureMonthly as _deriveAssumedFutureMonthly,
+            calculateRaProjection as _calculateRaProjection,
+            calculatePotValueToday as _calculatePotValueToday,
         } from './calculations.js';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1092,8 +1098,156 @@
                 renderRa();
             });
 
-            // Stub — implemented in Task 9
-            function renderRa() { /* filled in by Task 9 */ }
+            // --- RA STATE ---
+            let raTransactions = [];
+            let raParams = {
+                tax_refund_rate_pct: 41,
+                nominal_return_pct: 10,
+                future_years_to_project: 10,
+                // assumed_future_monthly omitted → derived from last 3 contributions
+            };
+
+            const raAssumedMonthly = () => (
+                raParams.assumed_future_monthly !== undefined
+                    ? Number(raParams.assumed_future_monthly)
+                    : _deriveAssumedFutureMonthly(raTransactions)
+            );
+
+            const raMakeId = () => 'ra_' + Math.random().toString(36).slice(2, 9);
+            const raFmtZARShort = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA');
+
+            function renderRa() {
+                document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
+                document.getElementById('ra-return-rate').value      = raParams.nominal_return_pct;
+                document.getElementById('ra-future-years').value     = raParams.future_years_to_project;
+                document.getElementById('ra-assumed-monthly').value  = raAssumedMonthly();
+
+                const total = raTransactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+                document.getElementById('ra-total-contributed').textContent = raFmtZARShort(total);
+                document.getElementById('ra-count').textContent = raTransactions.length;
+                if (raTransactions.length > 0) {
+                    const sortedAsc = [...raTransactions].sort((a, b) => a.date.localeCompare(b.date));
+                    document.getElementById('ra-first-date').textContent = sortedAsc[0].date;
+                    document.getElementById('ra-last-date').textContent  = sortedAsc[sortedAsc.length - 1].date;
+                } else {
+                    document.getElementById('ra-first-date').textContent = '—';
+                    document.getElementById('ra-last-date').textContent  = '—';
+                }
+
+                const today = new Date();
+                const currentYearLabel = _taxYearLabel(today);
+                const currentYearTotal = raTransactions
+                    .filter(t => _taxYearLabel(new Date(t.date + 'T00:00:00Z')) === currentYearLabel)
+                    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+                document.getElementById('ra-current-year-total').textContent = raFmtZARShort(currentYearTotal);
+
+                document.getElementById('ra-lifetime-refund').textContent = raFmtZARShort(total * (raParams.tax_refund_rate_pct / 100));
+                document.getElementById('ra-pot-value').textContent       = raFmtZARShort(_calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today));
+
+                const proj = _calculateRaProjection({
+                    transactions: raTransactions,
+                    taxRefundRatePct: raParams.tax_refund_rate_pct,
+                    assumedFutureMonthly: raAssumedMonthly(),
+                    futureYearsToProject: raParams.future_years_to_project,
+                }, today);
+
+                const anyCapHit = proj.rows.some(r => r.capHit);
+                document.getElementById('ra-cap-warning').classList.toggle('hidden', !anyCapHit);
+
+                const tbody = document.getElementById('ra-projection-rows');
+                tbody.innerHTML = proj.rows.map(r => {
+                    const cap = r.capHit ? ' <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 ml-1">cap</span>' : '';
+                    return `
+                        <tr class="border-b border-slate-100">
+                            <td class="py-2 font-medium">${r.taxYear}</td>
+                            <td class="py-2 text-slate-500">${r.status}${cap}</td>
+                            <td class="py-2 text-right">${raFmtZARShort(r.contributions)}</td>
+                            <td class="py-2 text-right">${raFmtZARShort(r.deductible)}</td>
+                            <td class="py-2 text-right text-green-700">${raFmtZARShort(r.refund)}</td>
+                        </tr>
+                    `;
+                }).join('');
+                document.getElementById('ra-total-row-contributions').textContent = raFmtZARShort(proj.total.contributions);
+                document.getElementById('ra-total-row-refund').textContent       = raFmtZARShort(proj.total.refund);
+
+                const list = document.getElementById('ra-list');
+                const sortedDesc = [...raTransactions].sort((a, b) => b.date.localeCompare(a.date));
+                list.innerHTML = sortedDesc.map(t => `
+                    <div class="grid gap-2 items-center bg-slate-50 p-2 rounded" style="grid-template-columns: 1fr 2fr 1fr auto;" data-id="${t.id}">
+                        <input type="date" class="input-field text-sm ra-row-date" value="${t.date}">
+                        <input type="text" class="input-field text-sm ra-row-desc" value="${(t.description || '').replace(/"/g, '&quot;')}">
+                        <div class="relative">
+                            <span class="currency-prefix text-sm">R</span>
+                            <input type="number" class="input-field amount-input text-sm ra-row-amount" value="${t.amount}" step="0.01" min="0">
+                        </div>
+                        <button class="btn btn-danger text-xs ra-row-delete">×</button>
+                    </div>
+                `).join('');
+
+                list.querySelectorAll('[data-id]').forEach(row => {
+                    const id = row.getAttribute('data-id');
+                    row.querySelector('.ra-row-date').addEventListener('change', (e) => {
+                        const tx = raTransactions.find(t => t.id === id);
+                        if (tx) { tx.date = e.target.value; raPersist(); renderRa(); }
+                    });
+                    row.querySelector('.ra-row-desc').addEventListener('change', (e) => {
+                        const tx = raTransactions.find(t => t.id === id);
+                        if (tx) { tx.description = e.target.value; raPersist(); }
+                    });
+                    row.querySelector('.ra-row-amount').addEventListener('change', (e) => {
+                        const tx = raTransactions.find(t => t.id === id);
+                        if (tx) { tx.amount = parseFloat(e.target.value) || 0; raPersist(); renderRa(); }
+                    });
+                    row.querySelector('.ra-row-delete').addEventListener('click', () => {
+                        raTransactions = raTransactions.filter(t => t.id !== id);
+                        raPersist();
+                        renderRa();
+                    });
+                });
+            }
+
+            const raTodayIso = () => new Date().toISOString().slice(0, 10);
+
+            document.getElementById('ra-add-contribution').addEventListener('click', () => {
+                raTransactions.push({
+                    id: raMakeId(),
+                    date: raTodayIso(),
+                    description: 'monthly repayment',
+                    amount: 0,
+                });
+                raPersist();
+                renderRa();
+            });
+
+            document.getElementById('ra-refund-rate').addEventListener('input', (e) => {
+                raParams.tax_refund_rate_pct = parseFloat(e.target.value) || 0;
+                raPersist();
+                renderRa();
+            });
+            document.getElementById('ra-return-rate').addEventListener('input', (e) => {
+                raParams.nominal_return_pct = parseFloat(e.target.value) || 0;
+                raPersist();
+                renderRa();
+            });
+            document.getElementById('ra-future-years').addEventListener('input', (e) => {
+                raParams.future_years_to_project = parseInt(e.target.value, 10) || 0;
+                raPersist();
+                renderRa();
+            });
+            document.getElementById('ra-assumed-monthly').addEventListener('input', (e) => {
+                const v = parseFloat(e.target.value);
+                raParams.assumed_future_monthly = Number.isNaN(v) ? 0 : v;
+                raPersist();
+                renderRa();
+            });
+            document.getElementById('ra-assumed-auto').addEventListener('click', () => {
+                delete raParams.assumed_future_monthly;
+                raPersist();
+                renderRa();
+            });
+
+            // Stub — implemented in Task 10
+            function raPersist() { /* filled in by Task 10 */ }
 
             // --- TEST MODE ---
             let testMode = false;
