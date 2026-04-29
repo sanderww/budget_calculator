@@ -18,6 +18,7 @@ import {
     parseRaCSV,
     generateRaCSV,
     deriveAssumedFutureMonthly,
+    calculateRaProjection,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -695,5 +696,133 @@ describe('deriveAssumedFutureMonthly', () => {
             { date: '2026-02-15', amount: 4000 },
         ];
         expect(deriveAssumedFutureMonthly(txs)).toBe(5000);
+    });
+});
+
+describe('calculateRaProjection', () => {
+    const rate = 41;
+    const cap = 350000;
+
+    it('returns empty rows when no transactions and no future projection', () => {
+        const today = new Date('2026-04-29');
+        const result = calculateRaProjection({
+            transactions: [],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 0,
+            futureYearsToProject: 0,
+        }, today);
+        expect(result.rows).toHaveLength(0);
+        expect(result.total.contributions).toBe(0);
+        expect(result.total.refund).toBe(0);
+    });
+
+    it('buckets a past tax year as actual', () => {
+        const today = new Date('2026-04-29');  // we are in 2026/27
+        const result = calculateRaProjection({
+            transactions: [
+                { date: '2025-06-15', amount: 10000 },
+                { date: '2025-12-15', amount: 10000 },
+                { date: '2026-02-15', amount: 10000 },
+            ],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 0,
+            futureYearsToProject: 0,
+        }, today);
+        const past = result.rows.find(r => r.taxYear === '2025/26');
+        expect(past).toBeTruthy();
+        expect(past.status).toBe('actual');
+        expect(past.contributions).toBe(30000);
+        expect(past.deductible).toBe(30000);
+        expect(past.refund).toBe(30000 * 0.41);
+        expect(past.capHit).toBe(false);
+    });
+
+    it('caps deductible at R350k and flags capHit', () => {
+        const today = new Date('2027-04-29');
+        const result = calculateRaProjection({
+            transactions: [
+                { date: '2025-06-15', amount: 400000 },
+            ],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 0,
+            futureYearsToProject: 0,
+        }, today);
+        const past = result.rows.find(r => r.taxYear === '2025/26');
+        expect(past.contributions).toBe(400000);
+        expect(past.deductible).toBe(cap);
+        expect(past.refund).toBe(cap * 0.41);
+        expect(past.capHit).toBe(true);
+    });
+
+    it('mixes actual + projected for the current tax year', () => {
+        // Current year: 2026/27 (starts 2026-03-01).
+        // Today: 2026-08-15. Months remaining (after Aug → Sep..Feb) = 6.
+        // 2 actual contributions of 5000, 6 projected of 5000 → year_total = 10000 + 30000 = 40000
+        const today = new Date('2026-08-15');
+        const result = calculateRaProjection({
+            transactions: [
+                { date: '2026-03-15', amount: 5000 },
+                { date: '2026-04-15', amount: 5000 },
+            ],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 5000,
+            futureYearsToProject: 0,
+        }, today);
+        const cur = result.rows.find(r => r.taxYear === '2026/27');
+        expect(cur).toBeTruthy();
+        expect(cur.status).toMatch(/^partial/);
+        expect(cur.contributions).toBe(40000);
+        expect(cur.deductible).toBe(40000);
+        expect(cur.refund).toBeCloseTo(40000 * 0.41, 2);
+    });
+
+    it('emits projected rows for futureYearsToProject years after current', () => {
+        const today = new Date('2026-04-29');
+        const result = calculateRaProjection({
+            transactions: [],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 5000,
+            futureYearsToProject: 3,
+        }, today);
+        const projected = result.rows.filter(r => r.status === 'projected');
+        expect(projected).toHaveLength(3);
+        expect(projected.map(r => r.taxYear)).toEqual(['2027/28', '2028/29', '2029/30']);
+        projected.forEach(r => {
+            expect(r.contributions).toBe(60000);
+            expect(r.deductible).toBe(60000);
+            expect(r.refund).toBeCloseTo(60000 * 0.41, 2);
+        });
+    });
+
+    it('sums totals across all rows', () => {
+        const today = new Date('2026-04-29');
+        const result = calculateRaProjection({
+            transactions: [
+                { date: '2025-06-15', amount: 10000 },
+            ],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 5000,
+            futureYearsToProject: 2,
+        }, today);
+        const sumContribs = result.rows.reduce((s, r) => s + r.contributions, 0);
+        const sumRefund   = result.rows.reduce((s, r) => s + r.refund, 0);
+        expect(result.total.contributions).toBeCloseTo(sumContribs, 2);
+        expect(result.total.refund).toBeCloseTo(sumRefund, 2);
+    });
+
+    it('orders rows chronologically', () => {
+        const today = new Date('2026-04-29');
+        const result = calculateRaProjection({
+            transactions: [
+                { date: '2024-06-15', amount: 1000 },
+                { date: '2025-06-15', amount: 1000 },
+                { date: '2026-06-15', amount: 1000 },
+            ],
+            taxRefundRatePct: rate,
+            assumedFutureMonthly: 1000,
+            futureYearsToProject: 2,
+        }, today);
+        const labels = result.rows.map(r => r.taxYear);
+        expect(labels).toEqual(['2024/25', '2025/26', '2026/27', '2027/28', '2028/29']);
     });
 });
