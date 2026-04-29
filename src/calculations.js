@@ -404,3 +404,11 @@ export function generateRaCSV(data) {
     writeParam('assumed_future_monthly');
     return csv;
 }
+
+export function deriveAssumedFutureMonthly(transactions) {
+    if (!transactions || transactions.length === 0) return 0;
+    const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+    const recent = sorted.slice(-3);
+    const sum = recent.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    return sum / recent.length;
+}

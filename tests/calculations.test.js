@@ -17,6 +17,7 @@ import {
     taxYearLabel,
     parseRaCSV,
     generateRaCSV,
+    deriveAssumedFutureMonthly,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -662,5 +663,37 @@ describe('generateRaCSV', () => {
             params: { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, assumed_future_monthly: 6000 },
         });
         expect(csv).toMatch(/param,assumed_future_monthly,6000,/);
+    });
+});
+
+describe('deriveAssumedFutureMonthly', () => {
+    it('returns 0 when there are no transactions', () => {
+        expect(deriveAssumedFutureMonthly([])).toBe(0);
+    });
+
+    it('returns the only amount when there is one transaction', () => {
+        expect(deriveAssumedFutureMonthly([
+            { date: '2026-03-15', amount: 5000 },
+        ])).toBe(5000);
+    });
+
+    it('averages the most recent up-to-3 transactions', () => {
+        const txs = [
+            { date: '2026-01-15', amount: 3000 },
+            { date: '2026-02-15', amount: 4000 },
+            { date: '2026-03-15', amount: 5000 },
+            { date: '2026-04-15', amount: 6000 },
+        ];
+        expect(deriveAssumedFutureMonthly(txs)).toBe(5000);
+    });
+
+    it('is order-independent (sorts by date internally)', () => {
+        const txs = [
+            { date: '2026-04-15', amount: 6000 },
+            { date: '2026-01-15', amount: 3000 },
+            { date: '2026-03-15', amount: 5000 },
+            { date: '2026-02-15', amount: 4000 },
+        ];
+        expect(deriveAssumedFutureMonthly(txs)).toBe(5000);
     });
 });
