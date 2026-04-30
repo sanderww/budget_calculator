@@ -15,7 +15,7 @@ A new tab for projecting retirement wealth and monthly income, reading live data
 - **RA accessibility age:** hardcoded to 55 (SA law). Not user-configurable.
 - **TFSA lifetime cap:** hardcoded to R500,000 (SARS rule). Not user-configurable.
 - **Year-by-year table:** out of scope for v1. Single snapshot only.
-- **DOB:** hardcoded to 1985-08-08. Not stored in CSV (personal constant).
+- **DOB:** stored as `param,dob` in `db/retirement.csv`. Editable via a date input in the sidebar. Default 1985-08-08.
 
 ## Tab placement
 
@@ -28,6 +28,7 @@ Between **RA** and **History**. Tab id `tab-retirement`, tab key `retirement`.
 Param rows only — same pattern as `db/ra.csv`:
 
 ```
+param,dob,1985-08-08
 param,retirement_age,65
 param,withdrawal_rate_pct,4
 param,return_discretionary_pct,10
@@ -60,6 +61,7 @@ Server: add `'retirement': 'db/retirement.csv'` to `FILE_MAP` and `REAL_KEYS`.
 Two sections, separated by a divider:
 
 **Core settings:**
+- Date of birth (date input, default 1985-08-08) — computed current age shown beneath as a read-only label
 - Retirement age (number input, e.g. 65) — computed years-to-retirement shown beneath as a read-only label
 - Withdrawal rate % (default 4%)
 - Per-fund nominal return %:
@@ -77,7 +79,28 @@ Two sections, separated by a divider:
 
 Below optional scenarios: Load / Save buttons for `db/retirement.csv`.
 
-### Main area — three cards
+### Main area — four cards
+
+#### Card 0: Snapshot Summary (top of page)
+
+Six headline figures arranged in two columns (age 55 | age 68), two rows (funds | monthly income), with a "Current" vs "Projected" distinction:
+
+|  | Age 55 | Age 68 |
+|---|---|---|
+| **Funds available** | Current / Projected | Projected |
+| **Monthly income** | Current / Projected | Projected |
+
+Each cell shows two stacked values — **Current** (no optional scenarios) and **Projected** (with all enabled optional scenarios). If both values are the same (no optional scenarios enabled), only one is shown.
+
+Definitions:
+- **Current funds at 55** — Discretionary + TFSA + Crypto grown from today to age 55, no extra contributions.
+- **Current monthly at 55** — RA pot grown from today to age 55 (no extra contributions) × withdrawal_rate / 12.
+- **Projected funds at 55** — same lump sum funds but with optional TFSA contributions (capped), house sale, and inheritance added.
+- **Projected monthly at 55** — RA pot grown to age 55 with extra monthly contributions (capped at retirement age) × withdrawal_rate / 12.
+- **Projected funds at 68** — lump sum funds grown further from 55 to 68 (no further TFSA contributions beyond cap; house sale / inheritance already included at retirement).
+- **Projected monthly at 68** — RA pot at 68 × withdrawal_rate / 12 + Dutch pension in ZAR (if enabled).
+
+Note: extra RA monthly contributions always stop at retirement age, not at the target snapshot age. So if retirement age is 60, RA contributions run until 60, and then the RA pot grows passively from 60 to 68.
 
 #### Card 1: Monthly Income
 
@@ -136,12 +159,13 @@ function fvGrow(pv, annualRatePct, months) {
 
 ### Years / months to a target age
 
-```js
-const DOB = new Date('1985-08-08');
+`dob` is read from `retirementParams.dob` (a string like `"1985-08-08"`), parsed once at render time.
 
-function monthsToAge(targetAge) {
-    const target = new Date(DOB);
-    target.setFullYear(DOB.getFullYear() + targetAge);
+```js
+function monthsToAge(dob, targetAge) {
+    const dobDate = new Date(dob);
+    const target = new Date(dobDate);
+    target.setFullYear(dobDate.getFullYear() + targetAge);
     const today = new Date();
     return Math.max(0, (target.getFullYear() - today.getFullYear()) * 12
         + (target.getMonth() - today.getMonth()));
@@ -229,6 +253,7 @@ These are read at render time. The Retirement tab re-renders whenever its inputs
 
 ## Edge cases
 
+- **Invalid/missing DOB:** fall back to default `1985-08-08` silently; show a validation hint near the DOB input if the parsed date is invalid.
 - **Retirement age < current age:** months = 0, all FV = current values. Show a warning "You are already past retirement age."
 - **Retirement age < 55:** show two RA phases (at retirement = inaccessible, at 55 = drawdown begins).
 - **Retirement age ≥ 68:** Dutch pension phase note omitted (already included in retirement income from day one).
