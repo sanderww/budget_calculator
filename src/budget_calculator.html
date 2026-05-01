@@ -188,6 +188,20 @@
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
+                    <button id="tab-retirement"
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        Retirement
+                    </button>
+                    <button id="refresh-retirement" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh retirement calculations">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 2v6h-6"/>
+                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+                            <path d="M3 22v-6h6"/>
+                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="inline-flex items-center gap-1">
                     <button id="tab-history"
                         class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
                         History
@@ -1018,6 +1032,28 @@
             </div>
         </div>
 
+        <!-- RETIREMENT TAB CONTENT -->
+        <div id="retirement-content" class="hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                <!-- Left Sidebar -->
+                <div class="lg:col-span-1">
+                    <div id="retirement-sidebar" class="card bg-gradient-to-b from-amber-50 to-orange-50 border-l-4 border-amber-400 sticky top-8">
+                        <!-- Filled in Task 10 -->
+                    </div>
+                </div>
+                <!-- Main Content Area -->
+                <div class="lg:col-span-3">
+                    <div class="grid grid-cols-1 gap-6">
+                        <div id="retirement-card-snapshot" class="card"></div>
+                        <div id="retirement-card-monthly" class="card"></div>
+                        <div id="retirement-card-lumpsum" class="card"></div>
+                        <div id="retirement-card-rapot" class="card"></div>
+                        <div id="retirement-card-assumptions" class="card"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script type="module">
@@ -1050,19 +1086,21 @@
             const tabDebt = document.getElementById('tab-debt');
             const tabHistory = document.getElementById('tab-history');
             const tabRa = document.getElementById('tab-ra');
+            const tabRetirement = document.getElementById('tab-retirement');
             const contentBudget = document.getElementById('budget-content');
             const contentInvestment = document.getElementById('investment-content');
             const contentDebt = document.getElementById('debt-content');
             const contentHistory = document.getElementById('history-content');
             const contentRa = document.getElementById('ra-content');
+            const contentRetirement = document.getElementById('retirement-content');
 
             const switchTab = (tab) => {
                 // Reset all tabs
-                [tabBudget, tabInvestment, tabDebt, tabHistory, tabRa].forEach(t => {
+                [tabBudget, tabInvestment, tabDebt, tabHistory, tabRa, tabRetirement].forEach(t => {
                     t.classList.remove('border-indigo-500', 'text-indigo-600');
                     t.classList.add('border-transparent', 'text-slate-500');
                 });
-                [contentBudget, contentInvestment, contentDebt, contentHistory, contentRa].forEach(c => c.classList.add('hidden'));
+                [contentBudget, contentInvestment, contentDebt, contentHistory, contentRa, contentRetirement].forEach(c => c.classList.add('hidden'));
 
                 // Activate selected tab
                 if (tab === 'budget') {
@@ -1082,6 +1120,11 @@
                     tabRa.classList.remove('border-transparent', 'text-slate-500');
                     contentRa.classList.remove('hidden');
                     renderRa();
+                } else if (tab === 'retirement') {
+                    tabRetirement.classList.add('border-indigo-500', 'text-indigo-600');
+                    tabRetirement.classList.remove('border-transparent', 'text-slate-500');
+                    contentRetirement.classList.remove('hidden');
+                    renderRetirement();
                 } else if (tab === 'history') {
                     tabHistory.classList.add('border-indigo-500', 'text-indigo-600');
                     tabHistory.classList.remove('border-transparent', 'text-slate-500');
@@ -1094,6 +1137,7 @@
             tabInvestment.addEventListener('click', () => switchTab('investment'));
             tabDebt.addEventListener('click', () => switchTab('debt'));
             tabRa.addEventListener('click', () => switchTab('ra'));
+            tabRetirement.addEventListener('click', () => switchTab('retirement'));
             tabHistory.addEventListener('click', () => switchTab('history'));
 
             document.getElementById('refresh-budget').addEventListener('click', (e) => {
@@ -1121,6 +1165,12 @@
                 e.stopPropagation();
                 switchTab('ra');
                 renderRa();
+            });
+
+            document.getElementById('refresh-retirement').addEventListener('click', (e) => {
+                e.stopPropagation();
+                switchTab('retirement');
+                renderRetirement();
             });
 
             // --- RA STATE ---
@@ -1329,6 +1379,11 @@
                     console.log('Could not auto-load ra.csv');
                 }
             })();
+
+            // --- RETIREMENT STATE ---
+            function renderRetirement() {
+                // Filled in subsequent tasks. Stub so tab switching doesn't crash.
+            }
 
             // --- TEST MODE ---
             let testMode = false;
