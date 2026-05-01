@@ -26,6 +26,7 @@ import {
     monthsToAge,
     lumpSumTax,
     raFutureValueTwoPot,
+    tfsaFutureValue,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -576,6 +577,7 @@ describe('smoke', () => {
         expect(typeof monthsToAge).toBe('function');
         expect(typeof lumpSumTax).toBe('function');
         expect(typeof raFutureValueTwoPot).toBe('function');
+        expect(typeof tfsaFutureValue).toBe('function');
     });
 });
 
@@ -1012,5 +1014,45 @@ describe('raFutureValueTwoPot', () => {
         expect(baseline.total).toBeCloseTo(100_000, 5);
         // Half offshore, depreciated 2% over 1 year: 50,000*1.02 + 50,000 = 101,000
         expect(offshore.total).toBeCloseTo(101_000, 5);
+    });
+});
+
+describe('tfsaFutureValue', () => {
+    it('returns simple FV when option disabled', () => {
+        const r = tfsaFutureValue({
+            currentValue: 100_000, annualRatePct: 10, monthsToRetirement: 12, optEnabled: false,
+        });
+        expect(r).toBeCloseTo(110_000, 0);
+    });
+
+    it('caps annual contributions when option enabled', () => {
+        // Today = 2026-03-01 (start of 2026/27 tax year). 12 months to retirement.
+        // Plug 46k current-year top-up, FV grown 12 months at 0%.
+        const r = tfsaFutureValue({
+            currentValue: 0, annualRatePct: 0, monthsToRetirement: 12, optEnabled: true,
+            transactions: [],
+        }, new Date(2026, 2, 1));
+        // Year 1 top-up: 46k contributed at month 0, no further years (only 12 mo horizon = ends 2027-03 which is end of current year exactly).
+        expect(r).toBeCloseTo(46_000, 0);
+    });
+
+    it('respects R500k lifetime cap', () => {
+        // Already contributed full lifetime → no further contributions added.
+        const txs = [{ date: '2024-03-01', amount: 500_000 }];
+        const r = tfsaFutureValue({
+            currentValue: 600_000, annualRatePct: 0, monthsToRetirement: 120,
+            optEnabled: true, transactions: txs,
+        }, new Date(2026, 2, 1));
+        expect(r).toBeCloseTo(600_000, 0);
+    });
+
+    it('skips current-year top-up when annual cap already hit', () => {
+        const txs = [{ date: '2026-03-15', amount: 46_000 }];
+        const r = tfsaFutureValue({
+            currentValue: 46_000, annualRatePct: 0, monthsToRetirement: 12,
+            optEnabled: true, transactions: txs,
+        }, new Date(2026, 5, 1));
+        // Current value 46k passive, 12 months 0% → 46k. No additional this-year top-up. Next March (still inside horizon? months=12 from June 2026 → end of horizon is June 2027; tax-year-end is March 2027 = 9 months in). At month 9, full 46k contribution → fv += 46k grown 3 months at 0% = 46k.
+        expect(r).toBeCloseTo(92_000, 0);
     });
 });

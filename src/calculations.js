@@ -657,3 +657,64 @@ export function raFutureValueTwoPot({
         savingsPotTaxPaid: totalWithdrawnGross - totalWithdrawnNet,
     };
 }
+
+export function tfsaFutureValue({
+    currentValue = 0,
+    annualRatePct = 0,
+    monthsToRetirement = 0,
+    optEnabled = false,
+    transactions = [],
+}, today = new Date()) {
+    const months = Math.max(0, Math.floor(Number(monthsToRetirement) || 0));
+    let fv = fvGrow(currentValue, annualRatePct, months);
+    if (!optEnabled || months === 0) return fv;
+
+    // SA tax year: 1 March → end Feb. February = month 1, March = month 2.
+    const taxYearStart = (today.getMonth() >= 2)
+        ? new Date(today.getFullYear(), 2, 1)
+        : new Date(today.getFullYear() - 1, 2, 1);
+
+    const lifetimeContributed = (transactions || [])
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const thisYearContrib = (transactions || [])
+        .filter(t => t.date && new Date(t.date) >= taxYearStart)
+        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+
+    let lifetimeRemaining = Math.max(0, RETIREMENT_CONSTANTS.TFSA_LIFETIME_CAP - lifetimeContributed);
+    if (lifetimeRemaining === 0) return fv;
+
+    const thisYearRemaining = Math.max(0, RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP - thisYearContrib);
+
+    // Months until end of current tax year (end Feb of next year, equivalently start of next March).
+    const nextTaxYearStart = new Date(taxYearStart.getFullYear() + 1, 2, 1);
+    const monthsToTaxYearEnd = Math.max(0,
+        (nextTaxYearStart.getFullYear() - today.getFullYear()) * 12
+        + (nextTaxYearStart.getMonth() - today.getMonth()));
+
+    if (thisYearRemaining > 0) {
+        const topUp = Math.min(thisYearRemaining, lifetimeRemaining);
+        fv += fvGrow(topUp, annualRatePct, months);
+        lifetimeRemaining -= topUp;
+    }
+
+    const yearsAvailable = months > monthsToTaxYearEnd
+        ? Math.max(0, Math.floor((months - monthsToTaxYearEnd - 1) / 12) + 1)
+        : 0;
+    const yearsByCap = Math.floor(lifetimeRemaining / RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP);
+    const fullYears = Math.min(yearsByCap, yearsAvailable);
+    for (let y = 0; y < fullYears; y++) {
+        const monthsRemaining = months - monthsToTaxYearEnd - y * 12;
+        if (monthsRemaining < 0) break;
+        fv += fvGrow(RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP, annualRatePct, monthsRemaining);
+        lifetimeRemaining -= RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP;
+    }
+
+    if (lifetimeRemaining > 0 && lifetimeRemaining < RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP) {
+        const monthsRemaining = months - monthsToTaxYearEnd - fullYears * 12;
+        if (monthsRemaining >= 0) {
+            fv += fvGrow(lifetimeRemaining, annualRatePct, monthsRemaining);
+        }
+    }
+
+    return fv;
+}
