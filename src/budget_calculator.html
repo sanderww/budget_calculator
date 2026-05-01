@@ -2879,7 +2879,67 @@
                     </table>
                     ${totalRow < 0 ? '<div class="mt-2 text-xs text-red-600">Outstanding bond exceeds lump-sum funds. You may need additional liquidity at retirement.</div>' : ''}
                 `;
-                document.getElementById('retirement-card-rapot').innerHTML = '<div class="text-xs text-slate-400">RA pot — Task 15.</div>';
+                const ra = snap.ra;
+                const raPotTodayValue = retRaPotToday();
+                let depletionLine = '';
+                if (ra.depletion) {
+                    const depAge = ra.depletion.ageAtThreshold.toFixed(1);
+                    if (ra.depletion.ageAtThreshold <= _RET_CONSTS.DUTCH_PENSION_AGE && retirementParams.opt_dutch_enabled) {
+                        depletionLine = `<div class="mt-3 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">RA pot expected to deplete below R150k by age ${depAge} — drawdown income ends, full commutation triggers; from then on income = Dutch pension only.</div>`;
+                    } else {
+                        depletionLine = `<div class="mt-3 p-2 bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded">Living-annuity threshold note: pot expected below R150,000 by age ${depAge}.</div>`;
+                    }
+                }
+
+                const savingsWdLine = (retirementParams.opt_savings_pot_withdrawal_enabled && ra.atRetirement.savingsPotWithdrawnGross > 0)
+                    ? `<div class="text-xs text-slate-600 mt-2">
+                        Pre-retirement savings-pot withdrawals:
+                        gross ${retFmtZAR(ra.atRetirement.savingsPotWithdrawnGross)},
+                        tax ${retFmtZAR(ra.atRetirement.savingsPotTaxPaid)},
+                        net to discretionary ${retFmtZAR(ra.atRetirement.savingsPotWithdrawnNet)}.
+                       </div>`
+                    : '';
+
+                // Compute monthly drawdown for display (mirrors raMonthlyIncome but without the de minimis branch).
+                const _drawdownAnnuitised = retirementParams.ra_commute_third ? ra.atRetirement.total * 2 / 3 : ra.atRetirement.total;
+                const _drawdownGross = _drawdownAnnuitised * ((Number(retirementParams.withdrawal_rate_pct) || 0) / 100) / 12;
+                const _drawdownNet = _drawdownGross * (1 - (Number(retirementParams.effective_tax_rate_pct) || 0) / 100);
+
+                document.getElementById('retirement-card-rapot').innerHTML = `
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4">RA pot at retirement</h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 uppercase tracking-wider">Today (live from RA tab)</div>
+                            <div class="text-xl font-bold text-slate-800">${retFmtZAR(raPotTodayValue)}</div>
+                            <div class="text-xs text-slate-500 mt-1">Vested: ${retFmtZAR(ra.vestedToday)}</div>
+                            <div class="text-xs text-slate-500">Savings: ${retFmtZAR(ra.savingsToday)}</div>
+                            <div class="text-xs text-slate-500">Retirement: ${retFmtZAR(ra.retirementToday)}</div>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 uppercase tracking-wider">At retirement age ${retirementParams.retirement_age}</div>
+                            <div class="text-xl font-bold text-indigo-700">${retFmtZAR(ra.atRetirement.total)}</div>
+                            <div class="text-xs text-slate-500 mt-1">Vested: ${retFmtZAR(ra.atRetirement.vested)}</div>
+                            <div class="text-xs text-slate-500">Savings: ${retFmtZAR(ra.atRetirement.savings)}</div>
+                            <div class="text-xs text-slate-500">Retirement: ${retFmtZAR(ra.atRetirement.retirement)}</div>
+                        </div>
+                    </div>
+                    ${savingsWdLine}
+                    <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 uppercase tracking-wider">${retirementParams.ra_commute_third ? '1/3 commuted (gross / tax / net)' : 'Commutation off'}</div>
+                            <div class="text-sm font-medium text-slate-800">
+                                ${retirementParams.ra_commute_third
+                                    ? `${retFmtZAR(ra.commutationAtRetirement.gross)} / ${retFmtZAR(ra.commutationAtRetirement.tax)} / ${retFmtZAR(ra.commutationAtRetirement.net)}`
+                                    : '—'}
+                            </div>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="text-xs text-slate-500 uppercase tracking-wider">Monthly drawdown</div>
+                            <div class="text-sm font-medium text-slate-800">gross ${retFmtZAR(_drawdownGross)} / net ${retFmtZAR(_drawdownNet)}</div>
+                        </div>
+                    </div>
+                    ${depletionLine}
+                `;
                 document.getElementById('retirement-card-assumptions').innerHTML = '<div class="text-xs text-slate-400">Assumptions — Task 16.</div>';
 
                 window.__retirementSnapshot = snap; // Exposed for manual debugging only.
