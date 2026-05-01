@@ -2733,6 +2733,14 @@
                 document.getElementById('ret-ra-vested-hint').classList.toggle('hidden', !vestedHint);
 
                 // Card placeholders — filled in subsequent tasks.
+                let retirementBanner = '';
+                if (snap.ageNow !== null && snap.ageNow >= Number(retirementParams.retirement_age)) {
+                    retirementBanner = `<div class="mb-4 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">You are already past your selected retirement age. All projections collapse to today's values.</div>`;
+                }
+                // Vested-balance validation
+                if ((Number(retirementParams.ra_vested_balance) || 0) > retRaPotToday()) {
+                    retirementBanner += `<div class="mb-4 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">Vested balance exceeds current RA pot — using min(vested, raPotToday) for calculations.</div>`;
+                }
                 const realLabel = retirementParams.show_real_terms ? "today's money" : 'nominal';
                 const cell = (current, projected) => {
                     if (Math.round(current) === Math.round(projected)) {
@@ -2744,6 +2752,7 @@
                     `;
                 };
                 document.getElementById('retirement-card-snapshot').innerHTML = `
+                    ${retirementBanner}
                     <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                         <h2 class="text-xl font-semibold text-slate-800">Snapshot</h2>
                         <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">${realLabel}</span>
