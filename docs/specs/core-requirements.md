@@ -360,39 +360,13 @@ Future-dated contributions are treated as having grown 0 months.
 
 ---
 
-## 5. History Module
+## 5. Retirement Module
 
 ### 5.1 Goal
 
-Give the user a year-by-year view of capital deployed — how much went toward debt reduction and how much went into investments, broken down by investment type.
-
-### 5.2 Data Sources
-
-| Column | Source |
-|---|---|
-| **Year** | Derived from transaction/repayment dates |
-| **Debt Repaid** | Sum of extra mortgage repayments for that year |
-| **Investments Total** | Sum of all investment transaction amounts for that year |
-| **TFSA** | Sum of TFSA-type investment transactions for that year |
-| **Discretionary** | Sum of Discretionary-type investment transactions for that year |
-| **Crypto** | Sum of Crypto-type investment transactions for that year |
-
-### 5.3 Rules
-
-- Rows are sorted by year ascending.
-- A totals row at the bottom sums all columns.
-- Years with no activity are omitted.
-- Empty values (no activity for that column/year) display as a dash.
-
----
-
-## 6. Retirement Module
-
-### 6.1 Goal
-
 Project retirement wealth and monthly income from existing Investments + RA tab data, so the user sees a single-snapshot view of where they will be at age 55 and age 68 under both a "current" baseline (no optional scenarios) and a "projected" outlook (with all enabled scenarios + 1/3 RA commutation if toggled).
 
-### 6.2 Domain Concepts
+### 5.2 Domain Concepts
 
 | Concept | Definition |
 |---|---|
@@ -408,7 +382,7 @@ Project retirement wealth and monthly income from existing Investments + RA tab 
 | **Dutch pension** | Optional fixed €900/month income from age 68 (rate configurable, ZAR conversion at user-supplied EUR/ZAR). |
 | **Savings-pot withdrawal** | Optional pre-retirement annual withdrawal from the savings component, taxed at the effective rate, flowing into discretionary funds. Min R 2,000 per SARS. |
 
-### 6.3 Hardcoded constants (SARS / SA Budget 2026/27)
+### 5.3 Hardcoded constants (SARS / SA Budget 2026/27)
 
 | Constant | Value |
 |---|---|
@@ -423,7 +397,7 @@ Project retirement wealth and monthly income from existing Investments + RA tab 
 | Two-pot split (post-Sep-2024) | 33% savings / 67% retirement |
 | Savings-pot minimum withdrawal | R 2,000 |
 
-### 6.4 Future-Value formulas
+### 5.4 Future-Value formulas
 
 **Monthly compounding**:
 ```
@@ -459,7 +433,7 @@ net monthly   = gross × (1 − taxRate / 100)
 
 **Living-annuity depletion check**: walk the annuitised pot forward month-by-month from retirement age; at any month where the pot drops below R 150,000, return the age-at-threshold (used for the depletion warning).
 
-### 6.5 Snapshot definitions
+### 5.5 Snapshot definitions
 
 | Cell | Definition |
 |---|---|
@@ -470,9 +444,35 @@ net monthly   = gross × (1 − taxRate / 100)
 | **Projected monthly at 55** | Annuitised RA pot (with optional contributions) × withdrawal rate / 12 × (1 − tax). |
 | **Projected monthly at 68** | Projected drawdown at 68 + Dutch pension (ZAR, net), or Dutch pension only if pot has crossed the R 150k threshold and Dutch is enabled. |
 
-### 6.6 Out of scope (v1)
+### 5.6 Out of scope (v1)
 
 Year-by-year growth chart, aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario side-by-side, sequence-of-returns risk, full DTA detail for Dutch pension, spouse/household joint projection, estate duty, marginal-rate brackets for savings-pot tax, multiple RAs at different providers. Months-to-age math is month-precision (ignores day-of-month) — known small boundary noise within ~30 days of a target age, acceptable for multi-decade projections.
+
+---
+
+## 6. History Module
+
+### 6.1 Goal
+
+Give the user a year-by-year view of capital deployed — how much went toward debt reduction and how much went into investments, broken down by investment type.
+
+### 6.2 Data Sources
+
+| Column | Source |
+|---|---|
+| **Year** | Derived from transaction/repayment dates |
+| **Debt Repaid** | Sum of extra mortgage repayments for that year |
+| **Investments Total** | Sum of all investment transaction amounts for that year |
+| **TFSA** | Sum of TFSA-type investment transactions for that year |
+| **Discretionary** | Sum of Discretionary-type investment transactions for that year |
+| **Crypto** | Sum of Crypto-type investment transactions for that year |
+
+### 6.3 Rules
+
+- Rows are sorted by year ascending.
+- A totals row at the bottom sums all columns.
+- Years with no activity are omitted.
+- Empty values (no activity for that column/year) display as a dash.
 
 ---
 
