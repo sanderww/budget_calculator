@@ -2733,7 +2733,35 @@
                 document.getElementById('ret-ra-vested-hint').classList.toggle('hidden', !vestedHint);
 
                 // Card placeholders — filled in subsequent tasks.
-                document.getElementById('retirement-card-snapshot').innerHTML = '<div class="text-xs text-slate-400">Snapshot — Task 12.</div>';
+                const realLabel = retirementParams.show_real_terms ? "today's money" : 'nominal';
+                const cell = (current, projected) => {
+                    if (Math.round(current) === Math.round(projected)) {
+                        return `<div class="text-2xl font-bold text-indigo-700">${retFmtZAR(projected)}</div>`;
+                    }
+                    return `
+                        <div class="text-2xl font-bold text-indigo-700">${retFmtZAR(projected)}</div>
+                        <div class="text-xs text-slate-500">current: ${retFmtZAR(current)}</div>
+                    `;
+                };
+                document.getElementById('retirement-card-snapshot').innerHTML = `
+                    <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
+                        <h2 class="text-xl font-semibold text-slate-800">Snapshot</h2>
+                        <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">${realLabel}</span>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div></div>
+                        <div class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Age 55</div>
+                        <div class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Age 68</div>
+
+                        <div class="text-xs text-slate-600 self-center">Funds available (lump sum)</div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.lumpSum.current55, snap.lumpSum.projected55)}</div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.lumpSum.projected68, snap.lumpSum.projected68)}</div>
+
+                        <div class="text-xs text-slate-600 self-center">Monthly income (net)</div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.monthly.current55.net, snap.monthly.projected55.net)}</div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.monthly.projected68.net, snap.monthly.projected68.net)}</div>
+                    </div>
+                `;
                 document.getElementById('retirement-card-monthly').innerHTML = '<div class="text-xs text-slate-400">Monthly income — Task 13.</div>';
                 document.getElementById('retirement-card-lumpsum').innerHTML = '<div class="text-xs text-slate-400">Lump sum — Task 14.</div>';
                 document.getElementById('retirement-card-rapot').innerHTML = '<div class="text-xs text-slate-400">RA pot — Task 15.</div>';
