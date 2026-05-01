@@ -29,6 +29,7 @@ import {
     tfsaFutureValue,
     raCommutationLumpSum,
     raMonthlyIncome,
+    projectLivingAnnuityDepletion,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -582,6 +583,7 @@ describe('smoke', () => {
         expect(typeof tfsaFutureValue).toBe('function');
         expect(typeof raCommutationLumpSum).toBe('function');
         expect(typeof raMonthlyIncome).toBe('function');
+        expect(typeof projectLivingAnnuityDepletion).toBe('function');
     });
 });
 
@@ -1107,5 +1109,26 @@ describe('raMonthlyIncome', () => {
         const r = raMonthlyIncome(3_000_000, 4, 25, true);
         expect(r.gross).toBeCloseTo(6_666.67, 1);
         expect(r.net).toBeCloseTo(5_000, 1);
+    });
+});
+
+describe('projectLivingAnnuityDepletion', () => {
+    it('returns null when pot grows faster than withdrawals', () => {
+        // 10% return, 4% drawdown → pot grows over time
+        const r = projectLivingAnnuityDepletion(2_000_000, 10, 4, 65);
+        expect(r).toBeNull();
+    });
+
+    it('flags depletion year when withdrawals exceed returns and pot dips below R150k', () => {
+        // Tiny pot, high drawdown
+        const r = projectLivingAnnuityDepletion(200_000, 0, 12, 65);
+        expect(r).not.toBeNull();
+        expect(r.ageAtThreshold).toBeGreaterThan(65);
+        expect(r.potAtThreshold).toBeLessThan(150_000);
+    });
+
+    it('returns null for non-positive pot', () => {
+        expect(projectLivingAnnuityDepletion(0, 10, 4, 65)).toBeNull();
+        expect(projectLivingAnnuityDepletion(-100, 10, 4, 65)).toBeNull();
     });
 });

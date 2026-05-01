@@ -738,3 +738,33 @@ export function raMonthlyIncome(raPot, withdrawalRatePct, taxRatePct, commuteThi
     const net = gross * (1 - tax);
     return { gross, net, fullCommutation: false };
 }
+
+export function projectLivingAnnuityDepletion(
+    annuitisedPot, annualReturnPct, withdrawalRatePct, retirementAge,
+    horizonAge = 95,
+    threshold = RETIREMENT_CONSTANTS.LIVING_ANNUITY_THRESHOLD
+) {
+    let pot = Number(annuitisedPot) || 0;
+    const rate = Number(annualReturnPct) || 0;
+    const wdRate = (Number(withdrawalRatePct) || 0) / 100;
+    if (pot <= 0) return null;
+    const r = (rate === 0) ? 0 : Math.pow(1 + rate / 100, 1 / 12) - 1;
+    const monthlyDrawdownRate = wdRate / 12;
+    const startAge = Math.max(0, Math.floor(Number(retirementAge) || 0));
+    const endAge = Math.max(startAge, Math.floor(Number(horizonAge) || 95));
+    for (let age = startAge; age < endAge; age++) {
+        for (let m = 0; m < 12; m++) {
+            const drawdown = pot * monthlyDrawdownRate;
+            pot = pot * (1 + r) - drawdown;
+            if (pot < threshold) {
+                return {
+                    ageAtThreshold: age + (m + 1) / 12,
+                    potAtThreshold: Math.max(0, pot),
+                    canCommute: true,
+                    commutationTax: lumpSumTax(Math.max(0, pot)),
+                };
+            }
+        }
+    }
+    return null;
+}
