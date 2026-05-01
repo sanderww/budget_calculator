@@ -718,3 +718,23 @@ export function tfsaFutureValue({
 
     return fv;
 }
+
+export function raCommutationLumpSum(raPot, commuteThird) {
+    if (!commuteThird) return { gross: 0, tax: 0, net: 0 };
+    const gross = (Number(raPot) || 0) / 3;
+    const tax = lumpSumTax(gross);
+    return { gross, tax, net: gross - tax };
+}
+
+export function raMonthlyIncome(raPot, withdrawalRatePct, taxRatePct, commuteThird) {
+    const pot = Number(raPot) || 0;
+    if (pot < RETIREMENT_CONSTANTS.DE_MINIMIS) {
+        return { gross: 0, net: 0, fullCommutation: true };
+    }
+    const annuitisedPot = commuteThird ? pot * 2 / 3 : pot;
+    const rate = (Number(withdrawalRatePct) || 0) / 100;
+    const tax = Math.max(0, Math.min(100, Number(taxRatePct) || 0)) / 100;
+    const gross = annuitisedPot * rate / 12;
+    const net = gross * (1 - tax);
+    return { gross, net, fullCommutation: false };
+}

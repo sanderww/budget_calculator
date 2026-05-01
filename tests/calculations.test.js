@@ -27,6 +27,8 @@ import {
     lumpSumTax,
     raFutureValueTwoPot,
     tfsaFutureValue,
+    raCommutationLumpSum,
+    raMonthlyIncome,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -578,6 +580,8 @@ describe('smoke', () => {
         expect(typeof lumpSumTax).toBe('function');
         expect(typeof raFutureValueTwoPot).toBe('function');
         expect(typeof tfsaFutureValue).toBe('function');
+        expect(typeof raCommutationLumpSum).toBe('function');
+        expect(typeof raMonthlyIncome).toBe('function');
     });
 });
 
@@ -1054,5 +1058,54 @@ describe('tfsaFutureValue', () => {
         }, new Date(2026, 5, 1));
         // Current value 46k passive, 12 months 0% → 46k. No additional this-year top-up. Next March (still inside horizon? months=12 from June 2026 → end of horizon is June 2027; tax-year-end is March 2027 = 9 months in). At month 9, full 46k contribution → fv += 46k grown 3 months at 0% = 46k.
         expect(r).toBeCloseTo(92_000, 0);
+    });
+});
+
+describe('raCommutationLumpSum', () => {
+    it('returns zeros when commutation is off', () => {
+        const r = raCommutationLumpSum(3_000_000, false);
+        expect(r).toEqual({ gross: 0, tax: 0, net: 0 });
+    });
+
+    it('takes 1/3 and applies the lump-sum tax table', () => {
+        // pot 3m → gross = 1m → tax = 39_600 + (1m - 770k)*0.27 = 39_600 + 62_100 = 101_700
+        const r = raCommutationLumpSum(3_000_000, true);
+        expect(r.gross).toBeCloseTo(1_000_000, 5);
+        expect(r.tax).toBeCloseTo(101_700, 5);
+        expect(r.net).toBeCloseTo(898_300, 5);
+    });
+
+    it('zero tax under R550k commutation', () => {
+        // pot 1.5m → gross 500k → no tax
+        const r = raCommutationLumpSum(1_500_000, true);
+        expect(r.tax).toBe(0);
+        expect(r.net).toBeCloseTo(500_000, 5);
+    });
+});
+
+describe('raMonthlyIncome', () => {
+    it('flags fullCommutation when pot is below R360k de minimis', () => {
+        const r = raMonthlyIncome(300_000, 4, 18, true);
+        expect(r.fullCommutation).toBe(true);
+        expect(r.gross).toBe(0);
+        expect(r.net).toBe(0);
+    });
+
+    it('annuitises 2/3 when commutation is on', () => {
+        // pot 3m → annuitised 2m → 4% / 12 = 6,666.67
+        const r = raMonthlyIncome(3_000_000, 4, 0, true);
+        expect(r.gross).toBeCloseTo(6_666.67, 1);
+        expect(r.net).toBeCloseTo(6_666.67, 1);
+    });
+
+    it('annuitises full pot when commutation is off', () => {
+        const r = raMonthlyIncome(3_000_000, 4, 0, false);
+        expect(r.gross).toBeCloseTo(10_000, 1);
+    });
+
+    it('applies tax rate to net', () => {
+        const r = raMonthlyIncome(3_000_000, 4, 25, true);
+        expect(r.gross).toBeCloseTo(6_666.67, 1);
+        expect(r.net).toBeCloseTo(5_000, 1);
     });
 });
