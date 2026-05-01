@@ -2762,7 +2762,60 @@
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.monthly.projected68.net, snap.monthly.projected68.net)}</div>
                     </div>
                 `;
-                document.getElementById('retirement-card-monthly').innerHTML = '<div class="text-xs text-slate-400">Monthly income — Task 13.</div>';
+                const retAge = Number(retirementParams.retirement_age) || 65;
+                const monthlyPhases = [];
+                if (retAge < _RET_CONSTS.RA_ACCESS_AGE) {
+                    monthlyPhases.push({
+                        title: `At retirement (age ${retAge}, before 55)`,
+                        net: 0, gross: 0,
+                        note: `RA not yet accessible. Until age 55: ${(_RET_CONSTS.RA_ACCESS_AGE - retAge)} years.`,
+                    });
+                    monthlyPhases.push({
+                        title: 'From age 55',
+                        net: snap.monthly.projected55.net,
+                        gross: snap.monthly.projected55.gross,
+                        note: 'RA drawdown begins.',
+                    });
+                } else if (retAge < _RET_CONSTS.DUTCH_PENSION_AGE) {
+                    monthlyPhases.push({
+                        title: `At retirement (age ${retAge})`,
+                        net: snap.monthly.projected55.net,
+                        gross: snap.monthly.projected55.gross,
+                        note: `RA drawdown.`,
+                    });
+                    monthlyPhases.push({
+                        title: 'From age 68',
+                        net: snap.monthly.projected68.net,
+                        gross: snap.monthly.projected68.gross,
+                        note: retirementParams.opt_dutch_enabled ? '+ Dutch pension' : '(Dutch pension disabled)',
+                    });
+                } else {
+                    monthlyPhases.push({
+                        title: `At retirement (age ${retAge}, ≥ 68)`,
+                        net: snap.monthly.projected68.net,
+                        gross: snap.monthly.projected68.gross,
+                        note: 'RA drawdown + Dutch pension combined.',
+                    });
+                }
+
+                const deMinimisBanner = snap.monthly.projected55.fullCommutation
+                    ? `<div class="mb-3 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">Pot below de minimis (R360,000) — full commutation possible, drawdown N/A.</div>`
+                    : '';
+
+                document.getElementById('retirement-card-monthly').innerHTML = `
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Monthly income (net of tax)</h2>
+                    ${deMinimisBanner}
+                    <div class="space-y-3">
+                        ${monthlyPhases.map(ph => `
+                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="text-xs text-slate-500">${ph.title}</div>
+                                <div class="text-xl font-bold text-indigo-700">${retFmtZAR(ph.net)}</div>
+                                <div class="text-xs text-slate-500">gross: ${retFmtZAR(ph.gross)}</div>
+                                <div class="text-[11px] text-slate-500 mt-1">${ph.note}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
                 document.getElementById('retirement-card-lumpsum').innerHTML = '<div class="text-xs text-slate-400">Lump sum — Task 14.</div>';
                 document.getElementById('retirement-card-rapot').innerHTML = '<div class="text-xs text-slate-400">RA pot — Task 15.</div>';
                 document.getElementById('retirement-card-assumptions').innerHTML = '<div class="text-xs text-slate-400">Assumptions — Task 16.</div>';
