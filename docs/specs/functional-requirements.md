@@ -2,7 +2,7 @@
 
 ## Overview
 
-A single-page web application for personal financial management with five modules: Budget Calculator, Investment Tracker, Debt Calculator, RA, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
+A single-page web application for personal financial management with six modules: Budget Calculator, Investment Tracker, Debt Calculator, RA, Retirement, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
 
 ---
 
@@ -232,7 +232,104 @@ A purple-accented sidebar (db/ra.csv with Load/Save buttons) and a main area wit
 
 ---
 
-## 5. History Tab
+## 5. Retirement
+
+### 5.1 Tab Placement
+
+Between the **RA** and **History** tabs. The tab header is "Retirement"; a refresh icon mirrors the other tabs.
+
+### 5.2 Sidebar (left col, sticky)
+
+Three sections separated by dividers:
+
+**Core**
+- Date of birth (date input). The current age is shown beneath as a read-only label.
+- Retirement age (number input). Years to retirement shown beneath.
+- Withdrawal rate %, Effective retirement income tax rate %, CPI assumption %, all numeric.
+- Toggle: "Show in today's money" — applies CPI deflation to all displayed figures.
+
+**Per-fund nominal return %**
+- Discretionary, TFSA, Crypto (note: "expected nominal return, no default consensus"), RA.
+
+**Offshore allocation** (collapsible `<details>`)
+- Discretionary offshore %, TFSA offshore %, ZAR depreciation %/yr.
+
+**RA structure**
+- Toggle: "Commute 1/3 as lump sum at retirement" (default ON).
+- Vested balance R (pre-Sep-2024 portion of current RA pot).
+- Read-only label: "New contributions split 33% savings / 67% retirement (Sep 2024 rule)."
+
+**Optional scenarios**
+
+Each scenario has a checkbox + inline inputs (only enabled when checkbox is checked):
+
+1. Dutch pension: EUR/ZAR rate input. Fixed €900/mo at age 68.
+2. TFSA contributions: no extra inputs; annual R 46,000 enforced; lifetime cap auto-checked from Investments transactions.
+3. Extra RA monthly: amount R/mo; soft warning when × 12 > R 430,000 deduction cap.
+4. House sale: ZAR value input.
+5. Inheritance: EUR amount, converted at the Dutch EUR/ZAR rate.
+6. Bond payoff: outstanding balance at retirement (subtracts from lump sum).
+7. Annual savings-pot withdrawal: amount R/yr (warning when 0 < amount < R 2,000).
+
+**Persistence**
+- Load Retirement / Save Retirement buttons hit `/api/save/retirement` (or `/api/save/test_retirement` in test mode), and on every input change a debounced save (800 ms) fires.
+- On page load the tab attempts `fetch(dbPath('retirement.csv'))` and falls back to defaults silently.
+
+### 5.3 Cards
+
+**Card 0 — Snapshot**
+
+Two-column × two-row grid (Age 55 / Age 68 × Funds / Monthly). Each cell shows "Projected" boldly; "Current" appears below in muted text only when the two values differ. A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
+
+**Card 1 — Monthly income (net of tax)**
+
+Phases vary by retirement age:
+- Retirement age < 55 → "At retirement (before 55) — R0 from RA" + "From age 55 — RA drawdown begins".
+- 55 ≤ age < 68 → "At retirement (age X)" + "From age 68 — + Dutch pension" (or "(Dutch pension disabled)" greyed).
+- Age ≥ 68 → "At retirement (age X, ≥ 68) — RA drawdown + Dutch pension combined".
+
+A de minimis banner replaces the drawdown row when the pot is below R 360,000.
+
+**Card 2 — Instantly available at retirement**
+
+Table with one row per source: Discretionary, TFSA (with cap note), Crypto, 1/3 RA commutation gross + tax + net (when toggled), savings-pot withdrawals net (when applicable), House sale, Inheritance (with EUR×rate note), Less: outstanding bond. Total row in indigo (red if negative; explanatory note appears in that case).
+
+**Card 3 — RA Pot at Retirement**
+
+Two side-by-side panels: "Today (live from RA tab)" and "At retirement age X", each with a vested / savings / retirement breakdown. Below: pre-retirement savings-pot withdrawal totals (when applicable), 1/3 commutation gross/tax/net, monthly drawdown gross/net, and the living-annuity depletion warning when applicable.
+
+**Card 4 — Assumptions** (collapsible `<details>`, default closed)
+
+Read-only key/value table summarising all in-effect assumptions: returns per fund, CPI, tax rate, FX rates, two-pot split, commutation, TFSA cap remaining, RA deduction-cap headroom (R 430,000 − last-12-months contributions), and the hardcoded constants.
+
+### 5.4 Edge cases
+
+- Invalid / missing DOB → silently fall back to default 1985-08-08; current age shown as "—".
+- Retirement age below current age → all FV collapse to current values + a warning banner.
+- Vested balance > current RA pot → warning banner; calculation uses `min(vested, raPotToday)`.
+- Retirement age < 55 → two RA phases (inaccessible at retirement, drawdown begins at 55).
+- Retirement age ≥ 68 → Dutch pension folded into the at-retirement phase (no separate "from 68" row).
+- TFSA cap already hit → no contributions added even if enabled; cap-remaining shown as R 0.
+- TFSA current-year cap already hit → optional contributions skip the current tax year and resume from the next 1 March.
+- RA pot < R 360,000 at retirement → de minimis banner replaces drawdown.
+- Savings-pot withdrawal > available balance in a given year → silently capped at the balance.
+- Savings-pot withdrawal below R 2,000 → inline validation hint (does not block input).
+- Extra RA monthly × 12 > R 430,000 → soft "above SARS deduction cap" hint.
+- Bond balance > total lump sum → total displays in red with an explanatory note.
+- Missing `db/retirement.csv` → all settings fall back to defaults silently.
+
+### 5.5 Data reads from other tabs
+
+- `investmentData.currentValues.{Discretionary,TFSA,Crypto}` → seed lump-sum and TFSA growth.
+- `investmentData.transactions.filter(t => t.type === 'TFSA')` → lifetime contributions and current-tax-year contributions for the cap math.
+- `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` → RA pot today.
+- `raTransactions` → contributions in the last 12 months for the deduction-cap headroom display.
+
+All reads happen at render time; the Retirement tab never mutates other tabs' state.
+
+---
+
+## 6. History Tab
 
 Aggregates all financial activity by year in a summary table:
 
@@ -251,9 +348,9 @@ Aggregates all financial activity by year in a summary table:
 
 ---
 
-## 6. Data Persistence
+## 7. Data Persistence
 
-### 6.1 CSV File Format
+### 7.1 CSV File Format
 
 Four separate CSV files store application state:
 
@@ -304,13 +401,13 @@ param,assumed_future_monthly,<amount>,
 - The `assumed_future_monthly` row is omitted unless the user has overridden the auto-derived value.
 - Defaults applied when a param row is missing: refund rate 41, return rate 10, future years 10.
 
-### 6.2 Auto-Save
+### 7.2 Auto-Save
 
 - All data changes trigger a debounced save (800ms delay) via POST to the server.
 - Manual save buttons are also available for each module.
 - On page load, all three CSV files are fetched automatically.
 
-### 6.3 Server API
+### 7.3 Server API
 
 | Endpoint | Method | Behavior |
 |---|---|---|
@@ -322,7 +419,7 @@ param,assumed_future_monthly,<amount>,
 
 ---
 
-## 7. Test Mode
+## 8. Test Mode
 
 - Toggle button in the header switches between real data and sample data.
 - When enabled:
@@ -335,7 +432,7 @@ param,assumed_future_monthly,<amount>,
 
 ---
 
-## 8. Calculation Functions Reference
+## 9. Calculation Functions Reference
 
 All pure calculation logic is extracted into a separate ES module (`calculations.js`) with the following exported functions:
 
