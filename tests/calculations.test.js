@@ -25,6 +25,7 @@ import {
     realValue,
     monthsToAge,
     lumpSumTax,
+    raFutureValueTwoPot,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -574,6 +575,7 @@ describe('smoke', () => {
         expect(typeof realValue).toBe('function');
         expect(typeof monthsToAge).toBe('function');
         expect(typeof lumpSumTax).toBe('function');
+        expect(typeof raFutureValueTwoPot).toBe('function');
     });
 });
 
@@ -937,5 +939,78 @@ describe('RETIREMENT_CONSTANTS', () => {
         expect(RETIREMENT_CONSTANTS.TFSA_LIFETIME_CAP).toBe(500_000);
         expect(RETIREMENT_CONSTANTS.DE_MINIMIS).toBe(360_000);
         expect(RETIREMENT_CONSTANTS.LIVING_ANNUITY_THRESHOLD).toBe(150_000);
+    });
+});
+
+describe('raFutureValueTwoPot', () => {
+    it('grows three components passively when no contributions', () => {
+        const r = raFutureValueTwoPot({
+            vestedToday: 100_000, savingsToday: 50_000, retirementToday: 100_000,
+            annualRatePct: 10, extraMonthly: 0, months: 12,
+        });
+        expect(r.vested).toBeCloseTo(110_000, 0);
+        expect(r.savings).toBeCloseTo(55_000, 0);
+        expect(r.retirement).toBeCloseTo(110_000, 0);
+        expect(r.total).toBeCloseTo(275_000, 0);
+        expect(r.savingsPotWithdrawnGross).toBe(0);
+    });
+
+    it('splits new monthly contributions 33/67 into savings/retirement', () => {
+        // 12 months, R1000 extra, 0% rate → savings += 1000*0.33*12 = 3960, retirement += 1000*0.67*12 = 8040
+        const r = raFutureValueTwoPot({
+            vestedToday: 0, savingsToday: 0, retirementToday: 0,
+            annualRatePct: 0, extraMonthly: 1000, months: 12,
+        });
+        expect(r.savings).toBeCloseTo(3960, 5);
+        expect(r.retirement).toBeCloseTo(8040, 5);
+        expect(r.vested).toBe(0);
+    });
+
+    it('applies annual savings-pot withdrawals capped at balance', () => {
+        const r = raFutureValueTwoPot({
+            vestedToday: 0, savingsToday: 100_000, retirementToday: 0,
+            annualRatePct: 0, extraMonthly: 0, months: 36,
+            savingsPotAnnualWithdrawal: 30_000,
+        });
+        // 100k → after y1 -30k = 70k → after y2 -30k = 40k → after y3 -30k = 10k
+        expect(r.savings).toBeCloseTo(10_000, 5);
+        expect(r.savingsPotWithdrawnGross).toBeCloseTo(90_000, 5);
+    });
+
+    it('caps a too-large withdrawal at the available balance', () => {
+        const r = raFutureValueTwoPot({
+            vestedToday: 0, savingsToday: 5_000, retirementToday: 0,
+            annualRatePct: 0, extraMonthly: 0, months: 24,
+            savingsPotAnnualWithdrawal: 10_000,
+        });
+        expect(r.savings).toBeCloseTo(0, 5);
+        expect(r.savingsPotWithdrawnGross).toBeCloseTo(5_000, 5);
+    });
+
+    it('computes net withdrawn at the configured tax rate', () => {
+        const r = raFutureValueTwoPot({
+            vestedToday: 0, savingsToday: 100_000, retirementToday: 0,
+            annualRatePct: 0, extraMonthly: 0, months: 12,
+            savingsPotAnnualWithdrawal: 30_000, taxRatePct: 30,
+        });
+        expect(r.savingsPotWithdrawnGross).toBeCloseTo(30_000, 5);
+        expect(r.savingsPotWithdrawnNet).toBeCloseTo(21_000, 5);
+        expect(r.savingsPotTaxPaid).toBeCloseTo(9_000, 5);
+    });
+
+    it('applies ZAR depreciation to offshore portion of total', () => {
+        const baseline = raFutureValueTwoPot({
+            vestedToday: 0, savingsToday: 0, retirementToday: 100_000,
+            annualRatePct: 0, extraMonthly: 0, months: 12,
+            offshorePct: 0, zarDeprePct: 2,
+        });
+        const offshore = raFutureValueTwoPot({
+            vestedToday: 0, savingsToday: 0, retirementToday: 100_000,
+            annualRatePct: 0, extraMonthly: 0, months: 12,
+            offshorePct: 50, zarDeprePct: 2,
+        });
+        expect(baseline.total).toBeCloseTo(100_000, 5);
+        // Half offshore, depreciated 2% over 1 year: 50,000*1.02 + 50,000 = 101,000
+        expect(offshore.total).toBeCloseTo(101_000, 5);
     });
 });

@@ -578,3 +578,82 @@ export function lumpSumTax(amount) {
     if (a <= 1_155_000) return 39_600 + (a - 770_000) * 0.27;
     return 143_550 + (a - 1_155_000) * 0.36;
 }
+
+function _grow(pv, annualRatePct, months, monthlyContrib = 0) {
+    const m = Math.max(0, Number(months) || 0);
+    const rate = Number(annualRatePct) || 0;
+    const principal = Number(pv) || 0;
+    const contrib = Number(monthlyContrib) || 0;
+    if (m === 0) return principal;
+    if (rate === 0) return principal + contrib * m;
+    const r = Math.pow(1 + rate / 100, 1 / 12) - 1;
+    const grown = principal * Math.pow(1 + r, m);
+    if (contrib === 0) return grown;
+    const annuity = contrib * (Math.pow(1 + r, m) - 1) / r;
+    return grown + annuity;
+}
+
+export function raFutureValueTwoPot({
+    vestedToday = 0,
+    savingsToday = 0,
+    retirementToday = 0,
+    annualRatePct = 0,
+    extraMonthly = 0,
+    months = 0,
+    savingsPotAnnualWithdrawal = 0,
+    taxRatePct = 18,
+    offshorePct = 0,
+    zarDeprePct = 0,
+}) {
+    const m = Math.max(0, Math.floor(Number(months) || 0));
+    const extra = Math.max(0, Number(extraMonthly) || 0);
+    const savingsContribMonthly = extra * RETIREMENT_CONSTANTS.SAVINGS_POT_SPLIT;
+    const retirementContribMonthly = extra * RETIREMENT_CONSTANTS.RETIREMENT_POT_SPLIT;
+
+    let vestedFV = _grow(vestedToday, annualRatePct, m);
+    let retirementFV = _grow(retirementToday, annualRatePct, m, retirementContribMonthly);
+
+    let savingsFV = Number(savingsToday) || 0;
+    let totalWithdrawnGross = 0;
+    const yearsFull = Math.floor(m / 12);
+    const monthsRemainder = m % 12;
+    const wd = Math.max(0, Number(savingsPotAnnualWithdrawal) || 0);
+    for (let y = 0; y < yearsFull; y++) {
+        savingsFV = _grow(savingsFV, annualRatePct, 12, savingsContribMonthly);
+        if (wd > 0) {
+            const taken = Math.min(wd, savingsFV);
+            savingsFV -= taken;
+            totalWithdrawnGross += taken;
+        }
+    }
+    if (monthsRemainder > 0) {
+        savingsFV = _grow(savingsFV, annualRatePct, monthsRemainder, savingsContribMonthly);
+    }
+
+    let total = vestedFV + savingsFV + retirementFV;
+    const off = Math.max(0, Number(offshorePct) || 0);
+    const dep = Number(zarDeprePct) || 0;
+    if (off > 0 && dep !== 0 && total > 0) {
+        const offshoreShare = total * (off / 100);
+        const localShare = total - offshoreShare;
+        const offshoreGrown = offshoreShare * Math.pow(1 + dep / 100, m / 12);
+        const newTotal = localShare + offshoreGrown;
+        const scale = newTotal / total;
+        vestedFV *= scale;
+        savingsFV *= scale;
+        retirementFV *= scale;
+        total = newTotal;
+    }
+
+    const tax = Math.max(0, Math.min(100, Number(taxRatePct) || 0)) / 100;
+    const totalWithdrawnNet = totalWithdrawnGross * (1 - tax);
+    return {
+        vested: vestedFV,
+        savings: savingsFV,
+        retirement: retirementFV,
+        total,
+        savingsPotWithdrawnGross: totalWithdrawnGross,
+        savingsPotWithdrawnNet: totalWithdrawnNet,
+        savingsPotTaxPaid: totalWithdrawnGross - totalWithdrawnNet,
+    };
+}
