@@ -227,8 +227,8 @@ A purple-accented sidebar (db/ra.csv with Load/Save buttons) and a main area wit
 
 - `tax_refund_rate_pct = 41`
 - `nominal_return_pct = 10`
-- `future_years_to_project = 10`
-- `assumed_future_monthly` = derived from last 3 contributions (or 0 if none).
+- `future_years_to_project = 2`
+- `assumed_future_monthly = 20000` (user can override; **auto** button re-derives from last 3 contributions).
 
 ---
 

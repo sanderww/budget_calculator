@@ -929,14 +929,57 @@
                             </div>
                         </div>
 
-                        <!-- Per tax-year projection -->
+                        <!-- Per tax-year refund (actuals only) -->
+                        <div class="card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Per tax-year refund</h2>
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">
+                                        <th class="text-left py-2">Tax year</th>
+                                        <th class="text-left py-2">Status</th>
+                                        <th class="text-right py-2">Contributions</th>
+                                        <th class="text-right py-2">Deductible</th>
+                                        <th class="text-right py-2">Refund</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="ra-actuals-rows"></tbody>
+                                <tfoot>
+                                    <tr class="font-bold border-t border-slate-300">
+                                        <td colspan="2" class="py-2">Total</td>
+                                        <td class="text-right py-2" id="ra-actuals-total-contributions">R 0</td>
+                                        <td></td>
+                                        <td class="text-right py-2 text-green-700" id="ra-actuals-total-refund">R 0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Transactions -->
+                        <div class="card">
+                            <div class="flex justify-between items-center mb-4">
+                                <h2 class="text-xl font-semibold text-slate-800">Contributions</h2>
+                                <button id="ra-add-contribution" class="btn btn-secondary text-sm">+ Add</button>
+                            </div>
+
+                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
+                                style="grid-template-columns: 1fr 2fr 1fr auto;">
+                                <div>Date</div>
+                                <div>Description</div>
+                                <div>Amount</div>
+                                <div></div>
+                            </div>
+
+                            <div id="ra-list" class="space-y-2"></div>
+                        </div>
+
+                        <!-- Projection Per Tax Year refund -->
                         <div class="card">
                             <div class="flex justify-between items-end mb-4 flex-wrap gap-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Per tax-year refund</h2>
+                                <h2 class="text-xl font-semibold text-slate-800">Projection Per Tax Year refund</h2>
                                 <div class="flex items-end gap-3">
                                     <div>
                                         <label class="block text-xs text-slate-500">Future years</label>
-                                        <input type="number" id="ra-future-years" class="input-field text-sm w-24" min="0" max="50" step="1" value="10">
+                                        <input type="number" id="ra-future-years" class="input-field text-sm w-24" min="0" max="50" step="1" value="2">
                                     </div>
                                     <div>
                                         <label class="block text-xs text-slate-500">Assumed monthly (R)</label>
@@ -968,24 +1011,6 @@
                                     </tr>
                                 </tfoot>
                             </table>
-                        </div>
-
-                        <!-- Transactions -->
-                        <div class="card">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Contributions</h2>
-                                <button id="ra-add-contribution" class="btn btn-secondary text-sm">+ Add</button>
-                            </div>
-
-                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
-                                style="grid-template-columns: 1fr 2fr 1fr auto;">
-                                <div>Date</div>
-                                <div>Description</div>
-                                <div>Amount</div>
-                                <div></div>
-                            </div>
-
-                            <div id="ra-list" class="space-y-2"></div>
                         </div>
 
                     </div>
@@ -1103,8 +1128,8 @@
             let raParams = {
                 tax_refund_rate_pct: 41,
                 nominal_return_pct: 10,
-                future_years_to_project: 10,
-                // assumed_future_monthly omitted → derived from last 3 contributions
+                future_years_to_project: 2,
+                assumed_future_monthly: 20000,
             };
 
             const raAssumedMonthly = () => (
@@ -1154,8 +1179,7 @@
                 const anyCapHit = proj.rows.some(r => r.capHit);
                 document.getElementById('ra-cap-warning').classList.toggle('hidden', !anyCapHit);
 
-                const tbody = document.getElementById('ra-projection-rows');
-                tbody.innerHTML = proj.rows.map(r => {
+                const renderTableRows = (rows) => rows.map(r => {
                     const cap = r.capHit ? ' <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 ml-1">cap</span>' : '';
                     return `
                         <tr class="border-b border-slate-100">
@@ -1167,6 +1191,15 @@
                         </tr>
                     `;
                 }).join('');
+
+                const actualRows = proj.rows.filter(r => r.status === 'actual');
+                const actualsContribTotal = actualRows.reduce((s, r) => s + r.contributions, 0);
+                const actualsRefundTotal  = actualRows.reduce((s, r) => s + r.refund, 0);
+                document.getElementById('ra-actuals-rows').innerHTML = renderTableRows(actualRows);
+                document.getElementById('ra-actuals-total-contributions').textContent = raFmtZARShort(actualsContribTotal);
+                document.getElementById('ra-actuals-total-refund').textContent        = raFmtZARShort(actualsRefundTotal);
+
+                document.getElementById('ra-projection-rows').innerHTML = renderTableRows(proj.rows);
                 document.getElementById('ra-total-row-contributions').textContent = raFmtZARShort(proj.total.contributions);
                 document.getElementById('ra-total-row-refund').textContent       = raFmtZARShort(proj.total.refund);
 
@@ -1270,7 +1303,7 @@
                     reader.onload = (ev) => {
                         const parsed = _parseRaCSV(ev.target.result);
                         raTransactions = parsed.transactions;
-                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, ...parsed.params };
+                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 2, assumed_future_monthly: 20000, ...parsed.params };
                         renderRa();
                     };
                     reader.readAsText(f);
@@ -1289,7 +1322,7 @@
                         const text = await response.text();
                         const parsed = _parseRaCSV(text);
                         raTransactions = parsed.transactions;
-                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, ...parsed.params };
+                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 2, assumed_future_monthly: 20000, ...parsed.params };
                         renderRa();
                     }
                 } catch (_e) {

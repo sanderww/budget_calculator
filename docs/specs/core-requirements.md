@@ -310,7 +310,7 @@ Track contributions to a South African Retirement Annuity, estimate the lifetime
 | **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
 | **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 350,000**. |
-| **Assumed future monthly** | Used for future-year projections. Defaults to the average of the last 3 contributions; user can override. |
+| **Assumed future monthly** | Used for future-year projections. Defaults to R 20,000; user can override. The **auto** button re-derives from the average of the last 3 contributions. |
 
 ### 4.3 Total Contributed and Lifetime Refund
 
