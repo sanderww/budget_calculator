@@ -525,3 +525,56 @@ export function calculatePotValueToday(transactions, nominalReturnPct, today = n
         return sum + (Number(t.amount) || 0) * Math.pow(1 + r_m, months);
     }, 0);
 }
+
+// ============================================================================
+// Retirement Tab
+// ============================================================================
+
+export const RETIREMENT_CONSTANTS = {
+    RA_ACCESS_AGE: 55,
+    DUTCH_PENSION_AGE: 68,
+    DUTCH_PENSION_EUR_MONTHLY: 900,
+    TFSA_ANNUAL_CAP: 46_000,
+    TFSA_LIFETIME_CAP: 500_000,
+    RA_DEDUCTION_CAP: 430_000,
+    DE_MINIMIS: 360_000,
+    LIVING_ANNUITY_THRESHOLD: 150_000,
+    LUMP_SUM_TAX_FREE: 550_000,
+    SAVINGS_POT_SPLIT: 0.33,
+    RETIREMENT_POT_SPLIT: 0.67,
+    SAVINGS_POT_MIN_WITHDRAWAL: 2_000,
+};
+
+export function fvGrow(pv, annualRatePct, months) {
+    const m = Math.max(0, Number(months) || 0);
+    const rate = Number(annualRatePct) || 0;
+    if (rate === 0 || m === 0) return Number(pv) || 0;
+    const r = Math.pow(1 + rate / 100, 1 / 12) - 1;
+    return (Number(pv) || 0) * Math.pow(1 + r, m);
+}
+
+export function realValue(nominal, cpiPct, years) {
+    const cpi = Number(cpiPct) || 0;
+    const y = Number(years) || 0;
+    if (cpi === 0 || y === 0) return Number(nominal) || 0;
+    return (Number(nominal) || 0) / Math.pow(1 + cpi / 100, y);
+}
+
+export function monthsToAge(dob, targetAge, today = new Date()) {
+    if (!dob) return 0;
+    const dobDate = (dob instanceof Date) ? dob : new Date(dob);
+    if (Number.isNaN(dobDate.getTime())) return 0;
+    const target = new Date(dobDate);
+    target.setFullYear(dobDate.getFullYear() + Number(targetAge || 0));
+    const months = (target.getFullYear() - today.getFullYear()) * 12
+                 + (target.getMonth() - today.getMonth());
+    return Math.max(0, months);
+}
+
+export function lumpSumTax(amount) {
+    const a = Number(amount) || 0;
+    if (a <= 550_000) return 0;
+    if (a <= 770_000) return (a - 550_000) * 0.18;
+    if (a <= 1_155_000) return 39_600 + (a - 770_000) * 0.27;
+    return 143_550 + (a - 1_155_000) * 0.36;
+}

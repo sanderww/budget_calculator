@@ -20,6 +20,11 @@ import {
     deriveAssumedFutureMonthly,
     calculateRaProjection,
     calculatePotValueToday,
+    RETIREMENT_CONSTANTS,
+    fvGrow,
+    realValue,
+    monthsToAge,
+    lumpSumTax,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -565,6 +570,10 @@ describe('smoke', () => {
         expect(typeof generateInvestmentCSV).toBe('function');
         expect(typeof parseDebtCSV).toBe('function');
         expect(typeof generateDebtCSV).toBe('function');
+        expect(typeof fvGrow).toBe('function');
+        expect(typeof realValue).toBe('function');
+        expect(typeof monthsToAge).toBe('function');
+        expect(typeof lumpSumTax).toBe('function');
     });
 });
 
@@ -863,5 +872,70 @@ describe('calculatePotValueToday', () => {
             today
         );
         expect(result).toBe(5000);
+    });
+});
+
+describe('fvGrow', () => {
+    it('returns pv when rate is 0', () => {
+        expect(fvGrow(1000, 0, 120)).toBe(1000);
+    });
+    it('returns pv when months is 0', () => {
+        expect(fvGrow(1000, 10, 0)).toBe(1000);
+    });
+    it('compounds monthly: 10% over 12 months ≈ 10%', () => {
+        expect(fvGrow(1000, 10, 12)).toBeCloseTo(1100, 2);
+    });
+    it('compounds monthly: 10% over 24 months ≈ 21%', () => {
+        expect(fvGrow(1000, 10, 24)).toBeCloseTo(1210, 1);
+    });
+});
+
+describe('realValue', () => {
+    it('returns nominal when cpi is 0', () => {
+        expect(realValue(1000, 0, 10)).toBe(1000);
+    });
+    it('deflates by CPI compounded annually', () => {
+        // 1000 / 1.05^10 ≈ 613.91
+        expect(realValue(1000, 5, 10)).toBeCloseTo(613.91, 1);
+    });
+});
+
+describe('monthsToAge', () => {
+    it('returns months to a target age from today', () => {
+        // DOB 1990-01-15, target age 35 → 2025-01-15. From 2024-01-15 = 12 months.
+        expect(monthsToAge('1990-01-15', 35, new Date(2024, 0, 15))).toBe(12);
+    });
+    it('returns 0 when target is in the past', () => {
+        expect(monthsToAge('1990-01-15', 30, new Date(2026, 0, 15))).toBe(0);
+    });
+    it('returns 0 for invalid dob', () => {
+        expect(monthsToAge('', 65, new Date(2026, 0, 1))).toBe(0);
+        expect(monthsToAge('not-a-date', 65, new Date(2026, 0, 1))).toBe(0);
+    });
+});
+
+describe('lumpSumTax', () => {
+    it('zero tax under R550k', () => {
+        expect(lumpSumTax(500_000)).toBe(0);
+        expect(lumpSumTax(550_000)).toBe(0);
+    });
+    it('18% in the R550k–R770k bracket', () => {
+        expect(lumpSumTax(700_000)).toBeCloseTo((700_000 - 550_000) * 0.18, 5);
+    });
+    it('R39,600 + 27% in the R770k–R1.155m bracket', () => {
+        expect(lumpSumTax(1_000_000)).toBeCloseTo(39_600 + (1_000_000 - 770_000) * 0.27, 5);
+    });
+    it('R143,550 + 36% above R1.155m', () => {
+        expect(lumpSumTax(2_000_000)).toBeCloseTo(143_550 + (2_000_000 - 1_155_000) * 0.36, 5);
+    });
+});
+
+describe('RETIREMENT_CONSTANTS', () => {
+    it('exposes the SARS / SA-Budget hardcoded constants', () => {
+        expect(RETIREMENT_CONSTANTS.RA_ACCESS_AGE).toBe(55);
+        expect(RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP).toBe(46_000);
+        expect(RETIREMENT_CONSTANTS.TFSA_LIFETIME_CAP).toBe(500_000);
+        expect(RETIREMENT_CONSTANTS.DE_MINIMIS).toBe(360_000);
+        expect(RETIREMENT_CONSTANTS.LIVING_ANNUITY_THRESHOLD).toBe(150_000);
     });
 });
