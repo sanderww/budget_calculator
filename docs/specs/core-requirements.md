@@ -10,6 +10,7 @@ A personal finance tool for an individual to:
 4. **Track investment performance** — see how each investment account is performing in absolute, percentage, and annualized terms, benchmarked against a simple savings alternative.
 5. **Manage a mortgage** — quantify the financial benefit of making extra repayments and see when the loan will be paid off.
 6. **View financial history** — a year-by-year summary of debt repaid and investments made.
+7. **Plan retirement** — project funds available at age 55 and 68, monthly net income, RA commutation impact, and optional scenarios (Dutch pension, TFSA top-ups, etc.).
 
 Currency is South African Rand (R) throughout.
 
@@ -385,7 +386,97 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 
 ---
 
-## 6. Hard Requirements Summary
+## 6. Retirement Module
+
+### 6.1 Goal
+
+Project retirement wealth and monthly income from existing Investments + RA tab data, so the user sees a single-snapshot view of where they will be at age 55 and age 68 under both a "current" baseline (no optional scenarios) and a "projected" outlook (with all enabled scenarios + 1/3 RA commutation if toggled).
+
+### 6.2 Domain Concepts
+
+| Concept | Definition |
+|---|---|
+| **DOB** | User's date of birth, used to compute current age and months to each target age. |
+| **Retirement age** | Configurable target age (default 65). |
+| **Two-pot system** | RA balance is split into three components: vested (pre-Sep-2024), savings (33% of post-Sep-2024 contributions), retirement (67% of post-Sep-2024 contributions). |
+| **Commutation** | At retirement, up to 1/3 of the RA pot may be taken as a lump sum (taxed via the SARS retirement lump-sum table); 2/3 must be annuitised. User toggle, default ON. |
+| **De minimis** | RA pot below R 360,000 at retirement may be fully commuted; no annuity required. |
+| **Living-annuity commutation threshold** | A living annuity that depletes below R 150,000 may be fully commuted to cash. |
+| **Withdrawal rate** | Annual percentage drawn from the annuitised pot (default 4%). |
+| **CPI** | Annual price-inflation rate; used for "today's money" deflation when toggled (default 5%). |
+| **Effective retirement-income tax rate** | Single-rate proxy for marginal tax in retirement (default 18%). |
+| **Dutch pension** | Optional fixed €900/month income from age 68 (rate configurable, ZAR conversion at user-supplied EUR/ZAR). |
+| **Savings-pot withdrawal** | Optional pre-retirement annual withdrawal from the savings component, taxed at the effective rate, flowing into discretionary funds. Min R 2,000 per SARS. |
+
+### 6.3 Hardcoded constants (SARS / SA Budget 2026/27)
+
+| Constant | Value |
+|---|---|
+| RA accessibility age | 55 |
+| Dutch pension start age | 68 |
+| TFSA annual cap | R 46,000 |
+| TFSA lifetime cap | R 500,000 |
+| RA deduction cap | R 430,000/year |
+| Retirement de minimis | R 360,000 |
+| Living-annuity commutation threshold | R 150,000 |
+| Lump-sum tax-free first slice | R 550,000 |
+| Two-pot split (post-Sep-2024) | 33% savings / 67% retirement |
+| Savings-pot minimum withdrawal | R 2,000 |
+
+### 6.4 Future-Value formulas
+
+**Monthly compounding**:
+```
+r_m = (1 + annualRate/100)^(1/12) − 1
+FV  = pv × (1 + r_m)^months [+ contrib × ((1+r_m)^months − 1) / r_m]
+```
+
+**Real-terms deflation** (when "Show in today's money" is on):
+```
+realValue = nominal / (1 + cpi/100)^years
+```
+
+**Two-pot future value**: vested grows passively; retirement grows with 67% of new contributions; savings grows with 33% of new contributions, less optional annual withdrawals applied at year boundaries (capped at available balance). After the components are summed, an offshore portion may be appreciated against ZAR using the depreciation rate.
+
+**TFSA future value**: passive growth of the current value, plus optional annual contributions at R 46,000 starting from the current tax year (top-up first, then full years), bounded by the R 500,000 lifetime cap and the months remaining to retirement.
+
+**Lump-sum tax (2026/27 retirement table)**:
+```
+≤ R 550,000:        0
+R 550k – R 770k:    18% × (a − 550k)
+R 770k – R 1.155m:  R 39,600 + 27% × (a − 770k)
+> R 1.155m:         R 143,550 + 36% × (a − 1.155m)
+```
+
+**RA monthly income**:
+```
+if pot < R 360,000:     full commutation, drawdown = 0
+else if commute 1/3:    annuitised = pot × 2/3
+else:                   annuitised = pot
+gross monthly = annuitised × (withdrawalRate / 100) / 12
+net monthly   = gross × (1 − taxRate / 100)
+```
+
+**Living-annuity depletion check**: walk the annuitised pot forward month-by-month from retirement age; at any month where the pot drops below R 150,000, return the age-at-threshold (used for the depletion warning).
+
+### 6.5 Snapshot definitions
+
+| Cell | Definition |
+|---|---|
+| **Current funds at 55** | Discretionary + TFSA (passive) + Crypto grown to age 55. |
+| **Projected funds at 55** | Current funds + 1/3 RA commutation (if on) + savings-pot withdrawals (net) + house sale + inheritance − bond payoff. |
+| **Projected funds at 68** | Same components projected forward to age 68. |
+| **Current monthly at 55** | Full RA pot (no extras) × withdrawal rate / 12 × (1 − tax). |
+| **Projected monthly at 55** | Annuitised RA pot (with optional contributions) × withdrawal rate / 12 × (1 − tax). |
+| **Projected monthly at 68** | Projected drawdown at 68 + Dutch pension (ZAR, net), or Dutch pension only if pot has crossed the R 150k threshold and Dutch is enabled. |
+
+### 6.6 Out of scope (v1)
+
+Year-by-year growth chart, aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario side-by-side, sequence-of-returns risk, full DTA detail for Dutch pension, spouse/household joint projection, estate duty, marginal-rate brackets for savings-pot tax, multiple RAs at different providers. Months-to-age math is month-precision (ignores day-of-month) — known small boundary noise within ~30 days of a target age, acceptable for multi-decade projections.
+
+---
+
+## 7. Hard Requirements Summary
 
 | # | Requirement |
 |---|---|
@@ -410,3 +501,11 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R18 | RA per-tax-year deductible is capped at R 350,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
 | R19 | RA current-year row mixes actual contributions to date with `Assumed Future Monthly × months_remaining`; status reads `partial (N actual + M projected)`. |
 | R20 | RA settings (refund rate, return rate, future years, optional assumed monthly override) are persisted as `param,<key>,<value>,` rows inside `db/ra.csv`. |
+| R21 | Retirement two-pot split: post-Sep-2024 RA balance is split 33% savings / 67% retirement; pre-Sep-2024 balance is "vested" and grows passively. |
+| R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. |
+| R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
+| R24 | Retirement lump-sum tax follows the 2026/27 retirement table; first R 550,000 is tax-free. |
+| R25 | TFSA cap is enforced when "TFSA contributions" is enabled: annual R 46,000 (current tax year + future March-start years) and lifetime R 500,000. |
+| R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
+| R27 | Retirement settings persist as `param,<key>,<value>,` rows in `db/retirement.csv` (no transaction rows). |
+| R28 | Retirement tab reads RA pot today live from RA tab state via `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` and TFSA / Discretionary / Crypto current values from the Investments tab — no shared state mutation. |
