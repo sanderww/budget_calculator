@@ -1038,7 +1038,131 @@
                 <!-- Left Sidebar -->
                 <div class="lg:col-span-1">
                     <div id="retirement-sidebar" class="card bg-gradient-to-b from-amber-50 to-orange-50 border-l-4 border-amber-400 sticky top-8">
-                        <!-- Filled in Task 10 -->
+                        <div class="flex flex-col gap-4">
+                            <div class="flex items-center gap-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" class="text-amber-600">
+                                    <circle cx="12" cy="12" r="10"/>
+                                    <polyline points="12 6 12 12 16 14"/>
+                                </svg>
+                                <h3 class="font-semibold text-amber-800">Retirement</h3>
+                            </div>
+
+                            <!-- Core settings -->
+                            <div class="pt-4 border-t border-amber-200">
+                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Core</div>
+                                <label class="block text-xs text-slate-600">Date of birth</label>
+                                <input type="date" id="ret-dob" class="input-field text-sm" value="1985-08-08">
+                                <div class="text-[11px] text-slate-500 mt-1">Current age: <span id="ret-current-age">—</span></div>
+
+                                <label class="block text-xs text-slate-600 mt-3">Retirement age</label>
+                                <input type="number" id="ret-retirement-age" class="input-field text-sm" min="0" max="120" step="1" value="65">
+                                <div class="text-[11px] text-slate-500 mt-1">Years to retirement: <span id="ret-years-to-retirement">—</span></div>
+
+                                <label class="block text-xs text-slate-600 mt-3">Withdrawal rate (%)</label>
+                                <input type="number" id="ret-wd-rate" class="input-field text-sm" min="0" max="100" step="0.1" value="4">
+
+                                <label class="block text-xs text-slate-600 mt-3">Effective tax rate on retirement income (%)</label>
+                                <input type="number" id="ret-tax-rate" class="input-field text-sm" min="0" max="100" step="0.1" value="18">
+
+                                <label class="block text-xs text-slate-600 mt-3">CPI assumption (%)</label>
+                                <input type="number" id="ret-cpi" class="input-field text-sm" min="0" max="100" step="0.1" value="5">
+
+                                <label class="inline-flex items-center gap-2 mt-3 text-xs text-slate-700">
+                                    <input type="checkbox" id="ret-real-terms" class="rounded">
+                                    Show in today's money
+                                </label>
+                            </div>
+
+                            <!-- Returns -->
+                            <div class="pt-4 border-t border-amber-200">
+                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Per-fund nominal return %</div>
+                                <label class="block text-xs text-slate-600">Discretionary</label>
+                                <input type="number" id="ret-return-discretionary" class="input-field text-sm" min="0" max="100" step="0.1" value="10">
+                                <label class="block text-xs text-slate-600 mt-2">TFSA</label>
+                                <input type="number" id="ret-return-tfsa" class="input-field text-sm" min="0" max="100" step="0.1" value="10">
+                                <label class="block text-xs text-slate-600 mt-2">Crypto</label>
+                                <input type="number" id="ret-return-crypto" class="input-field text-sm" min="0" max="100" step="0.1" value="7">
+                                <div class="text-[10px] text-slate-400 mt-1">expected nominal return, no default consensus</div>
+                                <label class="block text-xs text-slate-600 mt-2">RA</label>
+                                <input type="number" id="ret-return-ra" class="input-field text-sm" min="0" max="100" step="0.1" value="10">
+                            </div>
+
+                            <!-- Offshore -->
+                            <details class="pt-4 border-t border-amber-200">
+                                <summary class="text-xs font-semibold text-slate-700 uppercase tracking-wider cursor-pointer">Offshore allocation</summary>
+                                <label class="block text-xs text-slate-600 mt-2">Discretionary offshore %</label>
+                                <input type="number" id="ret-offshore-discretionary" class="input-field text-sm" min="0" max="100" step="1" value="0">
+                                <label class="block text-xs text-slate-600 mt-2">TFSA offshore %</label>
+                                <input type="number" id="ret-offshore-tfsa" class="input-field text-sm" min="0" max="100" step="1" value="0">
+                                <label class="block text-xs text-slate-600 mt-2">ZAR depreciation %/yr</label>
+                                <input type="number" id="ret-zar-depre" class="input-field text-sm" min="-100" max="100" step="0.1" value="2">
+                            </details>
+
+                            <!-- RA structure -->
+                            <div class="pt-4 border-t border-amber-200">
+                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">RA structure</div>
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700">
+                                    <input type="checkbox" id="ret-ra-commute" class="rounded" checked>
+                                    Commute 1/3 as lump sum at retirement
+                                </label>
+                                <label class="block text-xs text-slate-600 mt-3">Vested balance (pre-Sep-2024) R</label>
+                                <input type="number" id="ret-ra-vested" class="input-field text-sm" min="0" step="100" value="0">
+                                <div id="ret-ra-vested-hint" class="text-[10px] text-slate-400 mt-1">Enter your pre-Sep-2024 RA balance for accurate two-pot modelling.</div>
+                                <div class="text-[10px] text-slate-500 mt-2">New contributions split 33% savings / 67% retirement (Sep 2024 rule).</div>
+                            </div>
+
+                            <!-- Optional scenarios -->
+                            <div class="pt-4 border-t border-amber-200">
+                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Optional scenarios</div>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" id="ret-opt-dutch" class="rounded"> Dutch pension (€900/mo from age 68)</label>
+                                <div class="ml-5 mt-1">
+                                    <label class="block text-[11px] text-slate-500">EUR/ZAR rate</label>
+                                    <input type="number" id="ret-opt-dutch-rate" class="input-field text-sm" min="0" step="0.1" value="20">
+                                </div>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-tfsa" class="rounded"> TFSA contributions (R46k/yr)</label>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-ra-monthly" class="rounded"> Extra RA monthly</label>
+                                <div class="ml-5 mt-1">
+                                    <label class="block text-[11px] text-slate-500">Amount R/mo</label>
+                                    <input type="number" id="ret-opt-ra-monthly-amount" class="input-field text-sm" min="0" step="100" value="10000">
+                                    <div id="ret-opt-ra-cap-warn" class="hidden text-[10px] text-amber-700 mt-1">Above SARS deduction cap. Excess carries forward.</div>
+                                </div>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-house" class="rounded"> House sale</label>
+                                <div class="ml-5 mt-1">
+                                    <label class="block text-[11px] text-slate-500">Value R</label>
+                                    <input type="number" id="ret-opt-house-value" class="input-field text-sm" min="0" step="1000" value="2000000">
+                                </div>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-inherit" class="rounded"> Inheritance</label>
+                                <div class="ml-5 mt-1">
+                                    <label class="block text-[11px] text-slate-500">Amount EUR</label>
+                                    <input type="number" id="ret-opt-inherit-eur" class="input-field text-sm" min="0" step="100" value="0">
+                                </div>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-bond" class="rounded"> Bond payoff</label>
+                                <div class="ml-5 mt-1">
+                                    <label class="block text-[11px] text-slate-500">Outstanding at retirement R</label>
+                                    <input type="number" id="ret-opt-bond-balance" class="input-field text-sm" min="0" step="1000" value="0">
+                                </div>
+
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-savings-pot" class="rounded"> Annual savings-pot withdrawal</label>
+                                <div class="ml-5 mt-1">
+                                    <label class="block text-[11px] text-slate-500">Annual amount R (min 2,000)</label>
+                                    <input type="number" id="ret-opt-savings-pot-amount" class="input-field text-sm" min="0" step="100" value="0">
+                                    <div id="ret-opt-savings-pot-warn" class="hidden text-[10px] text-amber-700 mt-1">Below SARS minimum (R2,000).</div>
+                                </div>
+                            </div>
+
+                            <div class="pt-4 border-t border-amber-200">
+                                <button id="ret-load-csv" class="btn btn-secondary text-xs w-full mb-2">Load Retirement</button>
+                                <button id="ret-save-csv" class="btn btn-primary text-xs w-full">Save Retirement</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <!-- Main Content Area -->
