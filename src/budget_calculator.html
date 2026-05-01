@@ -1201,6 +1201,11 @@
             deriveAssumedFutureMonthly as _deriveAssumedFutureMonthly,
             calculateRaProjection as _calculateRaProjection,
             calculatePotValueToday as _calculatePotValueToday,
+            RETIREMENT_CONSTANTS as _RET_CONSTS,
+            getDefaultRetirementParams as _getDefaultRetirementParams,
+            parseRetirementCSV as _parseRetirementCSV,
+            generateRetirementCSV as _generateRetirementCSV,
+            calculateRetirementSnapshot as _calculateRetirementSnapshot,
         } from './calculations.js';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1503,11 +1508,6 @@
                     console.log('Could not auto-load ra.csv');
                 }
             })();
-
-            // --- RETIREMENT STATE ---
-            function renderRetirement() {
-                // Filled in subsequent tasks. Stub so tab switching doesn't crash.
-            }
 
             // --- TEST MODE ---
             let testMode = false;
@@ -2583,6 +2583,180 @@
 
                 await loadInvestmentCSVFromServer();
                 await loadDebtCSVFromServer();
+            })();
+
+            // --- RETIREMENT STATE ---
+            let retirementParams = _getDefaultRetirementParams();
+
+            const retFmtZAR = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA');
+            const retFmtZARSign = (n) => {
+                const v = Math.round(Number(n) || 0);
+                const sign = v < 0 ? '-' : '';
+                return sign + 'R ' + Math.abs(v).toLocaleString('en-ZA');
+            };
+
+            // Returns the RA pot today (live read from RA tab state).
+            const retRaPotToday = () => _calculatePotValueToday(
+                raTransactions || [],
+                (raParams && raParams.nominal_return_pct) || retirementParams.return_ra_pct,
+                new Date()
+            );
+
+            // Sum of last-12-months RA contributions for deduction-cap headroom display.
+            const retRaAnnualLast12 = () => {
+                const today = new Date();
+                const cutoff = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+                return (raTransactions || [])
+                    .filter(t => t.date && new Date(t.date) >= cutoff)
+                    .reduce((s, t) => s + (Number(t.amount) || 0), 0);
+            };
+
+            const retInputBindings = [
+                ['ret-dob',                       'dob',                                   'string'],
+                ['ret-retirement-age',            'retirement_age',                        'number'],
+                ['ret-wd-rate',                   'withdrawal_rate_pct',                   'number'],
+                ['ret-tax-rate',                  'effective_tax_rate_pct',                'number'],
+                ['ret-cpi',                       'cpi_pct',                               'number'],
+                ['ret-real-terms',                'show_real_terms',                       'checkbox'],
+
+                ['ret-return-discretionary',      'return_discretionary_pct',              'number'],
+                ['ret-return-tfsa',               'return_tfsa_pct',                       'number'],
+                ['ret-return-crypto',             'return_crypto_pct',                     'number'],
+                ['ret-return-ra',                 'return_ra_pct',                         'number'],
+
+                ['ret-offshore-discretionary',    'offshore_discretionary_pct',            'number'],
+                ['ret-offshore-tfsa',             'offshore_tfsa_pct',                     'number'],
+                ['ret-zar-depre',                 'zar_depreciation_pct',                  'number'],
+
+                ['ret-ra-commute',                'ra_commute_third',                      'checkbox'],
+                ['ret-ra-vested',                 'ra_vested_balance',                     'number'],
+
+                ['ret-opt-dutch',                 'opt_dutch_enabled',                     'checkbox'],
+                ['ret-opt-dutch-rate',            'opt_dutch_eur_zar',                     'number'],
+                ['ret-opt-tfsa',                  'opt_tfsa_enabled',                      'checkbox'],
+                ['ret-opt-ra-monthly',            'opt_ra_monthly_enabled',                'checkbox'],
+                ['ret-opt-ra-monthly-amount',     'opt_ra_monthly_amount',                 'number'],
+                ['ret-opt-house',                 'opt_house_enabled',                     'checkbox'],
+                ['ret-opt-house-value',           'opt_house_value',                       'number'],
+                ['ret-opt-inherit',               'opt_inheritance_enabled',               'checkbox'],
+                ['ret-opt-inherit-eur',           'opt_inheritance_eur',                   'number'],
+                ['ret-opt-bond',                  'opt_bond_enabled',                      'checkbox'],
+                ['ret-opt-bond-balance',          'opt_bond_balance',                      'number'],
+                ['ret-opt-savings-pot',           'opt_savings_pot_withdrawal_enabled',    'checkbox'],
+                ['ret-opt-savings-pot-amount',    'opt_savings_pot_withdrawal_annual',     'number'],
+            ];
+
+            function retApplyParamsToInputs() {
+                retInputBindings.forEach(([id, key, type]) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    if (type === 'checkbox') el.checked = !!retirementParams[key];
+                    else el.value = retirementParams[key] ?? '';
+                });
+            }
+
+            function retReadInput(el, type) {
+                if (type === 'checkbox') return el.checked ? 1 : 0;
+                if (type === 'string') return el.value;
+                const v = parseFloat(el.value);
+                return Number.isNaN(v) ? 0 : v;
+            }
+
+            function retPersist() {
+                debouncedSave(saveKey('retirement'), () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
+            }
+
+            function retWireInputs() {
+                retInputBindings.forEach(([id, key, type]) => {
+                    const el = document.getElementById(id);
+                    if (!el) return;
+                    const evt = (type === 'checkbox') ? 'change' : 'input';
+                    el.addEventListener(evt, () => {
+                        retirementParams[key] = retReadInput(el, type);
+                        retPersist();
+                        renderRetirement();
+                    });
+                });
+
+                document.getElementById('ret-save-csv').addEventListener('click', () => {
+                    saveToServer(saveKey('retirement'), () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
+                });
+
+                document.getElementById('ret-load-csv').addEventListener('click', () => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = '.csv';
+                    input.onchange = (e) => {
+                        const f = e.target.files && e.target.files[0];
+                        if (!f) return;
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                            retirementParams = _parseRetirementCSV(ev.target.result);
+                            retApplyParamsToInputs();
+                            renderRetirement();
+                        };
+                        reader.readAsText(f);
+                    };
+                    input.click();
+                });
+            }
+
+            function renderRetirement() {
+                const today = new Date();
+                const snap = _calculateRetirementSnapshot({
+                    params: retirementParams,
+                    discretionaryToday: Number(investmentData.currentValues.Discretionary) || 0,
+                    tfsaToday: Number(investmentData.currentValues.TFSA) || 0,
+                    cryptoToday: Number(investmentData.currentValues.Crypto) || 0,
+                    tfsaTransactions: (investmentData.transactions || []).filter(t => t.type === 'TFSA'),
+                    raPotToday: retRaPotToday(),
+                    raAnnualContributionLast12: retRaAnnualLast12(),
+                }, today);
+
+                // Sidebar derived labels
+                if (snap.ageNow !== null) {
+                    document.getElementById('ret-current-age').textContent = snap.ageNow.toFixed(1);
+                } else {
+                    document.getElementById('ret-current-age').textContent = '—';
+                }
+                document.getElementById('ret-years-to-retirement').textContent = snap.yearsToRet.toFixed(1);
+
+                // Sidebar warnings
+                const monthlyExtra = (retirementParams.opt_ra_monthly_enabled ? Number(retirementParams.opt_ra_monthly_amount) || 0 : 0);
+                document.getElementById('ret-opt-ra-cap-warn').classList.toggle('hidden', monthlyExtra * 12 <= _RET_CONSTS.RA_DEDUCTION_CAP);
+
+                const wd = retirementParams.opt_savings_pot_withdrawal_annual || 0;
+                const wdEnabled = !!retirementParams.opt_savings_pot_withdrawal_enabled;
+                document.getElementById('ret-opt-savings-pot-warn').classList.toggle('hidden', !(wdEnabled && wd > 0 && wd < _RET_CONSTS.SAVINGS_POT_MIN_WITHDRAWAL));
+
+                const vestedHint = (Number(retirementParams.ra_vested_balance) || 0) === 0;
+                document.getElementById('ret-ra-vested-hint').classList.toggle('hidden', !vestedHint);
+
+                // Card placeholders — filled in subsequent tasks.
+                document.getElementById('retirement-card-snapshot').innerHTML = '<div class="text-xs text-slate-400">Snapshot — Task 12.</div>';
+                document.getElementById('retirement-card-monthly').innerHTML = '<div class="text-xs text-slate-400">Monthly income — Task 13.</div>';
+                document.getElementById('retirement-card-lumpsum').innerHTML = '<div class="text-xs text-slate-400">Lump sum — Task 14.</div>';
+                document.getElementById('retirement-card-rapot').innerHTML = '<div class="text-xs text-slate-400">RA pot — Task 15.</div>';
+                document.getElementById('retirement-card-assumptions').innerHTML = '<div class="text-xs text-slate-400">Assumptions — Task 16.</div>';
+
+                window.__retirementSnapshot = snap; // Exposed for manual debugging only.
+            }
+
+            retApplyParamsToInputs();
+            retWireInputs();
+
+            (async () => {
+                try {
+                    const response = await fetch(dbPath('retirement.csv'), { cache: 'no-store' });
+                    if (response.ok) {
+                        const text = await response.text();
+                        retirementParams = _parseRetirementCSV(text);
+                        retApplyParamsToInputs();
+                        renderRetirement();
+                    }
+                } catch (_e) {
+                    console.log('Could not auto-load retirement.csv');
+                }
             })();
         });
     </script>
