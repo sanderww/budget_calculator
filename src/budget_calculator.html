@@ -2940,7 +2940,39 @@
                     </div>
                     ${depletionLine}
                 `;
-                document.getElementById('retirement-card-assumptions').innerHTML = '<div class="text-xs text-slate-400">Assumptions — Task 16.</div>';
+                const assumptionRows = [
+                    ['Date of birth', retirementParams.dob],
+                    ['Retirement age', retirementParams.retirement_age],
+                    ['CPI', `${retirementParams.cpi_pct}%`],
+                    ['Effective retirement income tax', `${retirementParams.effective_tax_rate_pct}%`],
+                    ['Withdrawal rate', `${retirementParams.withdrawal_rate_pct}%`],
+                    ['Returns (Discretionary / TFSA / Crypto / RA)', `${retirementParams.return_discretionary_pct}% / ${retirementParams.return_tfsa_pct}% / ${retirementParams.return_crypto_pct}% / ${retirementParams.return_ra_pct}%`],
+                    ['Offshore (Discretionary / TFSA)', `${retirementParams.offshore_discretionary_pct}% / ${retirementParams.offshore_tfsa_pct}%`],
+                    ['ZAR depreciation', `${retirementParams.zar_depreciation_pct}%/yr`],
+                    ['Two-pot split', '33% savings / 67% retirement (post-Sep-2024 contributions)'],
+                    ['Commutation', retirementParams.ra_commute_third ? '1/3 lump sum on' : 'off'],
+                    ['TFSA cap remaining', retFmtZAR(Math.max(0, _RET_CONSTS.TFSA_LIFETIME_CAP - (investmentData.transactions || []).filter(t => t.type === 'TFSA').reduce((s, t) => s + (Number(t.amount) || 0), 0)))],
+                    ['RA deduction-cap headroom', retFmtZAR(snap.ra.deductionCapHeadroom) + ' / yr'],
+                    ['Hard constants', `de minimis R${_RET_CONSTS.DE_MINIMIS.toLocaleString()}, living-annuity threshold R${_RET_CONSTS.LIVING_ANNUITY_THRESHOLD.toLocaleString()}, lump-sum tax-free R${_RET_CONSTS.LUMP_SUM_TAX_FREE.toLocaleString()}`],
+                ];
+                document.getElementById('retirement-card-assumptions').innerHTML = `
+                    <details>
+                        <summary class="cursor-pointer">
+                            <span class="text-xl font-semibold text-slate-800">Assumptions</span>
+                            <span class="text-xs text-slate-500 ml-2">(click to expand)</span>
+                        </summary>
+                        <table class="w-full text-sm mt-3">
+                            <tbody>
+                                ${assumptionRows.map(([k, v]) => `
+                                    <tr class="border-b border-slate-100">
+                                        <td class="py-1.5 text-slate-500">${k}</td>
+                                        <td class="py-1.5 text-slate-800 text-right">${v}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </details>
+                `;
 
                 window.__retirementSnapshot = snap; // Exposed for manual debugging only.
             }
