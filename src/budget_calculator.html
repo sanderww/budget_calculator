@@ -2816,7 +2816,69 @@
                         `).join('')}
                     </div>
                 `;
-                document.getElementById('retirement-card-lumpsum').innerHTML = '<div class="text-xs text-slate-400">Lump sum — Task 14.</div>';
+                const yearsTilTfsaCap = (() => {
+                    if (!retirementParams.opt_tfsa_enabled) return null;
+                    const tfsaTxs = (investmentData.transactions || []).filter(t => t.type === 'TFSA');
+                    const lifetime = tfsaTxs.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+                    const remaining = Math.max(0, _RET_CONSTS.TFSA_LIFETIME_CAP - lifetime);
+                    return Math.ceil(remaining / _RET_CONSTS.TFSA_ANNUAL_CAP);
+                })();
+
+                const rows = [
+                    ['Discretionary', snap.liquid.at55.discretionary, ''],
+                    ['TFSA', snap.liquid.at55.tfsa,
+                        retirementParams.opt_tfsa_enabled
+                            ? `R${_RET_CONSTS.TFSA_ANNUAL_CAP.toLocaleString()}/yr; ~${yearsTilTfsaCap ?? 0} more years until lifetime cap.`
+                            : ''],
+                    ['Crypto', snap.liquid.at55.crypto, ''],
+                ];
+                if (retirementParams.ra_commute_third) {
+                    rows.push(['1/3 RA commutation (gross)',
+                        snap.lumpSum.ra55Commutation.gross,
+                        `tax: ${retFmtZAR(snap.lumpSum.ra55Commutation.tax)} (first R550k tax-free)`]);
+                    rows.push(['1/3 RA commutation (net of tax)', snap.lumpSum.ra55Commutation.net, '']);
+                }
+                if (snap.ra.at55.savingsPotWithdrawnNet > 0) {
+                    rows.push(['Savings-pot withdrawals (net)', snap.ra.at55.savingsPotWithdrawnNet,
+                        `gross: ${retFmtZAR(snap.ra.at55.savingsPotWithdrawnGross)}; tax: ${retFmtZAR(snap.ra.at55.savingsPotTaxPaid)}`]);
+                }
+                if (retirementParams.opt_house_enabled) rows.push(['House sale', snap.lumpSum.houseSale, '']);
+                if (retirementParams.opt_inheritance_enabled) rows.push(['Inheritance (ZAR)', snap.lumpSum.inheritanceZar,
+                    `${Number(retirementParams.opt_inheritance_eur)||0} EUR × ${retirementParams.opt_dutch_eur_zar} ZAR/EUR`]);
+                if (retirementParams.opt_bond_enabled) rows.push(['Less: outstanding bond', -snap.lumpSum.bondPayoff, '']);
+
+                const totalRow = snap.lumpSum.projected55;
+                const totalClass = totalRow < 0 ? 'text-red-600' : 'text-indigo-700';
+
+                document.getElementById('retirement-card-lumpsum').innerHTML = `
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Instantly available at retirement</h2>
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">
+                                <th class="text-left py-2">Source</th>
+                                <th class="text-right py-2">Value at retirement</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows.map(([label, value, note]) => `
+                                <tr class="border-b border-slate-100">
+                                    <td class="py-2">
+                                        <div>${label}</div>
+                                        ${note ? `<div class="text-[11px] text-slate-500">${note}</div>` : ''}
+                                    </td>
+                                    <td class="py-2 text-right font-medium">${retFmtZARSign(value)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                        <tfoot>
+                            <tr class="font-bold border-t border-slate-300">
+                                <td class="py-2">Total</td>
+                                <td class="py-2 text-right ${totalClass}">${retFmtZARSign(totalRow)}</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                    ${totalRow < 0 ? '<div class="mt-2 text-xs text-red-600">Outstanding bond exceeds lump-sum funds. You may need additional liquidity at retirement.</div>' : ''}
+                `;
                 document.getElementById('retirement-card-rapot').innerHTML = '<div class="text-xs text-slate-400">RA pot — Task 15.</div>';
                 document.getElementById('retirement-card-assumptions').innerHTML = '<div class="text-xs text-slate-400">Assumptions — Task 16.</div>';
 
