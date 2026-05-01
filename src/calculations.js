@@ -768,3 +768,71 @@ export function projectLivingAnnuityDepletion(
     }
     return null;
 }
+
+const RETIREMENT_DEFAULT_PARAMS = {
+    dob: '1985-08-08',
+    retirement_age: 65,
+    withdrawal_rate_pct: 4,
+    cpi_pct: 5,
+    show_real_terms: 0,
+    effective_tax_rate_pct: 18,
+
+    return_discretionary_pct: 10,
+    return_tfsa_pct: 10,
+    return_crypto_pct: 7,
+    return_ra_pct: 10,
+
+    offshore_discretionary_pct: 0,
+    offshore_tfsa_pct: 0,
+    zar_depreciation_pct: 2,
+
+    ra_commute_third: 1,
+    ra_savings_component_pct: 33,
+    ra_vested_balance: 0,
+    opt_savings_pot_withdrawal_enabled: 0,
+    opt_savings_pot_withdrawal_annual: 0,
+
+    opt_dutch_enabled: 0,
+    opt_dutch_eur_zar: 20,
+    opt_tfsa_enabled: 0,
+    opt_ra_monthly_enabled: 0,
+    opt_ra_monthly_amount: 10_000,
+    opt_house_enabled: 0,
+    opt_house_value: 2_000_000,
+    opt_inheritance_enabled: 0,
+    opt_inheritance_eur: 0,
+    opt_bond_enabled: 0,
+    opt_bond_balance: 0,
+};
+
+export function getDefaultRetirementParams() {
+    return { ...RETIREMENT_DEFAULT_PARAMS };
+}
+
+export function parseRetirementCSV(text) {
+    const params = { ...RETIREMENT_DEFAULT_PARAMS };
+    const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');
+    rows.forEach(row => {
+        const cols = row.split(',').map(s => s.trim());
+        if (cols[0] !== 'param') return;
+        const key = cols[1];
+        const raw = cols[2];
+        if (!key || raw === undefined) return;
+        if (key === 'dob') {
+            params[key] = raw;
+            return;
+        }
+        const v = parseFloat(raw);
+        if (!Number.isNaN(v)) params[key] = v;
+    });
+    return params;
+}
+
+export function generateRetirementCSV(params) {
+    const p = { ...RETIREMENT_DEFAULT_PARAMS, ...(params || {}) };
+    let csv = '';
+    Object.keys(RETIREMENT_DEFAULT_PARAMS).forEach(key => {
+        csv += `param,${key},${p[key]},\n`;
+    });
+    return csv;
+}

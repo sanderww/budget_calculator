@@ -30,6 +30,9 @@ import {
     raCommutationLumpSum,
     raMonthlyIncome,
     projectLivingAnnuityDepletion,
+    parseRetirementCSV,
+    generateRetirementCSV,
+    getDefaultRetirementParams,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -584,6 +587,9 @@ describe('smoke', () => {
         expect(typeof raCommutationLumpSum).toBe('function');
         expect(typeof raMonthlyIncome).toBe('function');
         expect(typeof projectLivingAnnuityDepletion).toBe('function');
+        expect(typeof parseRetirementCSV).toBe('function');
+        expect(typeof generateRetirementCSV).toBe('function');
+        expect(typeof getDefaultRetirementParams).toBe('function');
     });
 });
 
@@ -1130,5 +1136,44 @@ describe('projectLivingAnnuityDepletion', () => {
     it('returns null for non-positive pot', () => {
         expect(projectLivingAnnuityDepletion(0, 10, 4, 65)).toBeNull();
         expect(projectLivingAnnuityDepletion(-100, 10, 4, 65)).toBeNull();
+    });
+});
+
+describe('retirement CSV round-trip', () => {
+    it('falls back to defaults when text is empty', () => {
+        const p = parseRetirementCSV('');
+        expect(p.dob).toBe('1985-08-08');
+        expect(p.retirement_age).toBe(65);
+        expect(p.withdrawal_rate_pct).toBe(4);
+    });
+
+    it('round-trips param overrides', () => {
+        const data = {
+            ...getDefaultRetirementParams(),
+            retirement_age: 60,
+            cpi_pct: 6.5,
+            opt_dutch_enabled: 1,
+            ra_vested_balance: 250_000,
+            dob: '1990-01-15',
+        };
+        const csv = generateRetirementCSV(data);
+        const parsed = parseRetirementCSV(csv);
+        expect(parsed.retirement_age).toBe(60);
+        expect(parsed.cpi_pct).toBe(6.5);
+        expect(parsed.opt_dutch_enabled).toBe(1);
+        expect(parsed.ra_vested_balance).toBe(250_000);
+        expect(parsed.dob).toBe('1990-01-15');
+    });
+
+    it('ignores non-param rows silently', () => {
+        const csv = 'header,row,1,\nparam,retirement_age,70,\nrandom\n';
+        const parsed = parseRetirementCSV(csv);
+        expect(parsed.retirement_age).toBe(70);
+    });
+
+    it('keeps default for invalid numeric values', () => {
+        const csv = 'param,retirement_age,not-a-number,\n';
+        const parsed = parseRetirementCSV(csv);
+        expect(parsed.retirement_age).toBe(65); // unchanged
     });
 });
