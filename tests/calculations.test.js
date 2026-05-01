@@ -33,6 +33,7 @@ import {
     parseRetirementCSV,
     generateRetirementCSV,
     getDefaultRetirementParams,
+    calculateRetirementSnapshot,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -590,6 +591,7 @@ describe('smoke', () => {
         expect(typeof parseRetirementCSV).toBe('function');
         expect(typeof generateRetirementCSV).toBe('function');
         expect(typeof getDefaultRetirementParams).toBe('function');
+        expect(typeof calculateRetirementSnapshot).toBe('function');
     });
 });
 
@@ -1175,5 +1177,60 @@ describe('retirement CSV round-trip', () => {
         const csv = 'param,retirement_age,not-a-number,\n';
         const parsed = parseRetirementCSV(csv);
         expect(parsed.retirement_age).toBe(65); // unchanged
+    });
+});
+
+describe('calculateRetirementSnapshot', () => {
+    const baseInput = {
+        params: {
+            ...getDefaultRetirementParams(),
+            dob: '1985-08-08',
+            retirement_age: 65,
+        },
+        discretionaryToday: 100_000,
+        tfsaToday: 50_000,
+        cryptoToday: 20_000,
+        tfsaTransactions: [],
+        raPotToday: 200_000,
+        raAnnualContributionLast12: 0,
+    };
+
+    it('returns sane structure with default inputs', () => {
+        const r = calculateRetirementSnapshot(baseInput, new Date(2026, 4, 1));
+        expect(r.ra.atRetirement.total).toBeGreaterThan(0);
+        expect(r.lumpSum.projected55).toBeGreaterThan(0);
+        expect(r.monthly.projected55.gross).toBeGreaterThanOrEqual(0);
+        expect(r.params.retirement_age).toBe(65);
+    });
+
+    it('current funds at 55 use only liquid (no commutation, no extras)', () => {
+        const r = calculateRetirementSnapshot(baseInput, new Date(2026, 4, 1));
+        expect(r.lumpSum.current55).toBeCloseTo(
+            r.liquid.at55.discretionary + r.liquid.at55.tfsaCurrent + r.liquid.at55.crypto, 5);
+    });
+
+    it('clamps vested balance to current RA pot', () => {
+        const r = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseInput.params, ra_vested_balance: 999_999_999 },
+        }, new Date(2026, 4, 1));
+        expect(r.ra.vestedToday).toBeLessThanOrEqual(baseInput.raPotToday);
+    });
+
+    it('shows real-terms values when toggle is on', () => {
+        const nominal = calculateRetirementSnapshot(baseInput, new Date(2026, 4, 1));
+        const real = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseInput.params, show_real_terms: 1 },
+        }, new Date(2026, 4, 1));
+        expect(real.lumpSum.projected55).toBeLessThan(nominal.lumpSum.projected55);
+    });
+
+    it('reports deduction cap headroom from current contribution', () => {
+        const r = calculateRetirementSnapshot({
+            ...baseInput,
+            raAnnualContributionLast12: 200_000,
+        }, new Date(2026, 4, 1));
+        expect(r.ra.deductionCapHeadroom).toBe(RETIREMENT_CONSTANTS.RA_DEDUCTION_CAP - 200_000);
     });
 });
