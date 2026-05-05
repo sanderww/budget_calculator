@@ -425,6 +425,19 @@ net monthly   = gross × (1 − taxRate / 100)
 
 **Living-annuity depletion check**: walk the annuitised pot forward month-by-month from retirement age; at any month where the pot drops below R 150,000, return the age-at-threshold (used for the depletion warning).
 
+**Lump-sum monthly drawdown (PMT annuity)**: the at-retirement lump sum is amortised into a level monthly payment that depletes the pot exactly to zero by `life_expectancy`, assuming the residual continues to earn `lump_sum_drawdown_return_pct` (annual, compounded monthly).
+```
+N        = max(0, round((life_expectancy − retirement_age) × 12))
+r_annual = lump_sum_drawdown_return_pct / 100
+r        = (1 + r_annual)^(1/12) − 1
+PV       = projected funds at retirement (post-tax-implied lump sum)
+
+if N == 0 or PV ≤ 0:           PMT = 0
+else if |r| < 1e-9:             PMT = PV / N             (zero-return fallback)
+else:                           PMT = PV × r / (1 − (1 + r)^−N)
+```
+`life_expectancy` is bounded below by `retirement_age` (a life expectancy below retirement age collapses to PMT = 0).
+
 ### 5.5 Snapshot definitions
 
 | Cell | Definition |
@@ -435,6 +448,9 @@ net monthly   = gross × (1 − taxRate / 100)
 | **Current monthly at 55** | Full RA pot (no extras) × withdrawal rate / 12 × (1 − tax). |
 | **Projected monthly at 55** | Annuitised RA pot (with optional contributions) × withdrawal rate / 12 × (1 − tax). |
 | **Projected monthly at 68** | Projected drawdown at 68 + Dutch pension (ZAR, net), or Dutch pension only if pot has crossed the R 150k threshold and Dutch is enabled. |
+| **Monthly from lump sum** | PMT annuity over `life_expectancy − retirement_age` years at `lump_sum_drawdown_return_pct` on the at-retirement lump sum (see §5.4). Same value displayed against both age columns. |
+| **Max estimated monthly income (Age 55)** | `Projected monthly at 55` (RA drawdown net) + `Monthly from lump sum`. |
+| **Max estimated monthly income (Age D)** | `Projected monthly at 68` (RA drawdown net + Dutch pension net) + `Monthly from lump sum`. |
 
 ### 5.6 Out of scope (v1)
 
@@ -504,3 +520,4 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |
 | R30 | Dutch pension start age (`opt_dutch_age`, default 68) and monthly EUR amount (`opt_dutch_eur_monthly`, default 900) are user-configurable in the retirement sidebar, persisted in `db/retirement.csv`, and applied throughout the snapshot — including the "Age D" snapshot column header and the "From age D" monthly-income phase title. |
 | R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. |
+| R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar and persisted in `db/retirement.csv`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |

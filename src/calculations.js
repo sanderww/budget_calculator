@@ -779,6 +779,8 @@ export function projectLivingAnnuityDepletion(
 const RETIREMENT_DEFAULT_PARAMS = {
     dob: '1985-08-08',
     retirement_age: 65,
+    life_expectancy: 95,
+    lump_sum_drawdown_return_pct: 6,
     withdrawal_rate_pct: 4,
     cpi_pct: 5,
     show_real_terms: 0,
@@ -1033,6 +1035,24 @@ export function calculateRetirementSnapshot({
     // Real-terms deflation if requested.
     const deflate = (n, years) => p.show_real_terms ? realValue(n, p.cpi_pct, years) : n;
 
+    // Lump-sum monthly drawdown: PMT-style annuity that depletes the at-retirement lump
+    // sum exactly to zero at age `life_expectancy`, assuming the residual continues to
+    // earn `lump_sum_drawdown_return_pct` (annual, compounded monthly).
+    //   monthly rate r = (1 + R)^(1/12) - 1
+    //   PMT = PV * r / (1 - (1 + r)^-N)
+    // Falls back to PV / N when r is 0 (or near zero).
+    const lifeExpectancy = Math.max(p.retirement_age, Number(p.life_expectancy) || 0);
+    const monthsLumpDrawdown = Math.max(0, Math.round((lifeExpectancy - p.retirement_age) * 12));
+    const lumpSumDrawdownReturnPct = Number(p.lump_sum_drawdown_return_pct) || 0;
+    const lumpSumMonthlyNominal = (() => {
+        if (monthsLumpDrawdown <= 0 || projectedFundsAtRet <= 0) return 0;
+        const monthlyRate = Math.pow(1 + lumpSumDrawdownReturnPct / 100, 1 / 12) - 1;
+        if (Math.abs(monthlyRate) < 1e-9) return projectedFundsAtRet / monthsLumpDrawdown;
+        return projectedFundsAtRet * monthlyRate / (1 - Math.pow(1 + monthlyRate, -monthsLumpDrawdown));
+    })();
+    const maxMonthly55Nominal = monthly55Projected.net + lumpSumMonthlyNominal;
+    const maxMonthly68Nominal = monthly68Projected.net + lumpSumMonthlyNominal;
+
     return {
         ageNow,
         monthsToRetirement, monthsTo55, monthsTo68,
@@ -1067,6 +1087,12 @@ export function calculateRetirementSnapshot({
             atRetirement: { gross: deflate(monthlyAtRetirement.gross, yearsToRet), net: deflate(monthlyAtRetirement.net, yearsToRet), fullCommutation: monthlyAtRetirement.fullCommutation },
             dutchMonthlyZAR: deflate(dutchMonthlyZAR, yearsTo68),
             dutchMonthlyNet: deflate(dutchMonthlyNet, yearsTo68),
+            lumpSumDrawdown: deflate(lumpSumMonthlyNominal, yearsToRet),
+            maxAt55: deflate(maxMonthly55Nominal, yearsTo55),
+            maxAt68: deflate(maxMonthly68Nominal, yearsTo68),
+            lumpSumDrawdownMonths: monthsLumpDrawdown,
+            lumpSumDrawdownReturnPct,
+            lifeExpectancy,
         },
     };
 }

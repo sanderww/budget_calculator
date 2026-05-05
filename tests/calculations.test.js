@@ -1349,6 +1349,57 @@ describe('calculateRetirementSnapshot', () => {
         expect(cryptoOff.lumpSum.atRetirement).toBeLessThan(baseline.lumpSum.atRetirement);
     });
 
+    it('lump-sum monthly drawdown is a PMT annuity sized to deplete by life_expectancy', () => {
+        // Use a zero-return drawdown so the figure collapses to PV/N — easier to reason about.
+        const r = calculateRetirementSnapshot({
+            ...baseInput,
+            params: {
+                ...baseInput.params,
+                retirement_age: 65,
+                life_expectancy: 95,
+                lump_sum_drawdown_return_pct: 0,
+            },
+        }, new Date(2026, 4, 1));
+        const months = (95 - 65) * 12;
+        expect(r.monthly.lumpSumDrawdownMonths).toBe(months);
+        expect(r.monthly.lumpSumDrawdown).toBeCloseTo(r.lumpSum.atRetirement / months, 5);
+    });
+
+    it('lump-sum monthly is higher with positive drawdown return than with zero return', () => {
+        const baseParams = {
+            ...baseInput.params,
+            retirement_age: 65,
+            life_expectancy: 95,
+        };
+        const at0 = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseParams, lump_sum_drawdown_return_pct: 0 },
+        }, new Date(2026, 4, 1));
+        const at6 = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseParams, lump_sum_drawdown_return_pct: 6 },
+        }, new Date(2026, 4, 1));
+        expect(at6.monthly.lumpSumDrawdown).toBeGreaterThan(at0.monthly.lumpSumDrawdown);
+    });
+
+    it('max monthly equals RA monthly net plus lump-sum monthly', () => {
+        const r = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseInput.params, show_real_terms: 0 },
+        }, new Date(2026, 4, 1));
+        expect(r.monthly.maxAt55).toBeCloseTo(r.monthly.projected55.net + r.monthly.lumpSumDrawdown, 5);
+        expect(r.monthly.maxAt68).toBeCloseTo(r.monthly.projected68.net + r.monthly.lumpSumDrawdown, 5);
+    });
+
+    it('lump-sum drawdown is zero when retirement_age >= life_expectancy', () => {
+        const r = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseInput.params, retirement_age: 95, life_expectancy: 95 },
+        }, new Date(2026, 4, 1));
+        expect(r.monthly.lumpSumDrawdownMonths).toBe(0);
+        expect(r.monthly.lumpSumDrawdown).toBe(0);
+    });
+
     it('Dutch pension is excluded before opt_dutch_age', () => {
         const params = {
             ...baseInput.params,

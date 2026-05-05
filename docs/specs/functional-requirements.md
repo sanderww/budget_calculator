@@ -238,6 +238,8 @@ Three sections separated by dividers:
 **Core**
 - Date of birth (date input). The current age is shown beneath as a read-only label.
 - Retirement age (number input). Years to retirement shown beneath.
+- **Life expectancy** (number input, default 95). Drives the lump-sum drawdown horizon. Helper label shows the resulting drawdown years.
+- **Lump-sum drawdown return %** (number input, default 6). Annual return assumed on the residual lump sum during PMT-style drawdown.
 - Withdrawal rate %, Effective retirement income tax rate %, CPI assumption %, all numeric.
 - Toggle: "Show in today's money" — applies CPI deflation to all displayed figures.
 
@@ -276,7 +278,14 @@ Each scenario has a checkbox + inline inputs (only enabled when checkbox is chec
 
 **Card 0 — Snapshot**
 
-Two-column × two-row grid (Age 55 / Age `opt_dutch_age` × Funds / Monthly). Each cell shows "Projected" boldly; "Current" appears below in muted text only when the two values differ. A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
+Three-column × four-row grid (label | Age 55 | Age `opt_dutch_age`):
+
+1. **Funds available (lump sum)** — projected lump sum at each age. "Current" appears in muted text below when the two values differ.
+2. **Monthly income (net)** — RA drawdown net + Dutch pension net (where applicable) at each age.
+3. **Monthly from lump sum** — PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` at `lump_sum_drawdown_return_pct` (annual, monthly-compounded). Single value cell spans both age columns; subtitle: `PMT to age <life_expectancy> @ <rate>%`. Caption beneath the value: `over <N> months (<years> yrs)`.
+4. **Max estimated monthly income** — `monthly income (net)` + `monthly from lump sum`, per age column. Rendered with an emerald accent; label includes the helper "RA + lump-sum drawdown; assumes all funds depleted by age <life_expectancy>".
+
+A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
 
 **Card 1 — Monthly income (net of tax)**
 
