@@ -27,6 +27,7 @@ import {
     lumpSumTax,
     raFutureValueTwoPot,
     tfsaFutureValue,
+    tfsaLifetimeContributions,
     raCommutationLumpSum,
     raMonthlyIncome,
     projectLivingAnnuityDepletion,
@@ -585,6 +586,7 @@ describe('smoke', () => {
         expect(typeof lumpSumTax).toBe('function');
         expect(typeof raFutureValueTwoPot).toBe('function');
         expect(typeof tfsaFutureValue).toBe('function');
+        expect(typeof tfsaLifetimeContributions).toBe('function');
         expect(typeof raCommutationLumpSum).toBe('function');
         expect(typeof raMonthlyIncome).toBe('function');
         expect(typeof projectLivingAnnuityDepletion).toBe('function');
@@ -665,7 +667,6 @@ describe('generateRaCSV', () => {
             params: {
                 tax_refund_rate_pct: 41,
                 nominal_return_pct: 10,
-                future_years_to_project: 10,
             },
         };
         const csv = generateRaCSV(data);
@@ -675,23 +676,20 @@ describe('generateRaCSV', () => {
         expect(parsed.transactions[0].amount).toBe(5000);
         expect(parsed.params.tax_refund_rate_pct).toBe(41);
         expect(parsed.params.nominal_return_pct).toBe(10);
-        expect(parsed.params.future_years_to_project).toBe(10);
     });
 
-    it('omits assumed_future_monthly when not set', () => {
+    it('does not write retired projection params even when supplied', () => {
         const csv = generateRaCSV({
             transactions: [],
-            params: { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10 },
+            params: {
+                tax_refund_rate_pct: 41,
+                nominal_return_pct: 10,
+                future_years_to_project: 10,
+                assumed_future_monthly: 6000,
+            },
         });
+        expect(csv).not.toMatch(/future_years_to_project/);
         expect(csv).not.toMatch(/assumed_future_monthly/);
-    });
-
-    it('writes assumed_future_monthly when set', () => {
-        const csv = generateRaCSV({
-            transactions: [],
-            params: { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 10, assumed_future_monthly: 6000 },
-        });
-        expect(csv).toMatch(/param,assumed_future_monthly,6000,/);
     });
 });
 
@@ -1071,6 +1069,36 @@ describe('tfsaFutureValue', () => {
     });
 });
 
+describe('tfsaLifetimeContributions', () => {
+    it('returns zero state for empty transactions', () => {
+        const r = tfsaLifetimeContributions([]);
+        expect(r.contributed).toBe(0);
+        expect(r.lifetimeCap).toBe(500_000);
+        expect(r.remaining).toBe(500_000);
+        expect(r.percentUsed).toBe(0);
+    });
+
+    it('sums transaction amounts and computes percent used', () => {
+        const txs = [
+            { amount: 36_000 },
+            { amount: 36_000 },
+            { amount: 50_000 },
+        ];
+        const r = tfsaLifetimeContributions(txs);
+        expect(r.contributed).toBe(122_000);
+        expect(r.remaining).toBe(378_000);
+        expect(r.percentUsed).toBeCloseTo(24.4, 1);
+    });
+
+    it('clamps percent and remaining when over the lifetime cap', () => {
+        const txs = [{ amount: 600_000 }];
+        const r = tfsaLifetimeContributions(txs);
+        expect(r.contributed).toBe(600_000);
+        expect(r.remaining).toBe(0);
+        expect(r.percentUsed).toBe(100);
+    });
+});
+
 describe('raCommutationLumpSum', () => {
     it('returns zeros when commutation is off', () => {
         const r = raCommutationLumpSum(3_000_000, false);
@@ -1271,5 +1299,68 @@ describe('calculateRetirementSnapshot', () => {
             { ...baseInput, params: { ...params, retirement_age: 55 } },
             new Date(2026, 4, 1));
         expect(noEarly.ra.at55.total).toBeGreaterThan(withCap.ra.at55.total);
+    });
+
+    it('Dutch pension uses configurable opt_dutch_age and opt_dutch_eur_monthly', () => {
+        const baseRet = 70;
+        const params = {
+            ...baseInput.params,
+            retirement_age: baseRet,
+            opt_dutch_enabled: 1,
+            opt_dutch_eur_zar: 20,
+            opt_dutch_age: 67,
+            opt_dutch_eur_monthly: 1200,
+        };
+        const r = calculateRetirementSnapshot(
+            { ...baseInput, params }, new Date(2026, 4, 1));
+        // retAge (70) >= dutchAge (67), so monthly atRetirement should include Dutch contribution.
+        // dutchMonthlyZAR (nominal, before deflation) = 1200 * 20 = 24000.
+        expect(r.monthly.dutchMonthlyZAR).toBeCloseTo(24_000, 0);
+    });
+
+    it('opt_include_* flags zero out the corresponding fund FV at every snapshot age', () => {
+        const allOff = calculateRetirementSnapshot({
+            ...baseInput,
+            params: {
+                ...baseInput.params,
+                opt_include_discretionary: 0,
+                opt_include_tfsa: 0,
+                opt_include_crypto: 0,
+            },
+        }, new Date(2026, 4, 1));
+        expect(allOff.liquid.atRetirement.discretionary).toBe(0);
+        expect(allOff.liquid.atRetirement.tfsa).toBe(0);
+        expect(allOff.liquid.atRetirement.tfsaCurrent).toBe(0);
+        expect(allOff.liquid.atRetirement.crypto).toBe(0);
+        expect(allOff.liquid.at55.discretionary).toBe(0);
+        expect(allOff.liquid.at55.tfsa).toBe(0);
+        expect(allOff.liquid.at68.crypto).toBe(0);
+    });
+
+    it('unchecking a single fund reduces lump sums but leaves the others intact', () => {
+        const baseline = calculateRetirementSnapshot(baseInput, new Date(2026, 4, 1));
+        const cryptoOff = calculateRetirementSnapshot({
+            ...baseInput,
+            params: { ...baseInput.params, opt_include_crypto: 0 },
+        }, new Date(2026, 4, 1));
+        expect(cryptoOff.liquid.atRetirement.crypto).toBe(0);
+        expect(cryptoOff.liquid.atRetirement.discretionary).toBeCloseTo(baseline.liquid.atRetirement.discretionary, 5);
+        expect(cryptoOff.liquid.atRetirement.tfsa).toBeCloseTo(baseline.liquid.atRetirement.tfsa, 5);
+        expect(cryptoOff.lumpSum.atRetirement).toBeLessThan(baseline.lumpSum.atRetirement);
+    });
+
+    it('Dutch pension is excluded before opt_dutch_age', () => {
+        const params = {
+            ...baseInput.params,
+            retirement_age: 60,
+            opt_dutch_enabled: 1,
+            opt_dutch_eur_zar: 20,
+            opt_dutch_age: 70,
+            opt_dutch_eur_monthly: 900,
+        };
+        const r = calculateRetirementSnapshot(
+            { ...baseInput, params }, new Date(2026, 4, 1));
+        // monthsTo68 is now monthsTo70.
+        expect(r.monthsTo68).toBeGreaterThan(r.monthsToRetirement);
     });
 });

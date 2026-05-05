@@ -108,6 +108,13 @@ For the **Discretionary** account specifically (only):
 
 These three rows are **not** shown on the TFSA or Crypto cards.
 
+For the **TFSA** account specifically:
+
+- **Lifetime contributed / R 500,000** — sum of TFSA transaction amounts vs the SARS lifetime cap of R 500,000.
+- **Progress bar** — visual fill indicating `% of cap used`. Bar is emerald below 80%, amber from 80% up to 100%, red at or above 100%.
+- **% of lifetime cap** — clamped to 100% even when contributions exceed the cap.
+- **Remaining (R)** — `max(0, R 500,000 − lifetime_contributed)`, formatted with thousands separators.
+
 For the Crypto account specifically:
 
 - **Total BTC** — sum of all `cryptoValue` fields across Crypto transactions.
@@ -197,38 +204,24 @@ Newton-Raphson method to find the internal rate of return:
 
 ### 4.1 Layout
 
-A purple-accented sidebar (db/ra.csv with Load/Save buttons) and a main area with three cards:
+A purple-accented sidebar (db/ra.csv with Load/Save buttons) and a main area with two cards:
 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
-   - Editable **Tax refund rate (%)** input (default 41) and the lifetime refund (uncapped).
+   - Editable **Tax refund rate (%)** input (default 41) and the **expected refund for the current tax year** computed as `min(current_year_contributions, R 350,000) × refund_rate`. Caption: "based on actual contributions to date; deductible capped at R 350,000". When any tax year's bucketed contributions exceed R 350,000, a "cap hit in some year" amber pill appears beneath the value.
    - Editable **Nominal return (%)** input (default 10) and the estimated pot value today.
-   - When any tax-year row hits the SARS cap, a "cap hit in some year" amber pill appears under the lifetime refund.
-2. **Per tax-year refund** — table with columns: Tax year | Status | Contributions | Deductible | Refund. A totals row at the bottom. Above the table:
-   - Editable **Future years** input (default 10).
-   - Editable **Assumed monthly (R)** input + **auto** button. Auto resets to the average of the last 3 contributions; typing a value persists an explicit override.
-   - Each row showing `contributions > R 350,000` displays an amber `cap` pill in the Status column.
-3. **Contributions** — list of contribution rows (date, description, amount, delete button). Sorted by date descending. A `+ Add` button appends a new row defaulting to today's date and `"monthly repayment"` description.
+2. **Contributions** — list of contribution rows (date, description, amount, delete button). Sorted by date descending. A `+ Add` button appends a new row defaulting to today's date and `"monthly repayment"` description.
 
-### 4.2 Tax-year status strings
-
-- `actual` — entirely past tax years.
-- `partial (N actual + M projected)` — the current tax year, where N is the count of actual contributions and M is the months remaining until 28/29 February.
-- `projected` — future tax years (entirely model-driven).
-
-### 4.3 Persistence
+### 4.2 Persistence
 
 - Auto-saves on any change (debounced 800ms) via POST to `/api/save/ra` (or `/api/save/test_ra` in test mode).
 - Auto-loads `db/ra.csv` (or `db/test/ra.csv`) on page open.
 - All RA settings are stored as `param,<key>,<value>,` rows alongside transactions in the same CSV.
-- The `assumed_future_monthly` param row is only written when the user has overridden the auto-derived value; the **auto** button removes the override.
 
-### 4.4 Defaults (first run, no saved file)
+### 4.3 Defaults (first run, no saved file)
 
 - `tax_refund_rate_pct = 41`
 - `nominal_return_pct = 10`
-- `future_years_to_project = 2`
-- `assumed_future_monthly = 20000` (user can override; **auto** button re-derives from last 3 contributions).
 
 ---
 
@@ -254,6 +247,10 @@ Three sections separated by dividers:
 **Offshore allocation** (collapsible `<details>`)
 - Discretionary offshore %, TFSA offshore %, ZAR depreciation %/yr.
 
+**Funds available at retirement**
+- Three checkboxes (default all ON): **Discretionary**, **TFSA**, **Crypto**. Unchecking a fund forces its value at every snapshot age (55, Dutch age, retirement age) to 0 in the projection. The fund's value on the Investment Tracker tab is unaffected; this is purely a "what if this account isn't there at retirement" scenario toggle.
+- Helper caption: "Uncheck a fund if you expect it not to be available at retirement (e.g. spent or repurposed). The current value still appears on the Investments tab; only the retirement projection treats it as zero."
+
 **RA structure**
 - Toggle: "Commute 1/3 as lump sum at retirement" (default ON).
 - Vested balance R (pre-Sep-2024 portion of current RA pot).
@@ -263,7 +260,7 @@ Three sections separated by dividers:
 
 Each scenario has a checkbox + inline inputs (only enabled when checkbox is checked):
 
-1. Dutch pension: EUR/ZAR rate input. Fixed €900/mo at age 68.
+1. Dutch pension: **Start age** (default 68), **EUR / month** (default 900), and **EUR/ZAR rate** (default 20). All three editable when the checkbox is enabled. The monthly figure flowing into the snapshot is `opt_dutch_eur_monthly × opt_dutch_eur_zar`.
 2. TFSA contributions: no extra inputs; annual R 46,000 enforced; lifetime cap auto-checked from Investments transactions.
 3. Extra RA monthly: amount R/mo; soft warning when × 12 > R 430,000 deduction cap.
 4. House sale: ZAR value input.
@@ -279,14 +276,14 @@ Each scenario has a checkbox + inline inputs (only enabled when checkbox is chec
 
 **Card 0 — Snapshot**
 
-Two-column × two-row grid (Age 55 / Age 68 × Funds / Monthly). Each cell shows "Projected" boldly; "Current" appears below in muted text only when the two values differ. A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
+Two-column × two-row grid (Age 55 / Age `opt_dutch_age` × Funds / Monthly). Each cell shows "Projected" boldly; "Current" appears below in muted text only when the two values differ. A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
 
 **Card 1 — Monthly income (net of tax)**
 
-Phases vary by retirement age:
+Phases vary by retirement age (let `D = opt_dutch_age`):
 - Retirement age < 55 → "At retirement (before 55) — R0 from RA" + "From age 55 — RA drawdown begins".
-- 55 ≤ age < 68 → "At retirement (age X)" + "From age 68 — + Dutch pension" (or "(Dutch pension disabled)" greyed).
-- Age ≥ 68 → "At retirement (age X, ≥ 68) — RA drawdown + Dutch pension combined".
+- 55 ≤ age < D → "At retirement (age X)" + "From age D — + Dutch pension" (or "(Dutch pension disabled)" greyed).
+- Age ≥ D → "At retirement (age X, ≥ D) — RA drawdown + Dutch pension combined".
 
 A de minimis banner replaces the drawdown row when the pot is below R 360,000.
 
@@ -308,7 +305,7 @@ Read-only key/value table summarising all in-effect assumptions: returns per fun
 - Retirement age below current age → all FV collapse to current values + a warning banner.
 - Vested balance > current RA pot → warning banner; calculation uses `min(vested, raPotToday)`.
 - Retirement age < 55 → two RA phases (inaccessible at retirement, drawdown begins at 55).
-- Retirement age ≥ 68 → Dutch pension folded into the at-retirement phase (no separate "from 68" row).
+- Retirement age ≥ `opt_dutch_age` → Dutch pension folded into the at-retirement phase (no separate "from D" row).
 - TFSA cap already hit → no contributions added even if enabled; cap-remaining shown as R 0.
 - TFSA current-year cap already hit → optional contributions skip the current tax year and resume from the next 1 March.
 - RA pot < R 360,000 at retirement → de minimis banner replaces drawdown.
@@ -393,13 +390,11 @@ param,original_term,<value>
 <YYYY-MM-DD>,<description>,<amount>
 param,tax_refund_rate_pct,<percent>,
 param,nominal_return_pct,<percent>,
-param,future_years_to_project,<int>,
-param,assumed_future_monthly,<amount>,
 ```
 - No header row.
 - Transactions and `param` rows share the file. The first column distinguishes them: an ISO date is a transaction; the literal `param` is a setting.
-- The `assumed_future_monthly` row is omitted unless the user has overridden the auto-derived value.
-- Defaults applied when a param row is missing: refund rate 41, return rate 10, future years 10.
+- Legacy `future_years_to_project` and `assumed_future_monthly` param rows in older saves are silently ignored on load and dropped on the next save.
+- Defaults applied when a param row is missing: refund rate 41, return rate 10.
 
 ### 7.2 Auto-Save
 
@@ -451,6 +446,5 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |
 | `taxYearLabel(date)` | Returns the SA tax-year bucket label `YYYY/YY` (e.g. `2026/27`) |
 | `parseRaCSV(text)` / `generateRaCSV(data)` | RA CSV serialization (transactions + param rows) |
-| `deriveAssumedFutureMonthly(transactions)` | Average of the last 3 contributions for projection default |
-| `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject}, today?)` | Per-tax-year refund table with actual/partial/projected statuses and cap handling |
+| `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject}, today?)` | Per-tax-year refund buckets. The RA tab calls it with `assumedFutureMonthly: 0, futureYearsToProject: 0` and renders only the rows whose status is `actual`. Internal projection mechanics are retained for unit tests but no longer surfaced in the UI. |
 | `calculatePotValueToday(transactions, nominalReturnPct, today?)` | Monthly-compounded estimate of pot value as of today |

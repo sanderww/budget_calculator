@@ -168,6 +168,18 @@ Net vs Savings = Absolute Return − Savings Gain
 
 A positive value means the investment outperformed a 6% savings account.
 
+#### TFSA Lifetime Cap Usage (TFSA only)
+
+Tracks how much of the SARS lifetime contribution allowance has been used. Withdrawals do not free up cap, but for parity with the existing `Total Invested` calculation, all signed transaction amounts are summed.
+
+```
+Lifetime Contributed = sum of all TFSA transaction amounts
+% of Cap Used = min(100, max(0, Lifetime Contributed) / R 500,000 × 100)
+Remaining = max(0, R 500,000 − max(0, Lifetime Contributed))
+```
+
+Displayed as a labelled progress bar on the TFSA card. Bar colour is emerald < 80%, amber 80–<100%, red ≥ 100%.
+
 #### Estimated CGT (Discretionary only)
 
 Estimates the South African Capital Gains Tax the user would owe if the Discretionary holdings were sold today. Treats the unrealized gain as if it were realized today. Not shown for TFSA (tax-free) or Crypto (separate treatment).
@@ -300,7 +312,7 @@ Result is the annualized yield (as a decimal, e.g. 0.12 = 12%).
 
 ### 4.1 Goal
 
-Track contributions to a South African Retirement Annuity, estimate the lifetime tax refund, and project the deductible refund per tax year (past + current + future).
+Track contributions to a South African Retirement Annuity, estimate the expected refund for the current tax year (based on actuals to date), and surface the deductible refund per past tax year.
 
 ### 4.2 Domain Concepts
 
@@ -311,41 +323,20 @@ Track contributions to a South African Retirement Annuity, estimate the lifetime
 | **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
 | **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 350,000**. |
-| **Assumed future monthly** | Used for future-year projections. Defaults to R 20,000; user can override. The **auto** button re-derives from the average of the last 3 contributions. |
 
-### 4.3 Total Contributed and Lifetime Refund
+### 4.3 Total Contributed and Expected Refund (Current Tax Year)
 
 ```
 Total Contributed = sum of all contribution amounts
-Lifetime Refund (uncapped) = Total Contributed × (Refund Rate / 100)
+Current Year Total = sum of contributions whose date falls in the current SA tax year
+Expected Refund (current tax year) = MIN(Current Year Total, R 350,000) × (Refund Rate / 100)
 ```
 
-The lifetime figure ignores per-year capping; the per-tax-year table is authoritative when any year exceeds the cap.
+The expected-refund figure is based on actual contributions to date only (no future projection). When `Current Year Total > R 350,000`, a `capHit` warning is shown.
 
-### 4.4 Per-Tax-Year Refund
+### 4.4 Cap-Hit Detection
 
-Each contribution is bucketed into the SA tax year of its date. For each observed past tax year:
-
-```
-Year Total = sum of contributions in that tax year
-Deductible = MIN(Year Total, R 350,000)
-Refund     = Deductible × (Refund Rate / 100)
-```
-
-The **current** tax year mixes actual contributions with projected future months until year-end:
-
-```
-Months Remaining = whole calendar months between today's month and the year-end month
-Current Year Total = actual contributions so far + Assumed Future Monthly × Months Remaining
-```
-
-Each **projected** future tax year (for `Future Years to Project` years after the current year):
-
-```
-Year Total = Assumed Future Monthly × 12
-```
-
-Deductible is capped at R 350,000 in every case. A row is flagged `capHit` when its raw Year Total exceeds the cap.
+Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 350,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
 
 ### 4.5 Estimated Pot Value Today
 
@@ -379,7 +370,7 @@ Project retirement wealth and monthly income from existing Investments + RA tab 
 | **Withdrawal rate** | Annual percentage drawn from the annuitised pot (default 4%). |
 | **CPI** | Annual price-inflation rate; used for "today's money" deflation when toggled (default 5%). |
 | **Effective retirement-income tax rate** | Single-rate proxy for marginal tax in retirement (default 18%). |
-| **Dutch pension** | Optional fixed €900/month income from age 68 (rate configurable, ZAR conversion at user-supplied EUR/ZAR). |
+| **Dutch pension** | Optional monthly income paid in EUR. Default €900/month from age 68; both the start age and the EUR/month amount are user-configurable. ZAR conversion uses the user-supplied EUR/ZAR rate. |
 | **Savings-pot withdrawal** | Optional pre-retirement annual withdrawal from the savings component, taxed at the effective rate, flowing into discretionary funds. Min R 2,000 per SARS. |
 
 ### 5.3 Hardcoded constants (SARS / SA Budget 2026/27)
@@ -387,7 +378,8 @@ Project retirement wealth and monthly income from existing Investments + RA tab 
 | Constant | Value |
 |---|---|
 | RA accessibility age | 55 |
-| Dutch pension start age | 68 |
+| Dutch pension start age | 68 (default; configurable via `opt_dutch_age`) |
+| Dutch pension monthly EUR | 900 (default; configurable via `opt_dutch_eur_monthly`) |
 | TFSA annual cap | R 46,000 |
 | TFSA lifetime cap | R 500,000 |
 | RA deduction cap | R 430,000/year |
@@ -437,9 +429,9 @@ net monthly   = gross × (1 − taxRate / 100)
 
 | Cell | Definition |
 |---|---|
-| **Current funds at 55** | Discretionary + TFSA (passive) + Crypto grown to age 55. |
+| **Current funds at 55** | Discretionary + TFSA (passive) + Crypto grown to age 55. Each component is gated by its `opt_include_*` flag — when unchecked, the fund contributes 0. |
 | **Projected funds at 55** | Current funds + 1/3 RA commutation (if on) + savings-pot withdrawals (net) + house sale + inheritance − bond payoff. |
-| **Projected funds at 68** | Same components projected forward to age 68. |
+| **Projected funds at 68** | Same components projected forward to age 68 (Dutch-pension age). |
 | **Current monthly at 55** | Full RA pot (no extras) × withdrawal rate / 12 × (1 − tax). |
 | **Projected monthly at 55** | Annuitised RA pot (with optional contributions) × withdrawal rate / 12 × (1 − tax). |
 | **Projected monthly at 68** | Projected drawdown at 68 + Dutch pension (ZAR, net), or Dutch pension only if pot has crossed the R 150k threshold and Dutch is enabled. |
@@ -499,8 +491,8 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R16 | All calculations update in real time on any data change (no manual "calculate" step required, except for monthly allocation which is triggered explicitly). |
 | R17 | RA tax year runs 1 March → 28/29 February; bucketing label is `YYYY/YY` (e.g. `2026/27`). |
 | R18 | RA per-tax-year deductible is capped at R 350,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
-| R19 | RA current-year row mixes actual contributions to date with `Assumed Future Monthly × months_remaining`; status reads `partial (N actual + M projected)`. |
-| R20 | RA settings (refund rate, return rate, future years, optional assumed monthly override) are persisted as `param,<key>,<value>,` rows inside `db/ra.csv`. |
+| R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 350,000) × refund_rate`. No future projection is performed. |
+| R20 | RA settings (refund rate, return rate) are persisted as `param,<key>,<value>,` rows inside `db/ra.csv`. |
 | R21 | Retirement two-pot split: post-Sep-2024 RA balance is split 33% savings / 67% retirement; pre-Sep-2024 balance is "vested" and grows passively. |
 | R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. |
 | R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
@@ -509,3 +501,6 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
 | R27 | Retirement settings persist as `param,<key>,<value>,` rows in `db/retirement.csv` (no transaction rows). |
 | R28 | Retirement tab reads RA pot today live from RA tab state via `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` and TFSA / Discretionary / Crypto current values from the Investments tab — no shared state mutation. |
+| R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |
+| R30 | Dutch pension start age (`opt_dutch_age`, default 68) and monthly EUR amount (`opt_dutch_eur_monthly`, default 900) are user-configurable in the retirement sidebar, persisted in `db/retirement.csv`, and applied throughout the snapshot — including the "Age D" snapshot column header and the "From age D" monthly-income phase title. |
+| R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. |

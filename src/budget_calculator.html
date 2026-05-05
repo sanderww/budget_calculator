@@ -609,6 +609,19 @@
                                             <span id="net-savings-tfsa" class="font-medium">R 0.00</span>
                                         </div>
                                     </div>
+                                    <div class="mt-2 pt-2 border-t border-slate-200">
+                                        <div class="flex justify-between text-xs text-slate-500">
+                                            <span>Lifetime contributed</span>
+                                            <span><span id="tfsa-lifetime-contrib" class="font-medium text-slate-700">R 0.00</span> / R 500,000</span>
+                                        </div>
+                                        <div class="w-full bg-slate-200 rounded-full h-1.5 mt-1.5 overflow-hidden">
+                                            <div id="tfsa-cap-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all" style="width: 0%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-[11px] text-slate-400 mt-1">
+                                            <span><span id="tfsa-cap-pct">0.0%</span> of lifetime cap</span>
+                                            <span>R <span id="tfsa-cap-remaining">500,000</span> remaining</span>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- Crypto -->
@@ -928,8 +941,9 @@
                                 <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
                                     <label class="text-xs text-slate-500">Tax refund rate (%)</label>
                                     <input type="number" id="ra-refund-rate" class="input-field text-sm font-bold" min="0" max="100" step="0.1" value="41">
-                                    <div class="text-xs text-slate-500 mt-2">Lifetime refund (uncapped):</div>
-                                    <div id="ra-lifetime-refund" class="text-xl font-bold text-green-700">R 0</div>
+                                    <div class="text-xs text-slate-500 mt-2">Expected refund (current tax year):</div>
+                                    <div id="ra-current-year-refund" class="text-xl font-bold text-green-700">R 0</div>
+                                    <div class="text-[10px] text-slate-400 mt-1">based on actual contributions to date; deductible capped at R 350,000</div>
                                     <div id="ra-cap-warning" class="hidden mt-2 inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">cap hit in some year</div>
                                 </div>
 
@@ -941,31 +955,6 @@
                                     <div class="text-[10px] text-slate-400 mt-1">monthly compounding</div>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Per tax-year refund (actuals only) -->
-                        <div class="card">
-                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Per tax-year refund</h2>
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">
-                                        <th class="text-left py-2">Tax year</th>
-                                        <th class="text-left py-2">Status</th>
-                                        <th class="text-right py-2">Contributions</th>
-                                        <th class="text-right py-2">Deductible</th>
-                                        <th class="text-right py-2">Refund</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ra-actuals-rows"></tbody>
-                                <tfoot>
-                                    <tr class="font-bold border-t border-slate-300">
-                                        <td colspan="2" class="py-2">Total</td>
-                                        <td class="text-right py-2" id="ra-actuals-total-contributions">R 0</td>
-                                        <td></td>
-                                        <td class="text-right py-2 text-green-700" id="ra-actuals-total-refund">R 0</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
                         </div>
 
                         <!-- Transactions -->
@@ -984,47 +973,6 @@
                             </div>
 
                             <div id="ra-list" class="space-y-2"></div>
-                        </div>
-
-                        <!-- Projection Per Tax Year refund -->
-                        <div class="card">
-                            <div class="flex justify-between items-end mb-4 flex-wrap gap-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Projection Per Tax Year refund</h2>
-                                <div class="flex items-end gap-3">
-                                    <div>
-                                        <label class="block text-xs text-slate-500">Future years</label>
-                                        <input type="number" id="ra-future-years" class="input-field text-sm w-24" min="0" max="50" step="1" value="2">
-                                    </div>
-                                    <div>
-                                        <label class="block text-xs text-slate-500">Assumed monthly (R)</label>
-                                        <div class="flex items-center gap-1">
-                                            <input type="number" id="ra-assumed-monthly" class="input-field text-sm w-32" min="0" step="100">
-                                            <button id="ra-assumed-auto" class="btn btn-secondary text-xs" title="Reset to last 3 months' average">auto</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">
-                                        <th class="text-left py-2">Tax year</th>
-                                        <th class="text-left py-2">Status</th>
-                                        <th class="text-right py-2">Contributions</th>
-                                        <th class="text-right py-2">Deductible</th>
-                                        <th class="text-right py-2">Refund</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="ra-projection-rows"></tbody>
-                                <tfoot>
-                                    <tr class="font-bold border-t border-slate-300">
-                                        <td colspan="2" class="py-2">Total</td>
-                                        <td class="text-right py-2" id="ra-total-row-contributions">R 0</td>
-                                        <td></td>
-                                        <td class="text-right py-2 text-green-700" id="ra-total-row-refund">R 0</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
                         </div>
 
                     </div>
@@ -1100,6 +1048,15 @@
                                 <input type="number" id="ret-zar-depre" class="input-field text-sm" min="-100" max="100" step="0.1" value="2">
                             </details>
 
+                            <!-- Funds available at retirement -->
+                            <div class="pt-4 border-t border-amber-200">
+                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Funds available at retirement</div>
+                                <div class="text-[10px] text-slate-500 mb-2">Uncheck a fund if you expect it not to be available at retirement (e.g. spent or repurposed). The current value still appears on the Investments tab; only the retirement projection treats it as zero.</div>
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" id="ret-include-discretionary" class="rounded" checked> Discretionary</label>
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-1.5"><input type="checkbox" id="ret-include-tfsa" class="rounded" checked> TFSA</label>
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-1.5"><input type="checkbox" id="ret-include-crypto" class="rounded" checked> Crypto</label>
+                            </div>
+
                             <!-- RA structure -->
                             <div class="pt-4 border-t border-amber-200">
                                 <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">RA structure</div>
@@ -1117,10 +1074,20 @@
                             <div class="pt-4 border-t border-amber-200">
                                 <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Optional scenarios</div>
 
-                                <label class="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" id="ret-opt-dutch" class="rounded"> Dutch pension (€900/mo from age 68)</label>
-                                <div class="ml-5 mt-1">
-                                    <label class="block text-[11px] text-slate-500">EUR/ZAR rate</label>
-                                    <input type="number" id="ret-opt-dutch-rate" class="input-field text-sm" min="0" step="0.1" value="20">
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" id="ret-opt-dutch" class="rounded"> Dutch pension</label>
+                                <div class="ml-5 mt-1 grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500">Start age</label>
+                                        <input type="number" id="ret-opt-dutch-age" class="input-field text-sm" min="0" max="100" step="1" value="68">
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] text-slate-500">EUR / month</label>
+                                        <input type="number" id="ret-opt-dutch-eur" class="input-field text-sm" min="0" step="10" value="900">
+                                    </div>
+                                    <div class="col-span-2">
+                                        <label class="block text-[11px] text-slate-500">EUR/ZAR rate</label>
+                                        <input type="number" id="ret-opt-dutch-rate" class="input-field text-sm" min="0" step="0.1" value="20">
+                                    </div>
                                 </div>
 
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-tfsa" class="rounded"> TFSA contributions (R46k/yr)</label>
@@ -1198,14 +1165,13 @@
             taxYearLabel as _taxYearLabel,
             parseRaCSV as _parseRaCSV,
             generateRaCSV as _generateRaCSV,
-            deriveAssumedFutureMonthly as _deriveAssumedFutureMonthly,
-            calculateRaProjection as _calculateRaProjection,
             calculatePotValueToday as _calculatePotValueToday,
             RETIREMENT_CONSTANTS as _RET_CONSTS,
             getDefaultRetirementParams as _getDefaultRetirementParams,
             parseRetirementCSV as _parseRetirementCSV,
             generateRetirementCSV as _generateRetirementCSV,
             calculateRetirementSnapshot as _calculateRetirementSnapshot,
+            tfsaLifetimeContributions as _tfsaLifetimeContributions,
         } from './calculations.js';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1343,15 +1309,7 @@
             let raParams = {
                 tax_refund_rate_pct: 41,
                 nominal_return_pct: 10,
-                future_years_to_project: 2,
-                assumed_future_monthly: 20000,
             };
-
-            const raAssumedMonthly = () => (
-                raParams.assumed_future_monthly !== undefined
-                    ? Number(raParams.assumed_future_monthly)
-                    : _deriveAssumedFutureMonthly(raTransactions)
-            );
 
             const raMakeId = () => 'ra_' + Math.random().toString(36).slice(2, 9);
             const raFmtZARShort = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA');
@@ -1359,8 +1317,6 @@
             function renderRa() {
                 document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
                 document.getElementById('ra-return-rate').value      = raParams.nominal_return_pct;
-                document.getElementById('ra-future-years').value     = raParams.future_years_to_project;
-                document.getElementById('ra-assumed-monthly').value  = raAssumedMonthly();
 
                 const total = raTransactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
                 document.getElementById('ra-total-contributed').textContent = raFmtZARShort(total);
@@ -1381,42 +1337,20 @@
                     .reduce((s, t) => s + (Number(t.amount) || 0), 0);
                 document.getElementById('ra-current-year-total').textContent = raFmtZARShort(currentYearTotal);
 
-                document.getElementById('ra-lifetime-refund').textContent = raFmtZARShort(total * (raParams.tax_refund_rate_pct / 100));
+                const RA_DEDUCTIBLE_CAP = 350000;
+                const expectedCurrentYearRefund = Math.min(currentYearTotal, RA_DEDUCTIBLE_CAP) * (raParams.tax_refund_rate_pct / 100);
+                document.getElementById('ra-current-year-refund').textContent = raFmtZARShort(expectedCurrentYearRefund);
                 document.getElementById('ra-pot-value').textContent       = raFmtZARShort(_calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today));
 
-                const proj = _calculateRaProjection({
-                    transactions: raTransactions,
-                    taxRefundRatePct: raParams.tax_refund_rate_pct,
-                    assumedFutureMonthly: raAssumedMonthly(),
-                    futureYearsToProject: raParams.future_years_to_project,
-                }, today);
-
-                const anyCapHit = proj.rows.some(r => r.capHit);
+                const yearTotals = new Map();
+                raTransactions.forEach(t => {
+                    const d = new Date(t.date + 'T00:00:00Z');
+                    if (Number.isNaN(d.getTime())) return;
+                    const label = _taxYearLabel(d);
+                    yearTotals.set(label, (yearTotals.get(label) || 0) + (Number(t.amount) || 0));
+                });
+                const anyCapHit = [...yearTotals.values()].some(v => v > RA_DEDUCTIBLE_CAP);
                 document.getElementById('ra-cap-warning').classList.toggle('hidden', !anyCapHit);
-
-                const renderTableRows = (rows) => rows.map(r => {
-                    const cap = r.capHit ? ' <span class="text-[10px] uppercase font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 ml-1">cap</span>' : '';
-                    return `
-                        <tr class="border-b border-slate-100">
-                            <td class="py-2 font-medium">${r.taxYear}</td>
-                            <td class="py-2 text-slate-500">${r.status}${cap}</td>
-                            <td class="py-2 text-right">${raFmtZARShort(r.contributions)}</td>
-                            <td class="py-2 text-right">${raFmtZARShort(r.deductible)}</td>
-                            <td class="py-2 text-right text-green-700">${raFmtZARShort(r.refund)}</td>
-                        </tr>
-                    `;
-                }).join('');
-
-                const actualRows = proj.rows.filter(r => r.status === 'actual');
-                const actualsContribTotal = actualRows.reduce((s, r) => s + r.contributions, 0);
-                const actualsRefundTotal  = actualRows.reduce((s, r) => s + r.refund, 0);
-                document.getElementById('ra-actuals-rows').innerHTML = renderTableRows(actualRows);
-                document.getElementById('ra-actuals-total-contributions').textContent = raFmtZARShort(actualsContribTotal);
-                document.getElementById('ra-actuals-total-refund').textContent        = raFmtZARShort(actualsRefundTotal);
-
-                document.getElementById('ra-projection-rows').innerHTML = renderTableRows(proj.rows);
-                document.getElementById('ra-total-row-contributions').textContent = raFmtZARShort(proj.total.contributions);
-                document.getElementById('ra-total-row-refund').textContent       = raFmtZARShort(proj.total.refund);
 
                 const list = document.getElementById('ra-list');
                 const sortedDesc = [...raTransactions].sort((a, b) => b.date.localeCompare(a.date));
@@ -1477,23 +1411,6 @@
                 raPersist();
                 renderRa();
             });
-            document.getElementById('ra-future-years').addEventListener('input', (e) => {
-                raParams.future_years_to_project = parseInt(e.target.value, 10) || 0;
-                raPersist();
-                renderRa();
-            });
-            document.getElementById('ra-assumed-monthly').addEventListener('input', (e) => {
-                const v = parseFloat(e.target.value);
-                raParams.assumed_future_monthly = Number.isNaN(v) ? 0 : v;
-                raPersist();
-                renderRa();
-            });
-            document.getElementById('ra-assumed-auto').addEventListener('click', () => {
-                delete raParams.assumed_future_monthly;
-                raPersist();
-                renderRa();
-            });
-
             const generateRaCSVFromState = () => _generateRaCSV({
                 transactions: raTransactions,
                 params: raParams,
@@ -1518,7 +1435,7 @@
                     reader.onload = (ev) => {
                         const parsed = _parseRaCSV(ev.target.result);
                         raTransactions = parsed.transactions;
-                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 2, assumed_future_monthly: 20000, ...parsed.params };
+                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, ...parsed.params };
                         renderRa();
                     };
                     reader.readAsText(f);
@@ -1537,7 +1454,7 @@
                         const text = await response.text();
                         const parsed = _parseRaCSV(text);
                         raTransactions = parsed.transactions;
-                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 2, assumed_future_monthly: 20000, ...parsed.params };
+                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, ...parsed.params };
                         renderRa();
                     } else {
                         console.warn('ra.csv fetch returned', response.status);
@@ -1826,6 +1743,23 @@
                 calculatePerformance('Discretionary', investmentData.currentValues.Discretionary, 'inv-discretionary', 'gain-discretionary', 'ann-discretionary', 'gain-money-discretionary');
                 calculatePerformance('TFSA', investmentData.currentValues.TFSA, 'inv-tfsa', 'gain-tfsa', 'ann-tfsa', 'gain-money-tfsa');
                 calculatePerformance('Crypto', investmentData.currentValues.Crypto, 'inv-crypto', 'gain-crypto', 'ann-crypto', 'gain-money-crypto');
+                updateTfsaCapDisplay();
+            };
+
+            const updateTfsaCapDisplay = () => {
+                const tfsaTxs = investmentData.transactions.filter(t => t.type === 'TFSA');
+                const cap = _tfsaLifetimeContributions(tfsaTxs);
+                const contribEl = document.getElementById('tfsa-lifetime-contrib');
+                const barEl = document.getElementById('tfsa-cap-bar');
+                const pctEl = document.getElementById('tfsa-cap-pct');
+                const remEl = document.getElementById('tfsa-cap-remaining');
+                if (contribEl) contribEl.textContent = formatCurrency(Math.max(0, cap.contributed));
+                if (barEl) {
+                    barEl.style.width = `${cap.percentUsed.toFixed(1)}%`;
+                    barEl.className = `h-1.5 rounded-full transition-all ${cap.percentUsed >= 100 ? 'bg-red-500' : cap.percentUsed >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`;
+                }
+                if (pctEl) pctEl.textContent = `${cap.percentUsed.toFixed(1)}%`;
+                if (remEl) remEl.textContent = Math.round(cap.remaining).toLocaleString('en-ZA');
             };
 
             const renderTransactions = () => {
@@ -2630,11 +2564,17 @@
                 ['ret-offshore-tfsa',             'offshore_tfsa_pct',                     'number'],
                 ['ret-zar-depre',                 'zar_depreciation_pct',                  'number'],
 
+                ['ret-include-discretionary',     'opt_include_discretionary',             'checkbox'],
+                ['ret-include-tfsa',              'opt_include_tfsa',                      'checkbox'],
+                ['ret-include-crypto',            'opt_include_crypto',                    'checkbox'],
+
                 ['ret-ra-commute',                'ra_commute_third',                      'checkbox'],
                 ['ret-ra-vested',                 'ra_vested_balance',                     'number'],
 
                 ['ret-opt-dutch',                 'opt_dutch_enabled',                     'checkbox'],
                 ['ret-opt-dutch-rate',            'opt_dutch_eur_zar',                     'number'],
+                ['ret-opt-dutch-age',             'opt_dutch_age',                         'number'],
+                ['ret-opt-dutch-eur',             'opt_dutch_eur_monthly',                 'number'],
                 ['ret-opt-tfsa',                  'opt_tfsa_enabled',                      'checkbox'],
                 ['ret-opt-ra-monthly',            'opt_ra_monthly_enabled',                'checkbox'],
                 ['ret-opt-ra-monthly-amount',     'opt_ra_monthly_amount',                 'number'],
@@ -2762,7 +2702,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div></div>
                         <div class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Age 55</div>
-                        <div class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Age 68</div>
+                        <div class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Age ${Number(retirementParams.opt_dutch_age) || 68}</div>
 
                         <div class="text-xs text-slate-600 self-center">Funds available (lump sum)</div>
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.lumpSum.current55, snap.lumpSum.projected55)}</div>
@@ -2774,6 +2714,7 @@
                     </div>
                 `;
                 const retAge = Number(retirementParams.retirement_age) || 65;
+                const dutchAge = Number(retirementParams.opt_dutch_age) || _RET_CONSTS.DUTCH_PENSION_AGE;
                 const monthlyPhases = [];
                 if (retAge < _RET_CONSTS.RA_ACCESS_AGE) {
                     monthlyPhases.push({
@@ -2787,7 +2728,7 @@
                         gross: snap.monthly.projected55.gross,
                         note: 'RA drawdown begins.',
                     });
-                } else if (retAge < _RET_CONSTS.DUTCH_PENSION_AGE) {
+                } else if (retAge < dutchAge) {
                     monthlyPhases.push({
                         title: `At retirement (age ${retAge})`,
                         net: snap.monthly.atRetirement.net,
@@ -2795,14 +2736,14 @@
                         note: `RA drawdown.`,
                     });
                     monthlyPhases.push({
-                        title: 'From age 68',
+                        title: `From age ${dutchAge}`,
                         net: snap.monthly.projected68.net,
                         gross: snap.monthly.projected68.gross,
                         note: retirementParams.opt_dutch_enabled ? '+ Dutch pension' : '(Dutch pension disabled)',
                     });
                 } else {
                     monthlyPhases.push({
-                        title: `At retirement (age ${retAge}, ≥ 68)`,
+                        title: `At retirement (age ${retAge}, ≥ ${dutchAge})`,
                         net: snap.monthly.atRetirement.net + snap.monthly.dutchMonthlyNet,
                         gross: snap.monthly.atRetirement.gross + snap.monthly.dutchMonthlyZAR,
                         note: 'RA drawdown + Dutch pension combined.',
@@ -2895,7 +2836,7 @@
                 let depletionLine = '';
                 if (ra.depletion) {
                     const depAge = ra.depletion.ageAtThreshold.toFixed(1);
-                    if (ra.depletion.ageAtThreshold <= _RET_CONSTS.DUTCH_PENSION_AGE && retirementParams.opt_dutch_enabled) {
+                    if (ra.depletion.ageAtThreshold <= dutchAge && retirementParams.opt_dutch_enabled) {
                         depletionLine = `<div class="mt-3 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">RA pot expected to deplete below R150k by age ${depAge} — drawdown income ends, full commutation triggers; from then on income = Dutch pension only.</div>`;
                     } else {
                         depletionLine = `<div class="mt-3 p-2 bg-slate-50 border border-slate-200 text-slate-700 text-xs rounded">Living-annuity threshold note: pot expected below R150,000 by age ${depAge}.</div>`;

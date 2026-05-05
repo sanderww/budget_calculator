@@ -400,8 +400,6 @@ export function generateRaCSV(data) {
     };
     writeParam('tax_refund_rate_pct');
     writeParam('nominal_return_pct');
-    writeParam('future_years_to_project');
-    writeParam('assumed_future_monthly');
     return csv;
 }
 
@@ -658,6 +656,15 @@ export function raFutureValueTwoPot({
     };
 }
 
+export function tfsaLifetimeContributions(transactions = []) {
+    const cap = RETIREMENT_CONSTANTS.TFSA_LIFETIME_CAP;
+    const contributed = transactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    const clamped = Math.max(0, contributed);
+    const remaining = Math.max(0, cap - clamped);
+    const percentUsed = cap > 0 ? Math.min(100, (clamped / cap) * 100) : 0;
+    return { contributed, lifetimeCap: cap, remaining, percentUsed };
+}
+
 export function tfsaFutureValue({
     currentValue = 0,
     annualRatePct = 0,
@@ -786,6 +793,10 @@ const RETIREMENT_DEFAULT_PARAMS = {
     offshore_tfsa_pct: 0,
     zar_depreciation_pct: 2,
 
+    opt_include_discretionary: 1,
+    opt_include_tfsa: 1,
+    opt_include_crypto: 1,
+
     ra_commute_third: 1,
     ra_savings_component_pct: 33,
     ra_vested_balance: 0,
@@ -794,6 +805,8 @@ const RETIREMENT_DEFAULT_PARAMS = {
 
     opt_dutch_enabled: 0,
     opt_dutch_eur_zar: 20,
+    opt_dutch_age: 68,
+    opt_dutch_eur_monthly: 900,
     opt_tfsa_enabled: 0,
     opt_ra_monthly_enabled: 0,
     opt_ra_monthly_amount: 10_000,
@@ -854,9 +867,12 @@ export function calculateRetirementSnapshot({
         return ms <= 0 ? 0 : ms / (365.25 * 24 * 60 * 60 * 1000);
     })();
 
+    const dutchAge = Number(p.opt_dutch_age) || RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE;
+    const dutchEurMonthly = Number(p.opt_dutch_eur_monthly) || 0;
+
     const monthsToRetirement = monthsToAge(p.dob, p.retirement_age, today);
     const monthsTo55 = monthsToAge(p.dob, RETIREMENT_CONSTANTS.RA_ACCESS_AGE, today);
-    const monthsTo68 = monthsToAge(p.dob, RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE, today);
+    const monthsTo68 = monthsToAge(p.dob, dutchAge, today);
 
     const yearsToRet = monthsToRetirement / 12;
     const yearsTo55 = monthsTo55 / 12;
@@ -914,17 +930,22 @@ export function calculateRetirementSnapshot({
     const raAt55Current = _projectRa(monthsTo55, /* includeExtras */ false);
 
     // Discretionary / TFSA / Crypto FV at any target age (passive — no contributions in current spec).
+    // Each fund is gated by its `opt_include_*` flag — when unchecked, the fund is treated as
+    // unavailable at retirement and contributes 0 to every snapshot age.
+    const incDisc = (p.opt_include_discretionary === 0 || p.opt_include_discretionary === false) ? 0 : 1;
+    const incTfsa = (p.opt_include_tfsa === 0 || p.opt_include_tfsa === false) ? 0 : 1;
+    const incCrypto = (p.opt_include_crypto === 0 || p.opt_include_crypto === false) ? 0 : 1;
     const fvAt = (months) => ({
-        discretionary: fvGrow(discretionaryToday, p.return_discretionary_pct, months),
-        tfsa: tfsaFutureValue({
+        discretionary: incDisc * fvGrow(discretionaryToday, p.return_discretionary_pct, months),
+        tfsa: incTfsa * tfsaFutureValue({
             currentValue: tfsaToday,
             annualRatePct: p.return_tfsa_pct,
             monthsToRetirement: months,
             optEnabled: !!p.opt_tfsa_enabled,
             transactions: tfsaTransactions,
         }, today),
-        tfsaCurrent: fvGrow(tfsaToday, p.return_tfsa_pct, months),
-        crypto: fvGrow(cryptoToday, p.return_crypto_pct, months),
+        tfsaCurrent: incTfsa * fvGrow(tfsaToday, p.return_tfsa_pct, months),
+        crypto: incCrypto * fvGrow(cryptoToday, p.return_crypto_pct, months),
     });
     const liquid55 = fvAt(monthsTo55);
     const liquid68 = fvAt(monthsTo68);
@@ -969,7 +990,7 @@ export function calculateRetirementSnapshot({
         ? { gross: 0, net: 0, fullCommutation: false }
         : raMonthlyIncome(raAtRetirement.total, p.withdrawal_rate_pct, p.effective_tax_rate_pct, commute);
 
-    const dutchMonthlyZAR = (p.opt_dutch_enabled ? RETIREMENT_CONSTANTS.DUTCH_PENSION_EUR_MONTHLY * dutchEurZar : 0);
+    const dutchMonthlyZAR = (p.opt_dutch_enabled ? dutchEurMonthly * dutchEurZar : 0);
     const tax = Math.max(0, Math.min(100, Number(p.effective_tax_rate_pct) || 0)) / 100;
     const dutchMonthlyNet = dutchMonthlyZAR * (1 - tax);
 
@@ -993,11 +1014,11 @@ export function calculateRetirementSnapshot({
     //  - retAge >= 68: no drawdown yet at 68; closest equivalent is the pot at retirement_age.
     const potForIncomeAt68 = (() => {
         if (p.retirement_age <= RETIREMENT_CONSTANTS.RA_ACCESS_AGE) return raAt55.total;
-        if (p.retirement_age < RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE) return raAt68.total;
+        if (p.retirement_age < dutchAge) return raAt68.total;
         return raAtRetirement.total;
     })();
     const monthly68Projected = (() => {
-        if (depletion && depletion.ageAtThreshold <= RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE) {
+        if (depletion && depletion.ageAtThreshold <= dutchAge) {
             // Pot has run out / commuted before age 68.
             return { gross: dutchMonthlyZAR, net: dutchMonthlyNet, fullCommutation: false };
         }
