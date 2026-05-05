@@ -1233,4 +1233,43 @@ describe('calculateRetirementSnapshot', () => {
         }, new Date(2026, 4, 1));
         expect(r.ra.deductionCapHeadroom).toBe(RETIREMENT_CONSTANTS.RA_DEDUCTION_CAP - 200_000);
     });
+
+    it('changing retirement_age moves the at-retirement totals', () => {
+        const withExtras = {
+            ...baseInput,
+            params: {
+                ...baseInput.params,
+                opt_ra_monthly_enabled: 1,
+                opt_ra_monthly_amount: 10_000,
+            },
+        };
+        const r60 = calculateRetirementSnapshot(
+            { ...withExtras, params: { ...withExtras.params, retirement_age: 60 } },
+            new Date(2026, 4, 1));
+        const r65 = calculateRetirementSnapshot(
+            { ...withExtras, params: { ...withExtras.params, retirement_age: 65 } },
+            new Date(2026, 4, 1));
+        // More contribution years → bigger pot at retirement and bigger lump sum.
+        expect(r65.ra.atRetirement.total).toBeGreaterThan(r60.ra.atRetirement.total);
+        expect(r65.lumpSum.atRetirement).toBeGreaterThan(r60.lumpSum.atRetirement);
+    });
+
+    it('caps RA contributions at retirement_age — early retirement leaves passive growth window to age 55', () => {
+        const params = {
+            ...baseInput.params,
+            retirement_age: 50,
+            opt_ra_monthly_enabled: 1,
+            opt_ra_monthly_amount: 10_000,
+        };
+        const withCap = calculateRetirementSnapshot(
+            { ...baseInput, params }, new Date(2026, 4, 1));
+        // Sanity: pot at 55 must be >= pot at retirement (passive growth never decreases the value).
+        expect(withCap.ra.at55.total).toBeGreaterThanOrEqual(withCap.ra.atRetirement.total);
+        // And a hypothetical projection that ran extras all the way to 55 would beat the capped one,
+        // which we approximate by comparing against a longer-retirement-age scenario.
+        const noEarly = calculateRetirementSnapshot(
+            { ...baseInput, params: { ...params, retirement_age: 55 } },
+            new Date(2026, 4, 1));
+        expect(noEarly.ra.at55.total).toBeGreaterThan(withCap.ra.at55.total);
+    });
 });

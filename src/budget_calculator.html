@@ -1302,6 +1302,42 @@
                 renderRetirement();
             });
 
+            // --- TEST MODE ---
+            let testMode = false;
+            const dbPath = (filename) => testMode ? `db/test/${filename}` : `db/${filename}`;
+            const saveKey = (name) => testMode ? `test_${name}` : name;
+
+            // --- SERVER SAVE HELPERS ---
+            const _saveTimers = {};
+            const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
+                clearTimeout(_saveTimers[name]);
+                _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn, btnId), delayMs);
+            };
+
+            const saveToServer = async (name, csvFn, btnId) => {
+                const csv = csvFn();
+                try {
+                    const headers = { 'Content-Type': 'text/csv' };
+                    if (testMode) headers['X-Test-Mode'] = 'true';
+                    const res = await fetch(`/api/save/${saveKey(name)}`, {
+                        method: 'POST',
+                        headers,
+                        body: csv
+                    });
+                    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+                    if (btnId) {
+                        const btn = document.getElementById(btnId);
+                        if (btn) {
+                            const orig = btn.innerHTML;
+                            btn.innerHTML = 'Saved!';
+                            setTimeout(() => btn.innerHTML = orig, 1500);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`Failed to save ${name}:`, err);
+                }
+            };
+
             // --- RA STATE ---
             let raTransactions = [];
             let raParams = {
@@ -1464,11 +1500,11 @@
             });
 
             function raPersist() {
-                debouncedSave(saveKey('ra'), generateRaCSVFromState, 'save-ra-csv');
+                debouncedSave('ra', generateRaCSVFromState, 'save-ra-csv');
             }
 
             document.getElementById('save-ra-csv').addEventListener('click', () => {
-                saveToServer(saveKey('ra'), generateRaCSVFromState, 'save-ra-csv');
+                saveToServer('ra', generateRaCSVFromState, 'save-ra-csv');
             });
 
             document.getElementById('load-ra-csv').addEventListener('click', () => {
@@ -1503,47 +1539,13 @@
                         raTransactions = parsed.transactions;
                         raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, future_years_to_project: 2, assumed_future_monthly: 20000, ...parsed.params };
                         renderRa();
-                    }
-                } catch (_e) {
-                    console.log('Could not auto-load ra.csv');
-                }
-            })();
-
-            // --- TEST MODE ---
-            let testMode = false;
-            const dbPath = (filename) => testMode ? `db/test/${filename}` : `db/${filename}`;
-            const saveKey = (name) => testMode ? `test_${name}` : name;
-
-            // --- SERVER SAVE HELPERS ---
-            const _saveTimers = {};
-            const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
-                clearTimeout(_saveTimers[name]);
-                _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn, btnId), delayMs);
-            };
-
-            const saveToServer = async (name, csvFn, btnId) => {
-                const csv = csvFn();
-                try {
-                    const headers = { 'Content-Type': 'text/csv' };
-                    if (testMode) headers['X-Test-Mode'] = 'true';
-                    const res = await fetch(`/api/save/${saveKey(name)}`, {
-                        method: 'POST',
-                        headers,
-                        body: csv
-                    });
-                    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-                    if (btnId) {
-                        const btn = document.getElementById(btnId);
-                        if (btn) {
-                            const orig = btn.innerHTML;
-                            btn.innerHTML = 'Saved!';
-                            setTimeout(() => btn.innerHTML = orig, 1500);
-                        }
+                    } else {
+                        console.warn('ra.csv fetch returned', response.status);
                     }
                 } catch (err) {
-                    console.error(`Failed to save ${name}:`, err);
+                    console.error('Failed to auto-load ra.csv:', err);
                 }
-            };
+            })();
 
             // --- BUDGET CALCULATOR LOGIC ---
             // (Existing Logic Wrapped)
@@ -2663,7 +2665,7 @@
             }
 
             function retPersist() {
-                debouncedSave(saveKey('retirement'), () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
+                debouncedSave('retirement', () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
             }
 
             function retWireInputs() {
@@ -2679,7 +2681,7 @@
                 });
 
                 document.getElementById('ret-save-csv').addEventListener('click', () => {
-                    saveToServer(saveKey('retirement'), () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
+                    saveToServer('retirement', () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
                 });
 
                 document.getElementById('ret-load-csv').addEventListener('click', () => {
@@ -2788,8 +2790,8 @@
                 } else if (retAge < _RET_CONSTS.DUTCH_PENSION_AGE) {
                     monthlyPhases.push({
                         title: `At retirement (age ${retAge})`,
-                        net: snap.monthly.projected55.net,
-                        gross: snap.monthly.projected55.gross,
+                        net: snap.monthly.atRetirement.net,
+                        gross: snap.monthly.atRetirement.gross,
                         note: `RA drawdown.`,
                     });
                     monthlyPhases.push({
@@ -2801,13 +2803,13 @@
                 } else {
                     monthlyPhases.push({
                         title: `At retirement (age ${retAge}, ≥ 68)`,
-                        net: snap.monthly.projected68.net,
-                        gross: snap.monthly.projected68.gross,
+                        net: snap.monthly.atRetirement.net + snap.monthly.dutchMonthlyNet,
+                        gross: snap.monthly.atRetirement.gross + snap.monthly.dutchMonthlyZAR,
                         note: 'RA drawdown + Dutch pension combined.',
                     });
                 }
 
-                const deMinimisBanner = snap.monthly.projected55.fullCommutation
+                const deMinimisBanner = snap.monthly.atRetirement.fullCommutation
                     ? `<div class="mb-3 p-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded">Pot below de minimis (R360,000) — full commutation possible, drawdown N/A.</div>`
                     : '';
 
@@ -2834,38 +2836,38 @@
                 })();
 
                 const rows = [
-                    ['Discretionary', snap.liquid.at55.discretionary, ''],
-                    ['TFSA', snap.liquid.at55.tfsa,
+                    ['Discretionary', snap.liquid.atRetirement.discretionary, ''],
+                    ['TFSA', snap.liquid.atRetirement.tfsa,
                         retirementParams.opt_tfsa_enabled
                             ? `R${_RET_CONSTS.TFSA_ANNUAL_CAP.toLocaleString()}/yr; ~${yearsTilTfsaCap ?? 0} more years until lifetime cap.`
                             : ''],
-                    ['Crypto', snap.liquid.at55.crypto, ''],
+                    ['Crypto', snap.liquid.atRetirement.crypto, ''],
                 ];
                 if (retirementParams.ra_commute_third) {
                     rows.push(['1/3 RA commutation (gross)',
-                        snap.lumpSum.ra55Commutation.gross,
-                        `tax: ${retFmtZAR(snap.lumpSum.ra55Commutation.tax)} (first R550k tax-free)`]);
-                    rows.push(['1/3 RA commutation (net of tax)', snap.lumpSum.ra55Commutation.net, '']);
+                        snap.lumpSum.raCommutationAtRetirement.gross,
+                        `tax: ${retFmtZAR(snap.lumpSum.raCommutationAtRetirement.tax)} (first R550k tax-free)`]);
+                    rows.push(['1/3 RA commutation (net of tax)', snap.lumpSum.raCommutationAtRetirement.net, '']);
                 }
-                if (snap.ra.at55.savingsPotWithdrawnNet > 0) {
-                    rows.push(['Savings-pot withdrawals (net)', snap.ra.at55.savingsPotWithdrawnNet,
-                        `gross: ${retFmtZAR(snap.ra.at55.savingsPotWithdrawnGross)}; tax: ${retFmtZAR(snap.ra.at55.savingsPotTaxPaid)}`]);
+                if (snap.ra.atRetirement.savingsPotWithdrawnNet > 0) {
+                    rows.push(['Savings-pot withdrawals (net)', snap.ra.atRetirement.savingsPotWithdrawnNet,
+                        `gross: ${retFmtZAR(snap.ra.atRetirement.savingsPotWithdrawnGross)}; tax: ${retFmtZAR(snap.ra.atRetirement.savingsPotTaxPaid)}`]);
                 }
                 if (retirementParams.opt_house_enabled) rows.push(['House sale', snap.lumpSum.houseSale, '']);
                 if (retirementParams.opt_inheritance_enabled) rows.push(['Inheritance (ZAR)', snap.lumpSum.inheritanceZar,
                     `${Number(retirementParams.opt_inheritance_eur)||0} EUR × ${retirementParams.opt_dutch_eur_zar} ZAR/EUR`]);
                 if (retirementParams.opt_bond_enabled) rows.push(['Less: outstanding bond', -snap.lumpSum.bondPayoff, '']);
 
-                const totalRow = snap.lumpSum.projected55;
+                const totalRow = snap.lumpSum.atRetirement;
                 const totalClass = totalRow < 0 ? 'text-red-600' : 'text-indigo-700';
 
                 document.getElementById('retirement-card-lumpsum').innerHTML = `
-                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Instantly available at retirement</h2>
+                    <h2 class="text-xl font-semibold text-slate-800 mb-4">Instantly available at retirement (age ${retAge})</h2>
                     <table class="w-full text-sm">
                         <thead>
                             <tr class="text-xs font-semibold text-slate-500 uppercase tracking-wider border-b">
                                 <th class="text-left py-2">Source</th>
-                                <th class="text-right py-2">Value at retirement</th>
+                                <th class="text-right py-2">Value at age ${retAge}</th>
                             </tr>
                         </thead>
                         <tbody>

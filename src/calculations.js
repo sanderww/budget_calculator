@@ -871,32 +871,49 @@ export function calculateRetirementSnapshot({
     const extraMonthly = (p.opt_ra_monthly_enabled ? Number(p.opt_ra_monthly_amount) || 0 : 0);
     const savingsWd = (p.opt_savings_pot_withdrawal_enabled ? Number(p.opt_savings_pot_withdrawal_annual) || 0 : 0);
 
-    const raAtRetirement = raFutureValueTwoPot({
-        vestedToday, savingsToday, retirementToday,
-        annualRatePct: p.return_ra_pct,
-        extraMonthly, months: monthsToRetirement,
-        savingsPotAnnualWithdrawal: savingsWd,
-        taxRatePct: p.effective_tax_rate_pct,
-    });
+    // Two-phase RA projection: extras + savings-pot withdrawals run only until retirement_age,
+    // then the pot grows passively for any remaining months to the target snapshot age.
+    const _projectRa = (monthsTarget, includeExtras = true) => {
+        const t = Math.max(0, Math.floor(Number(monthsTarget) || 0));
+        const monthsContrib = Math.min(t, monthsToRetirement);
+        const monthsPassive = Math.max(0, t - monthsToRetirement);
+        const phase1 = raFutureValueTwoPot({
+            vestedToday, savingsToday, retirementToday,
+            annualRatePct: p.return_ra_pct,
+            extraMonthly: includeExtras ? extraMonthly : 0,
+            months: monthsContrib,
+            savingsPotAnnualWithdrawal: includeExtras ? savingsWd : 0,
+            taxRatePct: p.effective_tax_rate_pct,
+        });
+        if (monthsPassive === 0) return phase1;
+        const phase2 = raFutureValueTwoPot({
+            vestedToday: phase1.vested,
+            savingsToday: phase1.savings,
+            retirementToday: phase1.retirement,
+            annualRatePct: p.return_ra_pct,
+            extraMonthly: 0, months: monthsPassive,
+            savingsPotAnnualWithdrawal: 0,
+            taxRatePct: p.effective_tax_rate_pct,
+        });
+        // Carry the phase-1 withdrawal totals (no withdrawals occur in passive phase).
+        return {
+            vested: phase2.vested,
+            savings: phase2.savings,
+            retirement: phase2.retirement,
+            total: phase2.total,
+            savingsPotWithdrawnGross: phase1.savingsPotWithdrawnGross,
+            savingsPotWithdrawnNet: phase1.savingsPotWithdrawnNet,
+            savingsPotTaxPaid: phase1.savingsPotTaxPaid,
+        };
+    };
 
-    const raAt55 = raFutureValueTwoPot({
-        vestedToday, savingsToday, retirementToday,
-        annualRatePct: p.return_ra_pct,
-        extraMonthly, months: monthsTo55,
-        savingsPotAnnualWithdrawal: savingsWd,
-        taxRatePct: p.effective_tax_rate_pct,
-    });
+    const raAtRetirement = _projectRa(monthsToRetirement);
+    const raAt55 = _projectRa(monthsTo55);
+    const raAt68 = _projectRa(monthsTo68);
+    // "Current" RA (no extras, no withdrawals) — for the side-by-side comparison at age 55.
+    const raAt55Current = _projectRa(monthsTo55, /* includeExtras */ false);
 
-    // "Current" RA (no extras, no commutation, no withdrawals)
-    const raAt55Current = raFutureValueTwoPot({
-        vestedToday, savingsToday, retirementToday,
-        annualRatePct: p.return_ra_pct,
-        extraMonthly: 0, months: monthsTo55,
-        savingsPotAnnualWithdrawal: 0,
-        taxRatePct: p.effective_tax_rate_pct,
-    });
-
-    // Discretionary / TFSA / Crypto FV at 55 and 68 (passive — no contributions in current spec).
+    // Discretionary / TFSA / Crypto FV at any target age (passive — no contributions in current spec).
     const fvAt = (months) => ({
         discretionary: fvGrow(discretionaryToday, p.return_discretionary_pct, months),
         tfsa: tfsaFutureValue({
@@ -911,8 +928,9 @@ export function calculateRetirementSnapshot({
     });
     const liquid55 = fvAt(monthsTo55);
     const liquid68 = fvAt(monthsTo68);
+    const liquidAtRet = fvAt(monthsToRetirement);
 
-    // Optional lump-sum components (apply once at age-55 snapshot).
+    // Optional lump-sum components.
     const dutchEurZar = Number(p.opt_dutch_eur_zar) || 0;
     const inheritanceZar = (p.opt_inheritance_enabled ? (Number(p.opt_inheritance_eur) || 0) * dutchEurZar : 0);
     const houseSale = (p.opt_house_enabled ? Number(p.opt_house_value) || 0 : 0);
@@ -923,6 +941,12 @@ export function calculateRetirementSnapshot({
     const commutationRet = raCommutationLumpSum(raAtRetirement.total, commute);
 
     // Lump-sum totals
+    const projectedFundsAtRet =
+        liquidAtRet.discretionary + liquidAtRet.tfsa + liquidAtRet.crypto
+        + commutationRet.net
+        + raAtRetirement.savingsPotWithdrawnNet
+        + houseSale + inheritanceZar
+        - bondPayoff;
     const projectedFunds55 =
         liquid55.discretionary + liquid55.tfsa + liquid55.crypto
         + commutation55.net
@@ -941,24 +965,43 @@ export function calculateRetirementSnapshot({
     // Monthly income
     const monthly55Projected = raMonthlyIncome(raAt55.total, p.withdrawal_rate_pct, p.effective_tax_rate_pct, commute);
     const monthly55Current = raMonthlyIncome(raAt55Current.total, p.withdrawal_rate_pct, p.effective_tax_rate_pct, false);
+    const monthlyAtRetirement = (p.retirement_age < RETIREMENT_CONSTANTS.RA_ACCESS_AGE)
+        ? { gross: 0, net: 0, fullCommutation: false }
+        : raMonthlyIncome(raAtRetirement.total, p.withdrawal_rate_pct, p.effective_tax_rate_pct, commute);
 
     const dutchMonthlyZAR = (p.opt_dutch_enabled ? RETIREMENT_CONSTANTS.DUTCH_PENSION_EUR_MONTHLY * dutchEurZar : 0);
     const tax = Math.max(0, Math.min(100, Number(p.effective_tax_rate_pct) || 0)) / 100;
     const dutchMonthlyNet = dutchMonthlyZAR * (1 - tax);
 
-    // RA at 68 — depletion check on annuitised pot from age 55 forward.
-    const annuitisedAt55 = commute ? raAt55.total * 2 / 3 : raAt55.total;
+    // Living-annuity depletion: walk the annuitised pot from when drawdown actually starts
+    // (max(retirement_age, 55)) forward through the horizon.
+    const drawdownStartAge = Math.max(p.retirement_age, RETIREMENT_CONSTANTS.RA_ACCESS_AGE);
+    const annuitisedAtDrawdownStart = (() => {
+        const pot = (p.retirement_age >= RETIREMENT_CONSTANTS.RA_ACCESS_AGE)
+            ? raAtRetirement.total
+            : raAt55.total;
+        return commute ? pot * 2 / 3 : pot;
+    })();
     const depletion = projectLivingAnnuityDepletion(
-        annuitisedAt55, p.return_ra_pct, p.withdrawal_rate_pct,
-        RETIREMENT_CONSTANTS.RA_ACCESS_AGE
+        annuitisedAtDrawdownStart, p.return_ra_pct, p.withdrawal_rate_pct,
+        drawdownStartAge
     );
 
+    // Pot used for "monthly income at 68" snapshot:
+    //  - retAge <= 55: drawdown started at 55, snapshot uses raAt55 (constant withdrawal rate).
+    //  - 55 < retAge < 68: drawdown started at retAge, pot at 68 = raAt68 (passive growth from retAge to 68).
+    //  - retAge >= 68: no drawdown yet at 68; closest equivalent is the pot at retirement_age.
+    const potForIncomeAt68 = (() => {
+        if (p.retirement_age <= RETIREMENT_CONSTANTS.RA_ACCESS_AGE) return raAt55.total;
+        if (p.retirement_age < RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE) return raAt68.total;
+        return raAtRetirement.total;
+    })();
     const monthly68Projected = (() => {
         if (depletion && depletion.ageAtThreshold <= RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE) {
             // Pot has run out / commuted before age 68.
             return { gross: dutchMonthlyZAR, net: dutchMonthlyNet, fullCommutation: false };
         }
-        const ra68 = raMonthlyIncome(raAt55.total, p.withdrawal_rate_pct, p.effective_tax_rate_pct, commute);
+        const ra68 = raMonthlyIncome(potForIncomeAt68, p.withdrawal_rate_pct, p.effective_tax_rate_pct, commute);
         return {
             gross: ra68.gross + dutchMonthlyZAR,
             net: ra68.net + dutchMonthlyNet,
@@ -978,6 +1021,7 @@ export function calculateRetirementSnapshot({
             vestedToday, savingsToday, retirementToday,
             atRetirement: raAtRetirement,
             at55: raAt55,
+            at68: raAt68,
             commutationAtRetirement: commutationRet,
             commutationAt55: commutation55,
             depletion,
@@ -985,18 +1029,21 @@ export function calculateRetirementSnapshot({
             annualContributionLast12: raAnnualContributionLast12,
             deductionCapHeadroom: Math.max(0, RETIREMENT_CONSTANTS.RA_DEDUCTION_CAP - raAnnualContributionLast12),
         },
-        liquid: { at55: liquid55, at68: liquid68 },
+        liquid: { at55: liquid55, at68: liquid68, atRetirement: liquidAtRet },
         lumpSum: {
             current55: deflate(currentFunds55, yearsTo55),
             projected55: deflate(projectedFunds55, yearsTo55),
             projected68: deflate(projectedFunds68, yearsTo68),
+            atRetirement: deflate(projectedFundsAtRet, yearsToRet),
             houseSale, inheritanceZar, bondPayoff,
             ra55Commutation: commutation55,
+            raCommutationAtRetirement: commutationRet,
         },
         monthly: {
             current55: { gross: deflate(monthly55Current.gross, yearsTo55), net: deflate(monthly55Current.net, yearsTo55), fullCommutation: monthly55Current.fullCommutation },
             projected55: { gross: deflate(monthly55Projected.gross, yearsTo55), net: deflate(monthly55Projected.net, yearsTo55), fullCommutation: monthly55Projected.fullCommutation },
             projected68: { gross: deflate(monthly68Projected.gross, yearsTo68), net: deflate(monthly68Projected.net, yearsTo68), fullCommutation: monthly68Projected.fullCommutation },
+            atRetirement: { gross: deflate(monthlyAtRetirement.gross, yearsToRet), net: deflate(monthlyAtRetirement.net, yearsToRet), fullCommutation: monthlyAtRetirement.fullCommutation },
             dutchMonthlyZAR: deflate(dutchMonthlyZAR, yearsTo68),
             dutchMonthlyNet: deflate(dutchMonthlyNet, yearsTo68),
         },
