@@ -1477,7 +1477,20 @@
                     reader.onload = (ev) => {
                         const parsed = _parseRaCSV(ev.target.result);
                         raTransactions = parsed.transactions;
-                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, ...parsed.params };
+                        raParams = {
+                            tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? parsed.params.tax_refund_rate_pct ?? 41,
+                            nominal_return_pct:  configMap.nominal_return_pct  ?? parsed.params.nominal_return_pct  ?? 10,
+                        };
+                        let dirty = false;
+                        if (configMap.tax_refund_rate_pct === undefined && parsed.params.tax_refund_rate_pct !== undefined) {
+                            configMap.tax_refund_rate_pct = parsed.params.tax_refund_rate_pct;
+                            dirty = true;
+                        }
+                        if (configMap.nominal_return_pct === undefined && parsed.params.nominal_return_pct !== undefined) {
+                            configMap.nominal_return_pct = parsed.params.nominal_return_pct;
+                            dirty = true;
+                        }
+                        if (dirty) persistConfig();
                         renderRa();
                     };
                     reader.readAsText(f);
