@@ -4,18 +4,27 @@ from datetime import datetime
 
 PORT = 8000
 FILE_MAP = {
-    'budget':           'db/calulator_data.csv',
-    'investments':      'db/investments.csv',
-    'debt':             'db/debt.csv',
-    'ra':               'db/ra.csv',
-    'retirement':       'db/retirement.csv',
-    'test_budget':      'db/test/calulator_data.csv',
-    'test_investments': 'db/test/investments.csv',
-    'test_debt':        'db/test/debt.csv',
-    'test_ra':          'db/test/ra.csv',
-    'test_retirement':  'db/test/retirement.csv',
+    'transactions_budget':           'db/transactions/budget.csv',
+    'transactions_ra':               'db/transactions/ra.csv',
+    'transactions_investments':      'db/transactions/investments.csv',
+    'transactions_debt':             'db/transactions/debt.csv',
+    'config_public':                 'db/config.public.csv',
+    'config_private':                'db/config.private.csv',
+    'test_transactions_budget':      'db/test/transactions/budget.csv',
+    'test_transactions_ra':          'db/test/transactions/ra.csv',
+    'test_transactions_investments': 'db/test/transactions/investments.csv',
+    'test_transactions_debt':        'db/test/transactions/debt.csv',
+    'test_config_public':            'db/test/config.public.csv',
+    'test_config_private':           'db/test/config.private.csv',
 }
-REAL_KEYS = {'budget', 'investments', 'debt', 'ra', 'retirement'}
+REAL_KEYS = {
+    'transactions_budget',
+    'transactions_ra',
+    'transactions_investments',
+    'transactions_debt',
+    'config_public',
+    'config_private',
+}
 BACKUP_DIR = '/Users/sanderwiersma/Documents/budget_backups'
 
 def backup_file(filepath, name):
