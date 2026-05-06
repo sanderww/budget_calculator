@@ -1177,9 +1177,11 @@
             RETIREMENT_CONSTANTS as _RET_CONSTS,
             getDefaultRetirementParams as _getDefaultRetirementParams,
             parseRetirementCSV as _parseRetirementCSV,
-            generateRetirementCSV as _generateRetirementCSV,
             calculateRetirementSnapshot as _calculateRetirementSnapshot,
             tfsaLifetimeContributions as _tfsaLifetimeContributions,
+            parseConfigCSV as _parseConfigCSV,
+            generateConfigCSV as _generateConfigCSV,
+            PUBLIC_PARAMS as _PUBLIC_PARAMS,
         } from './calculations.js';
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -1312,6 +1314,41 @@
                 }
             };
 
+            // --- SHARED CONFIG LAYER ---
+            // Single source of truth for every param-style value. Loaded from
+            // db/config.public.csv + db/config.private.csv at startup and
+            // rewritten on any change.
+            let configMap = {};
+
+            const loadConfigFromServer = async () => {
+                try {
+                    const [pubRes, privRes] = await Promise.all([
+                        fetch(dbPath('config.public.csv'), { cache: 'no-store' }),
+                        fetch(dbPath('config.private.csv'), { cache: 'no-store' }),
+                    ]);
+                    const pubText  = pubRes.ok  ? await pubRes.text()  : '';
+                    const privText = privRes.ok ? await privRes.text() : '';
+                    configMap = { ..._parseConfigCSV(pubText), ..._parseConfigCSV(privText) };
+                } catch (err) {
+                    console.error('Failed to load config:', err);
+                    configMap = {};
+                }
+            };
+
+            const persistConfig = () => {
+                debouncedSave('config_public',
+                    () => _generateConfigCSV(configMap, { public: true }),
+                    null);
+                debouncedSave('config_private',
+                    () => _generateConfigCSV(configMap, { public: false }),
+                    null);
+            };
+
+            const setConfig = (key, value) => {
+                configMap[key] = value;
+                persistConfig();
+            };
+
             // --- RA STATE ---
             let raTransactions = [];
             let raParams = {
@@ -1411,12 +1448,12 @@
 
             document.getElementById('ra-refund-rate').addEventListener('input', (e) => {
                 raParams.tax_refund_rate_pct = parseFloat(e.target.value) || 0;
-                raPersist();
+                setConfig('tax_refund_rate_pct', raParams.tax_refund_rate_pct);
                 renderRa();
             });
             document.getElementById('ra-return-rate').addEventListener('input', (e) => {
                 raParams.nominal_return_pct = parseFloat(e.target.value) || 0;
-                raPersist();
+                setConfig('nominal_return_pct', raParams.nominal_return_pct);
                 renderRa();
             });
             const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions);
@@ -1459,7 +1496,11 @@
                         const text = await response.text();
                         const parsed = _parseRaCSV(text);
                         raTransactions = parsed.transactions;
-                        raParams = { tax_refund_rate_pct: 41, nominal_return_pct: 10, ...parsed.params };
+                        // RA params now live in configMap; only RA transactions are loaded here.
+                        raParams = {
+                            tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? 41,
+                            nominal_return_pct:  configMap.nominal_return_pct  ?? 10,
+                        };
                         renderRa();
                     } else {
                         console.warn('ra.csv fetch returned', response.status);
@@ -2016,6 +2057,7 @@
             marginalRateInput.addEventListener('input', (e) => {
                 const v = parseFloat(e.target.value);
                 investmentData.marginalRate = Number.isNaN(v) ? 0 : v;
+                setConfig('marginal_rate', investmentData.marginalRate);
                 updatePerformanceDisplay();
                 debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
             });
@@ -2033,7 +2075,7 @@
                         const parsed = parseInvestmentCSV(text);
                         investmentData.transactions = parsed.transactions;
                         investmentData.currentValues = parsed.currentValues;
-                        investmentData.marginalRate = (parsed.marginalRate ?? 41);
+                        investmentData.marginalRate = (configMap.marginal_rate ?? parsed.marginalRate ?? 41);
                         renderFullInvestmentUI();
                     }
                 } catch (e) {
@@ -2055,7 +2097,7 @@
                     const parsed = parseInvestmentCSV(text);
                     investmentData.transactions = parsed.transactions;
                     investmentData.currentValues = parsed.currentValues;
-                    investmentData.marginalRate = (parsed.marginalRate ?? 41);
+                    investmentData.marginalRate = (configMap.marginal_rate ?? parsed.marginalRate ?? 41);
                     renderFullInvestmentUI();
                 } catch (err) {
                     console.error(err);
@@ -2287,10 +2329,20 @@
                 }
             });
 
-            [debtAmountInput, debtCurrentBalanceInput, debtRepaymentInput, debtServiceFeeInput, debtInterestRateInput, debtNextPaymentInput, debtLoanStartInput, debtOriginalTermInput].forEach(input => {
-                input.addEventListener('input', (e) => {
+            const _debtInputBindings = [
+                ['principal',       debtAmountInput],
+                ['current_balance', debtCurrentBalanceInput],
+                ['repayment',       debtRepaymentInput],
+                ['service_fee',     debtServiceFeeInput],
+                ['interest_rate',   debtInterestRateInput],
+                ['next_payment',    debtNextPaymentInput],
+                ['loan_start',      debtLoanStartInput],
+                ['original_term',   debtOriginalTermInput],
+            ];
+            _debtInputBindings.forEach(([key, input]) => {
+                input.addEventListener('input', () => {
+                    setConfig(key, input.value);
                     calculateDebtProjection();
-                    debouncedSave('transactions_debt', generateDebtCSV, null);
                 });
             });
 
@@ -2306,14 +2358,19 @@
                         const parsed = parseDebtCSV(text);
                         debtData.repayments = parsed.repayments;
 
-                        // Load params if exist
-                        if (parsed.params.principal) debtAmountInput.value = parsed.params.principal;
-                        if (parsed.params.current_balance) debtCurrentBalanceInput.value = parsed.params.current_balance;
-                        if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
-                        if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
-                        if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
-                        if (parsed.params.loan_start) debtLoanStartInput.value = parsed.params.loan_start;
-                        if (parsed.params.original_term) debtOriginalTermInput.value = parsed.params.original_term;
+                        const _debtKeys = [
+                            ['principal',       debtAmountInput],
+                            ['current_balance', debtCurrentBalanceInput],
+                            ['repayment',       debtRepaymentInput],
+                            ['service_fee',     debtServiceFeeInput],
+                            ['interest_rate',   debtInterestRateInput],
+                            ['loan_start',      debtLoanStartInput],
+                            ['original_term',   debtOriginalTermInput],
+                        ];
+                        _debtKeys.forEach(([k, el]) => {
+                            const v = configMap[k] ?? parsed.params[k];
+                            if (v !== undefined && v !== '') el.value = v;
+                        });
 
                         // Always use the upcoming 25th
                         debtNextPaymentInput.value = getUpcoming25th();
@@ -2356,13 +2413,23 @@
                     const parsed = parseDebtCSV(text);
                     debtData.repayments = parsed.repayments;
 
-                    if (parsed.params.principal) debtAmountInput.value = parsed.params.principal;
-                    if (parsed.params.current_balance) debtCurrentBalanceInput.value = parsed.params.current_balance;
-                    if (parsed.params.repayment) debtRepaymentInput.value = parsed.params.repayment;
-                    if (parsed.params.service_fee) debtServiceFeeInput.value = parsed.params.service_fee;
-                    if (parsed.params.interest_rate) debtInterestRateInput.value = parsed.params.interest_rate;
-                    if (parsed.params.loan_start) debtLoanStartInput.value = parsed.params.loan_start;
-                    if (parsed.params.original_term) debtOriginalTermInput.value = parsed.params.original_term;
+                    const _debtKeys = [
+                        ['principal',       debtAmountInput],
+                        ['current_balance', debtCurrentBalanceInput],
+                        ['repayment',       debtRepaymentInput],
+                        ['service_fee',     debtServiceFeeInput],
+                        ['interest_rate',   debtInterestRateInput],
+                        ['loan_start',      debtLoanStartInput],
+                        ['original_term',   debtOriginalTermInput],
+                    ];
+                    _debtKeys.forEach(([k, el]) => {
+                        const v = parsed.params[k];
+                        if (v !== undefined && v !== '') el.value = v;
+                    });
+                    _debtKeys.forEach(([k, el]) => {
+                        if (el.value !== '') configMap[k] = el.value;
+                    });
+                    persistConfig();
 
                     // Always use the upcoming 25th
                     debtNextPaymentInput.value = getUpcoming25th();
@@ -2502,6 +2569,7 @@
 
             // --- INITIALIZATION ---
             (async () => {
+                await loadConfigFromServer();          // must run before tabs that read configMap
                 try {
                     await loadBudgetCSVFromServer();
                 } catch (err) {
@@ -2512,6 +2580,9 @@
 
                 await loadInvestmentCSVFromServer();
                 await loadDebtCSVFromServer();
+                // Note: loadRaCSVFromServer and loadRetirementFromConfig
+                // are introduced in Task 5c. Wire them in here at that
+                // time (await loadRaCSVFromServer(); loadRetirementFromConfig();).
             })();
 
             // --- RETIREMENT STATE ---
@@ -2600,7 +2671,8 @@
             }
 
             function retPersist() {
-                debouncedSave('retirement', () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
+                Object.keys(retirementParams).forEach(k => { configMap[k] = retirementParams[k]; });
+                persistConfig();
             }
 
             function retWireInputs() {
@@ -2616,7 +2688,13 @@
                 });
 
                 document.getElementById('ret-save-csv').addEventListener('click', () => {
-                    saveToServer('retirement', () => _generateRetirementCSV(retirementParams), 'ret-save-csv');
+                    Object.keys(retirementParams).forEach(k => { configMap[k] = retirementParams[k]; });
+                    saveToServer('config_public',
+                        () => _generateConfigCSV(configMap, { public: true }),
+                        'ret-save-csv');
+                    saveToServer('config_private',
+                        () => _generateConfigCSV(configMap, { public: false }),
+                        null);
                 });
 
                 document.getElementById('ret-load-csv').addEventListener('click', () => {
@@ -2936,17 +3014,10 @@
             retWireInputs();
 
             (async () => {
-                try {
-                    const response = await fetch(dbPath('retirement.csv'), { cache: 'no-store' });
-                    if (response.ok) {
-                        const text = await response.text();
-                        retirementParams = _parseRetirementCSV(text);
-                        retApplyParamsToInputs();
-                        renderRetirement();
-                    }
-                } catch (_e) {
-                    console.log('Could not auto-load retirement.csv');
-                }
+                // configMap is loaded by the init IIFE; merge it onto defaults.
+                retirementParams = { ..._getDefaultRetirementParams(), ...configMap };
+                retApplyParamsToInputs();
+                renderRetirement();
             })();
         });
     </script>
