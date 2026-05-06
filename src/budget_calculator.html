@@ -1488,27 +1488,28 @@
             // Initial render so the empty state is visible immediately
             renderRa();
 
-            // Try to auto-load ra.csv if available
-            (async () => {
+            const loadRaCSVFromServer = async () => {
                 try {
                     const response = await fetch(dbPath('transactions/ra.csv'), { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = _parseRaCSV(text);
                         raTransactions = parsed.transactions;
-                        // RA params now live in configMap; only RA transactions are loaded here.
-                        raParams = {
-                            tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? 41,
-                            nominal_return_pct:  configMap.nominal_return_pct  ?? 10,
-                        };
-                        renderRa();
                     } else {
-                        console.warn('ra.csv fetch returned', response.status);
+                        raTransactions = [];
                     }
                 } catch (err) {
-                    console.error('Failed to auto-load ra.csv:', err);
+                    console.error('Failed to load RA transactions:', err);
+                    raTransactions = [];
                 }
-            })();
+                raParams = {
+                    tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? 41,
+                    nominal_return_pct:  configMap.nominal_return_pct  ?? 10,
+                };
+                renderRa();
+            };
+            // Note: do NOT call loadRaCSVFromServer() here. It depends on
+            // configMap being loaded first; the init IIFE invokes it.
 
             // --- BUDGET CALCULATOR LOGIC ---
             // (Existing Logic Wrapped)
@@ -2586,9 +2587,8 @@
 
                 await loadInvestmentCSVFromServer();
                 await loadDebtCSVFromServer();
-                // Note: loadRaCSVFromServer and loadRetirementFromConfig
-                // are introduced in Task 5c. Wire them in here at that
-                // time (await loadRaCSVFromServer(); loadRetirementFromConfig();).
+                await loadRaCSVFromServer();
+                loadRetirementFromConfig();
             })();
 
             // --- RETIREMENT STATE ---
@@ -3019,12 +3019,13 @@
             retApplyParamsToInputs();
             retWireInputs();
 
-            (async () => {
-                // configMap is loaded by the init IIFE; merge it onto defaults.
+            const loadRetirementFromConfig = () => {
                 retirementParams = { ..._getDefaultRetirementParams(), ...configMap };
                 retApplyParamsToInputs();
                 renderRetirement();
-            })();
+            };
+            // Note: do NOT call loadRetirementFromConfig() here. It depends
+            // on configMap being loaded; the init IIFE invokes it.
         });
     </script>
 </body>
