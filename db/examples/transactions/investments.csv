@@ -5,4 +5,3 @@ Date,Description,amount,account type,crypto_value
 current_value,Discretionary,2050.00,
 current_value,TFSA,5100.00,
 current_value,Crypto,950,
-param,marginal_rate,41,

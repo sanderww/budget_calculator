@@ -1,0 +1,5 @@
+type,description,amount,date
+savings,,15000,
+debt,Sample loan,3000,
+provision,Holiday fund,2000,2026-12-01
+costfuturecost,Laptop,1500,2026-09-01
