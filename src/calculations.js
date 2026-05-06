@@ -1,6 +1,53 @@
 // Internal helper used by CSV parsers (not exported)
 const _generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+export const PUBLIC_PARAMS = new Set([
+    'life_expectancy',
+    'lump_sum_drawdown_return_pct',
+    'withdrawal_rate_pct',
+    'cpi_pct',
+    'return_discretionary_pct',
+    'return_tfsa_pct',
+    'return_crypto_pct',
+    'return_ra_pct',
+    'offshore_discretionary_pct',
+    'offshore_tfsa_pct',
+    'zar_depreciation_pct',
+    'ra_savings_component_pct',
+    'nominal_return_pct',
+]);
+
+export function parseConfigCSV(text) {
+    const map = {};
+    const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');
+    rows.forEach(row => {
+        const cols = row.split(',').map(s => s.trim());
+        if (cols[0] !== 'param') return;
+        const key = cols[1];
+        const raw = cols[2];
+        if (!key || raw === undefined) return;
+        if (key === 'dob') {
+            map[key] = raw;
+            return;
+        }
+        const v = parseFloat(raw);
+        if (!Number.isNaN(v)) map[key] = v;
+    });
+    return map;
+}
+
+export function generateConfigCSV(map, opts) {
+    const wantPublic = !!(opts && opts.public);
+    const keys = Object.keys(map || {})
+        .filter(k => PUBLIC_PARAMS.has(k) === wantPublic)
+        .sort();
+    let csv = '';
+    keys.forEach(k => {
+        csv += `param,${k},${map[k]},\n`;
+    });
+    return csv;
+}
+
 export function getUpcoming25th(today = new Date()) {
     let year = today.getFullYear();
     let month = today.getMonth();

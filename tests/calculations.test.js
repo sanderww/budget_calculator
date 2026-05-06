@@ -35,6 +35,9 @@ import {
     generateRetirementCSV,
     getDefaultRetirementParams,
     calculateRetirementSnapshot,
+    PUBLIC_PARAMS,
+    parseConfigCSV,
+    generateConfigCSV,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -1413,5 +1416,92 @@ describe('calculateRetirementSnapshot', () => {
             { ...baseInput, params }, new Date(2026, 4, 1));
         // monthsTo68 is now monthsTo70.
         expect(r.monthsTo68).toBeGreaterThan(r.monthsToRetirement);
+    });
+});
+
+describe('PUBLIC_PARAMS', () => {
+    it('contains exactly the 13 public params from the design', () => {
+        const expected = new Set([
+            'life_expectancy',
+            'lump_sum_drawdown_return_pct',
+            'withdrawal_rate_pct',
+            'cpi_pct',
+            'return_discretionary_pct',
+            'return_tfsa_pct',
+            'return_crypto_pct',
+            'return_ra_pct',
+            'offshore_discretionary_pct',
+            'offshore_tfsa_pct',
+            'zar_depreciation_pct',
+            'ra_savings_component_pct',
+            'nominal_return_pct',
+        ]);
+        expect(PUBLIC_PARAMS instanceof Set).toBe(true);
+        expect(PUBLIC_PARAMS.size).toBe(expected.size);
+        for (const k of expected) expect(PUBLIC_PARAMS.has(k)).toBe(true);
+    });
+});
+
+describe('parseConfigCSV', () => {
+    it('parses param rows into a flat map with numeric coercion', () => {
+        const csv = [
+            'param,return_ra_pct,10,',
+            'param,cpi_pct,5,',
+        ].join('\n');
+        const map = parseConfigCSV(csv);
+        expect(map).toEqual({ return_ra_pct: 10, cpi_pct: 5 });
+    });
+
+    it('preserves dob as a string (does not coerce to number)', () => {
+        const csv = 'param,dob,1985-08-08,';
+        expect(parseConfigCSV(csv)).toEqual({ dob: '1985-08-08' });
+    });
+
+    it('ignores non-param rows and blank lines', () => {
+        const csv = [
+            'header,row,here',
+            '',
+            'param,cpi_pct,5,',
+            'random,thing,1',
+        ].join('\n');
+        expect(parseConfigCSV(csv)).toEqual({ cpi_pct: 5 });
+    });
+
+    it('returns an empty map for empty input', () => {
+        expect(parseConfigCSV('')).toEqual({});
+        expect(parseConfigCSV(null)).toEqual({});
+    });
+});
+
+describe('generateConfigCSV', () => {
+    it('emits only public params when public:true', () => {
+        const map = { cpi_pct: 5, dob: '1985-08-08', return_ra_pct: 10 };
+        const csv = generateConfigCSV(map, { public: true });
+        expect(csv).toMatch(/^param,cpi_pct,5,$/m);
+        expect(csv).toMatch(/^param,return_ra_pct,10,$/m);
+        expect(csv).not.toMatch(/dob/);
+    });
+
+    it('emits only private params when public:false', () => {
+        const map = { cpi_pct: 5, dob: '1985-08-08', return_ra_pct: 10 };
+        const csv = generateConfigCSV(map, { public: false });
+        expect(csv).toMatch(/^param,dob,1985-08-08,$/m);
+        expect(csv).not.toMatch(/cpi_pct/);
+        expect(csv).not.toMatch(/return_ra_pct/);
+    });
+
+    it('round-trips through parseConfigCSV', () => {
+        const map = { cpi_pct: 5, return_ra_pct: 10 };
+        const csv = generateConfigCSV(map, { public: true });
+        expect(parseConfigCSV(csv)).toEqual(map);
+    });
+
+    it('emits keys in a stable sorted order', () => {
+        const csv = generateConfigCSV(
+            { return_ra_pct: 10, cpi_pct: 5 },
+            { public: true },
+        );
+        const order = csv.trim().split('\n').map(l => l.split(',')[1]);
+        expect(order).toEqual(['cpi_pct', 'return_ra_pct']);
     });
 });
