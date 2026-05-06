@@ -1172,7 +1172,7 @@
             generateDebtCSV as _generateDebtCSV,
             taxYearLabel as _taxYearLabel,
             parseRaCSV as _parseRaCSV,
-            generateRaCSV as _generateRaCSV,
+            generateRaTransactionsCSV as _generateRaTransactionsCSV,
             calculatePotValueToday as _calculatePotValueToday,
             RETIREMENT_CONSTANTS as _RET_CONSTS,
             getDefaultRetirementParams as _getDefaultRetirementParams,
@@ -1419,17 +1419,14 @@
                 raPersist();
                 renderRa();
             });
-            const generateRaCSVFromState = () => _generateRaCSV({
-                transactions: raTransactions,
-                params: raParams,
-            });
+            const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions);
 
             function raPersist() {
-                debouncedSave('ra', generateRaCSVFromState, 'save-ra-csv');
+                debouncedSave('transactions_ra', generateRaCSVFromState, 'save-ra-csv');
             }
 
             document.getElementById('save-ra-csv').addEventListener('click', () => {
-                saveToServer('ra', generateRaCSVFromState, 'save-ra-csv');
+                saveToServer('transactions_ra', generateRaCSVFromState, 'save-ra-csv');
             });
 
             document.getElementById('load-ra-csv').addEventListener('click', () => {
@@ -1457,7 +1454,7 @@
             // Try to auto-load ra.csv if available
             (async () => {
                 try {
-                    const response = await fetch(dbPath('ra.csv'), { cache: 'no-store' });
+                    const response = await fetch(dbPath('transactions/ra.csv'), { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = _parseRaCSV(text);
@@ -1667,36 +1664,36 @@
             addDebtBtn.addEventListener('click', () => {
                 budgetData.debts.push({ id: generateId(), description: '', amount: '' });
                 renderBudget();
-                debouncedSave('budget', generateBudgetCSV, 'save-csv');
+                debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
             });
 
             addProvisionBtn.addEventListener('click', () => {
                 budgetData.provisions.push({ id: generateId(), description: '', amount: '', date: '' });
                 renderBudget();
-                debouncedSave('budget', generateBudgetCSV, 'save-csv');
+                debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
             });
 
             addFutureCostBtn.addEventListener('click', () => {
                 budgetData.futureCosts.push({ id: generateId(), description: '', amount: '', date: '' });
                 renderBudget();
-                debouncedSave('budget', generateBudgetCSV, 'save-csv');
+                debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
             });
 
             savingsInput.addEventListener('input', (e) => {
                 budgetData.savings = e.target.value;
                 calculateAndDisplaySummary();
-                debouncedSave('budget', generateBudgetCSV, 'save-csv');
+                debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
             });
 
             futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 
-            debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
-            provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
-            futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
+            debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+            provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+            futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
 
-            debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
-            provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
-            futureCostList.addEventListener('click', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('budget', generateBudgetCSV, 'save-csv'); });
+            debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+            provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+            futureCostList.addEventListener('click', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
 
             calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 
@@ -1704,7 +1701,7 @@
             const generateBudgetCSV = () => _generateBudgetCSV(budgetData);
 
             const loadBudgetCSVFromServer = async () => {
-                const response = await fetch(dbPath('calulator_data.csv'), { cache: 'no-store' });
+                const response = await fetch(dbPath('transactions/budget.csv'), { cache: 'no-store' });
                 if (!response.ok) throw new Error(`Failed to load CSV: ${response.status}`);
                 const text = await response.text();
                 budgetData = parseBudgetCSV(text);
@@ -1720,7 +1717,7 @@
                 renderBudget();
             };
 
-            const saveBudgetCSV = () => saveToServer('budget', generateBudgetCSV, 'save-csv');
+            const saveBudgetCSV = () => saveToServer('transactions_budget', generateBudgetCSV, 'save-csv');
 
             saveCsvBtn.addEventListener('click', saveBudgetCSV);
 
@@ -1959,7 +1956,7 @@
                 });
                 renderTransactions();
                 updatePerformanceDisplay();
-                debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
+                debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
             });
 
             transactionList.addEventListener('input', (e) => {
@@ -1988,7 +1985,7 @@
                 }
 
                 updatePerformanceDisplay();
-                debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
+                debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
             });
 
             transactionList.addEventListener('click', (e) => {
@@ -2000,7 +1997,7 @@
                         investmentData.transactions.splice(index, 1);
                         renderTransactions();
                         updatePerformanceDisplay();
-                        debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
+                        debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
                     }
                 }
             });
@@ -2012,7 +2009,7 @@
                     if (id === 'val-tfsa') investmentData.currentValues.TFSA = e.target.value;
                     if (id === 'val-crypto') investmentData.currentValues.Crypto = e.target.value;
                     updatePerformanceDisplay();
-                    debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
+                    debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
                 });
             });
 
@@ -2020,7 +2017,7 @@
                 const v = parseFloat(e.target.value);
                 investmentData.marginalRate = Number.isNaN(v) ? 0 : v;
                 updatePerformanceDisplay();
-                debouncedSave('investments', generateInvestmentCSV, 'save-inv-csv');
+                debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
             });
 
             // Investment CSV Handling
@@ -2030,7 +2027,7 @@
             // Try to auto-load investments.csv if available
             const loadInvestmentCSVFromServer = async () => {
                 try {
-                    const response = await fetch(dbPath('investments.csv'), { cache: 'no-store' });
+                    const response = await fetch(dbPath('transactions/investments.csv'), { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = parseInvestmentCSV(text);
@@ -2044,7 +2041,7 @@
                 }
             };
 
-            const saveInvestmentCSV = () => saveToServer('investments', generateInvestmentCSV, 'save-inv-csv');
+            const saveInvestmentCSV = () => saveToServer('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
 
             loadInvCsvBtn.addEventListener('click', async () => {
                 if (!window.showOpenFilePicker) return;
@@ -2258,7 +2255,7 @@
                     amount: ''
                 });
                 renderRepayments();
-                debouncedSave('debt', generateDebtCSV, null);
+                debouncedSave('transactions_debt', generateDebtCSV, null);
             });
 
             repaymentList.addEventListener('input', (e) => {
@@ -2274,7 +2271,7 @@
                 else if (target.classList.contains('date-input')) item.date = target.value;
 
                 calculateDebtProjection();
-                debouncedSave('debt', generateDebtCSV, null);
+                debouncedSave('transactions_debt', generateDebtCSV, null);
             });
 
             repaymentList.addEventListener('click', (e) => {
@@ -2285,7 +2282,7 @@
                     if (index > -1) {
                         debtData.repayments.splice(index, 1);
                         renderRepayments();
-                        debouncedSave('debt', generateDebtCSV, null);
+                        debouncedSave('transactions_debt', generateDebtCSV, null);
                     }
                 }
             });
@@ -2293,29 +2290,17 @@
             [debtAmountInput, debtCurrentBalanceInput, debtRepaymentInput, debtServiceFeeInput, debtInterestRateInput, debtNextPaymentInput, debtLoanStartInput, debtOriginalTermInput].forEach(input => {
                 input.addEventListener('input', (e) => {
                     calculateDebtProjection();
-                    debouncedSave('debt', generateDebtCSV, null);
+                    debouncedSave('transactions_debt', generateDebtCSV, null);
                 });
             });
 
             // CSV Handling
             const parseDebtCSV = (text) => _parseDebtCSV(text);
-            const generateDebtCSV = () => {
-                const params = {
-                    principal: debtAmountInput.value,
-                    current_balance: debtCurrentBalanceInput.value,
-                    repayment: debtRepaymentInput.value,
-                    service_fee: debtServiceFeeInput.value,
-                    interest_rate: debtInterestRateInput.value,
-                    next_payment: debtNextPaymentInput.value,
-                    loan_start: debtLoanStartInput.value,
-                    original_term: debtOriginalTermInput.value,
-                };
-                return _generateDebtCSV(debtData.repayments, params);
-            };
+            const generateDebtCSV = () => _generateDebtCSV(debtData.repayments);
 
             const loadDebtCSVFromServer = async () => {
                 try {
-                    const response = await fetch(dbPath('debt.csv'), { cache: 'no-store' });
+                    const response = await fetch(dbPath('transactions/debt.csv'), { cache: 'no-store' });
                     if (response.ok) {
                         const text = await response.text();
                         const parsed = parseDebtCSV(text);
@@ -2357,7 +2342,7 @@
                 }
             };
 
-            const saveDebtCSV = () => saveToServer('debt', generateDebtCSV, null);
+            const saveDebtCSV = () => saveToServer('transactions_debt', generateDebtCSV, null);
 
             loadDebtCsvBtn.addEventListener('click', async () => {
                 if (!window.showOpenFilePicker) return;
