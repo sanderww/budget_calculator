@@ -2098,6 +2098,10 @@
                     investmentData.transactions = parsed.transactions;
                     investmentData.currentValues = parsed.currentValues;
                     investmentData.marginalRate = (configMap.marginal_rate ?? parsed.marginalRate ?? 41);
+                    if (configMap.marginal_rate === undefined && parsed.marginalRate !== undefined) {
+                        configMap.marginal_rate = parsed.marginalRate;
+                        persistConfig();
+                    }
                     renderFullInvestmentUI();
                 } catch (err) {
                     console.error(err);
