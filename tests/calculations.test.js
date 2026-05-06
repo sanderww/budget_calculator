@@ -16,7 +16,7 @@ import {
     generateDebtCSV,
     taxYearLabel,
     parseRaCSV,
-    generateRaCSV,
+    generateRaTransactionsCSV,
     deriveAssumedFutureMonthly,
     calculateRaProjection,
     calculatePotValueToday,
@@ -32,7 +32,6 @@ import {
     raMonthlyIncome,
     projectLivingAnnuityDepletion,
     parseRetirementCSV,
-    generateRetirementCSV,
     getDefaultRetirementParams,
     calculateRetirementSnapshot,
     PUBLIC_PARAMS,
@@ -477,17 +476,7 @@ describe('CSV round-trips', () => {
             expect(parsed.transactions[0].date).toBe('2024-06-15');
         });
 
-        it('defaults marginalRate to 41 when no param row is present', () => {
-            const csv = [
-                'Date,Description,amount,account type,crypto_value',
-                '15-01-2025,Stock,2000,Discretionary,',
-                'current_value,Discretionary,2050,',
-            ].join('\n');
-            const r = parseInvestmentCSV(csv);
-            expect(r.marginalRate).toBe(41);
-        });
-
-        it('parses the marginal_rate param row when present', () => {
+        it('parseInvestmentCSV still reads a marginal_rate param row when present (legacy CSVs)', () => {
             const csv = [
                 'Date,Description,amount,account type,crypto_value',
                 '15-01-2025,Stock,2000,Discretionary,',
@@ -498,7 +487,16 @@ describe('CSV round-trips', () => {
             expect(r.marginalRate).toBe(36);
         });
 
-        it('does not treat a param row as a transaction', () => {
+        it('parseInvestmentCSV defaults marginalRate to 41 when no param row is present', () => {
+            const csv = [
+                'Date,Description,amount,account type,crypto_value',
+                '15-01-2025,Stock,2000,Discretionary,',
+                'current_value,Discretionary,2050,',
+            ].join('\n');
+            expect(parseInvestmentCSV(csv).marginalRate).toBe(41);
+        });
+
+        it('parseInvestmentCSV does not treat a param row as a transaction', () => {
             const csv = [
                 'Date,Description,amount,account type,crypto_value',
                 '15-01-2025,Stock,2000,Discretionary,',
@@ -509,60 +507,45 @@ describe('CSV round-trips', () => {
             expect(r.transactions[0].description).toBe('Stock');
         });
 
-        it('emits a marginal_rate param row using data.marginalRate', () => {
-            const data = {
-                transactions: [],
-                currentValues: { Discretionary: 0, TFSA: 0, Crypto: 0 },
-                marginalRate: 36,
-            };
-            const csv = generateInvestmentCSV(data);
-            expect(csv).toMatch(/^param,marginal_rate,36,$/m);
-        });
-
-        it('defaults to 41 when marginalRate is missing on data', () => {
-            const data = {
-                transactions: [],
-                currentValues: { Discretionary: 0, TFSA: 0, Crypto: 0 },
-            };
-            const csv = generateInvestmentCSV(data);
-            expect(csv).toMatch(/^param,marginal_rate,41,$/m);
-        });
-
-        it('round-trips marginalRate through generate -> parse', () => {
+        it('generateInvestmentCSV emits no param rows', () => {
             const data = {
                 transactions: [{ id: 'x', date: '2025-01-15', description: 'Stock', amount: 2000, type: 'Discretionary', cryptoValue: '' }],
                 currentValues: { Discretionary: 2050, TFSA: 0, Crypto: 0 },
                 marginalRate: 31,
             };
             const csv = generateInvestmentCSV(data);
-            const parsed = parseInvestmentCSV(csv);
-            expect(parsed.marginalRate).toBe(31);
+            expect(csv).not.toMatch(/^param,/m);
         });
     });
 
     describe('debt', () => {
-        it('round-trips debt repayments and params', () => {
+        it('round-trips debt repayments only (no param rows)', () => {
             const repayments = [{ id: 'x1', date: '2026-02-15', description: 'Bonus', amount: 5000 }];
-            const params = {
-                principal: '500000', current_balance: '450000', repayment: '4500',
-                service_fee: '69', interest_rate: '11.25', next_payment: '2026-02-25',
-                loan_start: '2020-01-01', original_term: '240',
-            };
-            const csv = generateDebtCSV(repayments, params);
+            const csv = generateDebtCSV(repayments);
             const parsed = parseDebtCSV(csv);
-            expect(parsed.params.principal).toBe('500000');
-            expect(parsed.params.interest_rate).toBe('11.25');
-            expect(parsed.params.original_term).toBe('240');
             expect(parsed.repayments).toHaveLength(1);
             expect(parsed.repayments[0].amount).toBe(5000);
             expect(parsed.repayments[0].description).toBe('Bonus');
+            expect(csv).not.toMatch(/^param,/m);
+        });
+
+        it('parseDebtCSV still reads param rows for legacy CSVs', () => {
+            const csv = [
+                'Date,Description,Amount',
+                'param,principal,500000',
+                'param,interest_rate,11.25',
+                '2026-02-15,Bonus,5000',
+            ].join('\n');
+            const parsed = parseDebtCSV(csv);
+            expect(parsed.params.principal).toBe('500000');
+            expect(parsed.params.interest_rate).toBe('11.25');
+            expect(parsed.repayments).toHaveLength(1);
         });
 
         it('handles empty repayments list', () => {
-            const csv = generateDebtCSV([], { principal: '100000', current_balance: '', repayment: '', service_fee: '', interest_rate: '', next_payment: '', loan_start: '', original_term: '' });
+            const csv = generateDebtCSV([]);
             const parsed = parseDebtCSV(csv);
             expect(parsed.repayments).toHaveLength(0);
-            expect(parsed.params.principal).toBe('100000');
         });
     });
 });
@@ -594,7 +577,7 @@ describe('smoke', () => {
         expect(typeof raMonthlyIncome).toBe('function');
         expect(typeof projectLivingAnnuityDepletion).toBe('function');
         expect(typeof parseRetirementCSV).toBe('function');
-        expect(typeof generateRetirementCSV).toBe('function');
+        expect(typeof generateRaTransactionsCSV).toBe('function');
         expect(typeof getDefaultRetirementParams).toBe('function');
         expect(typeof calculateRetirementSnapshot).toBe('function');
     });
@@ -660,39 +643,29 @@ param,tax_refund_rate_pct,41,
     });
 });
 
-describe('generateRaCSV', () => {
-    it('round-trips transactions and params', () => {
-        const data = {
-            transactions: [
-                { id: 'a', date: '2026-03-15', description: 'monthly repayment', amount: 5000 },
-                { id: 'b', date: '2026-04-15', description: 'monthly repayment', amount: 5000 },
-            ],
-            params: {
-                tax_refund_rate_pct: 41,
-                nominal_return_pct: 10,
-            },
-        };
-        const csv = generateRaCSV(data);
+describe('generateRaTransactionsCSV', () => {
+    it('round-trips transactions (transactions only, no params)', () => {
+        const transactions = [
+            { id: 'a', date: '2026-03-15', description: 'monthly repayment', amount: 5000 },
+            { id: 'b', date: '2026-04-15', description: 'monthly repayment', amount: 5000 },
+        ];
+        const csv = generateRaTransactionsCSV(transactions);
         const parsed = parseRaCSV(csv);
         expect(parsed.transactions).toHaveLength(2);
         expect(parsed.transactions[0].date).toBe('2026-03-15');
         expect(parsed.transactions[0].amount).toBe(5000);
-        expect(parsed.params.tax_refund_rate_pct).toBe(41);
-        expect(parsed.params.nominal_return_pct).toBe(10);
     });
 
-    it('does not write retired projection params even when supplied', () => {
-        const csv = generateRaCSV({
-            transactions: [],
-            params: {
-                tax_refund_rate_pct: 41,
-                nominal_return_pct: 10,
-                future_years_to_project: 10,
-                assumed_future_monthly: 6000,
-            },
-        });
-        expect(csv).not.toMatch(/future_years_to_project/);
-        expect(csv).not.toMatch(/assumed_future_monthly/);
+    it('emits no param rows', () => {
+        const csv = generateRaTransactionsCSV([
+            { id: 'a', date: '2026-03-15', description: 'monthly repayment', amount: 5000 },
+        ]);
+        expect(csv).not.toMatch(/^param,/m);
+    });
+
+    it('handles empty transactions list', () => {
+        const csv = generateRaTransactionsCSV([]);
+        expect(csv).toBe('');
     });
 });
 
@@ -1181,15 +1154,13 @@ describe('retirement CSV round-trip', () => {
     });
 
     it('round-trips param overrides', () => {
-        const data = {
-            ...getDefaultRetirementParams(),
-            retirement_age: 60,
-            cpi_pct: 6.5,
-            opt_dutch_enabled: 1,
-            ra_vested_balance: 250_000,
-            dob: '1990-01-15',
-        };
-        const csv = generateRetirementCSV(data);
+        const csv = [
+            'param,retirement_age,60,',
+            'param,cpi_pct,6.5,',
+            'param,opt_dutch_enabled,1,',
+            'param,ra_vested_balance,250000,',
+            'param,dob,1990-01-15,',
+        ].join('\n');
         const parsed = parseRetirementCSV(csv);
         expect(parsed.retirement_age).toBe(60);
         expect(parsed.cpi_pct).toBe(6.5);

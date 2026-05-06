@@ -354,10 +354,6 @@ export function generateInvestmentCSV(data) {
     Object.keys(data.currentValues).forEach(type => {
         csv += `current_value,${type},${data.currentValues[type]},\n`;
     });
-    const rate = (data.marginalRate === undefined || data.marginalRate === null || Number.isNaN(parseFloat(data.marginalRate)))
-        ? 41
-        : parseFloat(data.marginalRate);
-    csv += `param,marginal_rate,${rate},\n`;
     return csv;
 }
 
@@ -384,17 +380,9 @@ export function parseDebtCSV(text) {
     return { repayments, params };
 }
 
-export function generateDebtCSV(repayments, params) {
+export function generateDebtCSV(repayments) {
     let csv = 'Date,Description,Amount\n';
-    csv += `param,principal,${params.principal || ''}\n`;
-    csv += `param,current_balance,${params.current_balance || ''}\n`;
-    csv += `param,repayment,${params.repayment || ''}\n`;
-    csv += `param,service_fee,${params.service_fee || ''}\n`;
-    csv += `param,interest_rate,${params.interest_rate || ''}\n`;
-    csv += `param,next_payment,${params.next_payment || ''}\n`;
-    csv += `param,loan_start,${params.loan_start || ''}\n`;
-    csv += `param,original_term,${params.original_term || ''}\n`;
-    repayments.forEach(r => { csv += `${r.date},${r.description},${r.amount}\n`; });
+    (repayments || []).forEach(r => { csv += `${r.date},${r.description},${r.amount}\n`; });
     return csv;
 }
 
@@ -434,19 +422,11 @@ export function parseRaCSV(text) {
     return { transactions, params };
 }
 
-export function generateRaCSV(data) {
+export function generateRaTransactionsCSV(transactions) {
     let csv = '';
-    (data.transactions || []).forEach(t => {
+    (transactions || []).forEach(t => {
         csv += `${t.date},${t.description},${t.amount}\n`;
     });
-    const p = data.params || {};
-    const writeParam = (key) => {
-        if (p[key] !== undefined && p[key] !== null && p[key] !== '') {
-            csv += `param,${key},${p[key]},\n`;
-        }
-    };
-    writeParam('tax_refund_rate_pct');
-    writeParam('nominal_return_pct');
     return csv;
 }
 
@@ -888,15 +868,6 @@ export function parseRetirementCSV(text) {
         if (!Number.isNaN(v)) params[key] = v;
     });
     return params;
-}
-
-export function generateRetirementCSV(params) {
-    const p = { ...RETIREMENT_DEFAULT_PARAMS, ...(params || {}) };
-    let csv = '';
-    Object.keys(RETIREMENT_DEFAULT_PARAMS).forEach(key => {
-        csv += `param,${key},${p[key]},\n`;
-    });
-    return csv;
 }
 
 export function calculateRetirementSnapshot({
