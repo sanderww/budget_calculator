@@ -1,7 +1,10 @@
 # Ignore database CSV files
 db/*.csv
-db/backups/
+db/transactions/*.csv
 db/test/
+db/backups/
+!db/config.public.csv
+!db/examples/
 
 # MacOS
 .DS_Store
