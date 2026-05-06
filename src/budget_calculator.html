@@ -2364,6 +2364,7 @@
                             ['repayment',       debtRepaymentInput],
                             ['service_fee',     debtServiceFeeInput],
                             ['interest_rate',   debtInterestRateInput],
+                            ['next_payment',    debtNextPaymentInput],
                             ['loan_start',      debtLoanStartInput],
                             ['original_term',   debtOriginalTermInput],
                         ];
@@ -2372,8 +2373,8 @@
                             if (v !== undefined && v !== '') el.value = v;
                         });
 
-                        // Always use the upcoming 25th
-                        debtNextPaymentInput.value = getUpcoming25th();
+                        // Default to upcoming 25th only if no persisted value.
+                        if (!debtNextPaymentInput.value) debtNextPaymentInput.value = getUpcoming25th();
 
                         renderRepayments();
                     } else {
@@ -2419,6 +2420,7 @@
                         ['repayment',       debtRepaymentInput],
                         ['service_fee',     debtServiceFeeInput],
                         ['interest_rate',   debtInterestRateInput],
+                        ['next_payment',    debtNextPaymentInput],
                         ['loan_start',      debtLoanStartInput],
                         ['original_term',   debtOriginalTermInput],
                     ];
@@ -2431,8 +2433,8 @@
                     });
                     persistConfig();
 
-                    // Always use the upcoming 25th
-                    debtNextPaymentInput.value = getUpcoming25th();
+                    // Default to upcoming 25th only if no persisted value.
+                    if (!debtNextPaymentInput.value) debtNextPaymentInput.value = getUpcoming25th();
 
                     renderRepayments();
                 } catch (err) {
