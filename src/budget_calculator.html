@@ -2562,11 +2562,14 @@
                 testMode = !testMode;
                 updateTestModeUI();
                 try {
+                    await loadConfigFromServer();           // configMap first — tabs read it
                     await Promise.all([
                         loadBudgetCSVFromServer(),
                         loadInvestmentCSVFromServer(),
                         loadDebtCSVFromServer(),
+                        loadRaCSVFromServer(),
                     ]);
+                    loadRetirementFromConfig();             // synchronous — uses configMap
                 } catch (err) {
                     console.error('Test mode load failed, reverting:', err);
                     testMode = !testMode;
