@@ -35,8 +35,8 @@ import {
     getDefaultRetirementParams,
     calculateRetirementSnapshot,
     PUBLIC_PARAMS,
-    parseConfigCSV,
-    generateConfigCSV,
+    parseConfigJSON,
+    generateConfigJSON,
 } from '../src/calculations.js';
 
 describe('getUpcoming25th', () => {
@@ -1413,66 +1413,54 @@ describe('PUBLIC_PARAMS', () => {
     });
 });
 
-describe('parseConfigCSV', () => {
-    it('parses param rows into a flat map with numeric coercion', () => {
-        const csv = [
-            'param,return_ra_pct,10,',
-            'param,cpi_pct,5,',
-        ].join('\n');
-        const map = parseConfigCSV(csv);
-        expect(map).toEqual({ return_ra_pct: 10, cpi_pct: 5 });
+describe('parseConfigJSON', () => {
+    it('parses a flat JSON object into the same map', () => {
+        const json = '{"cpi_pct":5,"return_ra_pct":10}';
+        expect(parseConfigJSON(json)).toEqual({ cpi_pct: 5, return_ra_pct: 10 });
     });
 
-    it('preserves dob as a string (does not coerce to number)', () => {
-        const csv = 'param,dob,1985-08-08,';
-        expect(parseConfigCSV(csv)).toEqual({ dob: '1985-08-08' });
+    it('preserves string values (e.g. dob)', () => {
+        const json = '{"dob":"1985-08-08"}';
+        expect(parseConfigJSON(json)).toEqual({ dob: '1985-08-08' });
     });
 
-    it('ignores non-param rows and blank lines', () => {
-        const csv = [
-            'header,row,here',
-            '',
-            'param,cpi_pct,5,',
-            'random,thing,1',
-        ].join('\n');
-        expect(parseConfigCSV(csv)).toEqual({ cpi_pct: 5 });
-    });
-
-    it('returns an empty map for empty input', () => {
-        expect(parseConfigCSV('')).toEqual({});
-        expect(parseConfigCSV(null)).toEqual({});
+    it('returns an empty map for empty or malformed input', () => {
+        expect(parseConfigJSON('')).toEqual({});
+        expect(parseConfigJSON(null)).toEqual({});
+        expect(parseConfigJSON('not json')).toEqual({});
     });
 });
 
-describe('generateConfigCSV', () => {
+describe('generateConfigJSON', () => {
     it('emits only public params when public:true', () => {
         const map = { cpi_pct: 5, dob: '1985-08-08', return_ra_pct: 10 };
-        const csv = generateConfigCSV(map, { public: true });
-        expect(csv).toMatch(/^param,cpi_pct,5,$/m);
-        expect(csv).toMatch(/^param,return_ra_pct,10,$/m);
-        expect(csv).not.toMatch(/dob/);
+        const json = generateConfigJSON(map, { public: true });
+        expect(JSON.parse(json)).toEqual({ cpi_pct: 5, return_ra_pct: 10 });
     });
 
     it('emits only private params when public:false', () => {
         const map = { cpi_pct: 5, dob: '1985-08-08', return_ra_pct: 10 };
-        const csv = generateConfigCSV(map, { public: false });
-        expect(csv).toMatch(/^param,dob,1985-08-08,$/m);
-        expect(csv).not.toMatch(/cpi_pct/);
-        expect(csv).not.toMatch(/return_ra_pct/);
+        const json = generateConfigJSON(map, { public: false });
+        expect(JSON.parse(json)).toEqual({ dob: '1985-08-08' });
     });
 
-    it('round-trips through parseConfigCSV', () => {
+    it('round-trips through parseConfigJSON', () => {
         const map = { cpi_pct: 5, return_ra_pct: 10 };
-        const csv = generateConfigCSV(map, { public: true });
-        expect(parseConfigCSV(csv)).toEqual(map);
+        const json = generateConfigJSON(map, { public: true });
+        expect(parseConfigJSON(json)).toEqual(map);
     });
 
-    it('emits keys in a stable sorted order', () => {
-        const csv = generateConfigCSV(
+    it('emits keys in stable sorted order', () => {
+        const json = generateConfigJSON(
             { return_ra_pct: 10, cpi_pct: 5 },
             { public: true },
         );
-        const order = csv.trim().split('\n').map(l => l.split(',')[1]);
+        const order = Object.keys(JSON.parse(json));
         expect(order).toEqual(['cpi_pct', 'return_ra_pct']);
+    });
+
+    it('pretty-prints with 2-space indent', () => {
+        const json = generateConfigJSON({ cpi_pct: 5 }, { public: true });
+        expect(json).toBe('{\n  "cpi_pct": 5\n}');
     });
 });

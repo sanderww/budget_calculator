@@ -17,35 +17,24 @@ export const PUBLIC_PARAMS = new Set([
     'nominal_return_pct',
 ]);
 
-export function parseConfigCSV(text) {
-    const map = {};
-    const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');
-    rows.forEach(row => {
-        const cols = row.split(',').map(s => s.trim());
-        if (cols[0] !== 'param') return;
-        const key = cols[1];
-        const raw = cols[2];
-        if (!key || raw === undefined) return;
-        if (key === 'dob') {
-            map[key] = raw;
-            return;
-        }
-        const v = parseFloat(raw);
-        if (!Number.isNaN(v)) map[key] = v;
-    });
-    return map;
+export function parseConfigJSON(text) {
+    if (!text) return {};
+    try {
+        const parsed = JSON.parse(text);
+        return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+    } catch (_e) {
+        return {};
+    }
 }
 
-export function generateConfigCSV(map, opts) {
+export function generateConfigJSON(map, opts) {
     const wantPublic = !!(opts && opts.public);
     const keys = Object.keys(map || {})
         .filter(k => PUBLIC_PARAMS.has(k) === wantPublic)
         .sort();
-    let csv = '';
-    keys.forEach(k => {
-        csv += `param,${k},${map[k]},\n`;
-    });
-    return csv;
+    const filtered = {};
+    keys.forEach(k => { filtered[k] = map[k]; });
+    return JSON.stringify(filtered, null, 2);
 }
 
 export function getUpcoming25th(today = new Date()) {
