@@ -1179,8 +1179,8 @@
             parseRetirementCSV as _parseRetirementCSV,
             calculateRetirementSnapshot as _calculateRetirementSnapshot,
             tfsaLifetimeContributions as _tfsaLifetimeContributions,
-            parseConfigCSV as _parseConfigCSV,
-            generateConfigCSV as _generateConfigCSV,
+            parseConfigJSON as _parseConfigJSON,
+            generateConfigJSON as _generateConfigJSON,
             PUBLIC_PARAMS as _PUBLIC_PARAMS,
         } from './calculations.js';
 
@@ -1316,19 +1316,19 @@
 
             // --- SHARED CONFIG LAYER ---
             // Single source of truth for every param-style value. Loaded from
-            // db/config.public.csv + db/config.private.csv at startup and
+            // db/config.public.json + db/config.private.json at startup and
             // rewritten on any change.
             let configMap = {};
 
             const loadConfigFromServer = async () => {
                 try {
                     const [pubRes, privRes] = await Promise.all([
-                        fetch(dbPath('config.public.csv'), { cache: 'no-store' }),
-                        fetch(dbPath('config.private.csv'), { cache: 'no-store' }),
+                        fetch(dbPath('config.public.json'), { cache: 'no-store' }),
+                        fetch(dbPath('config.private.json'), { cache: 'no-store' }),
                     ]);
                     const pubText  = pubRes.ok  ? await pubRes.text()  : '';
                     const privText = privRes.ok ? await privRes.text() : '';
-                    configMap = { ..._parseConfigCSV(pubText), ..._parseConfigCSV(privText) };
+                    configMap = { ..._parseConfigJSON(pubText), ..._parseConfigJSON(privText) };
                 } catch (err) {
                     console.error('Failed to load config:', err);
                     configMap = {};
@@ -1337,10 +1337,10 @@
 
             const persistConfig = () => {
                 debouncedSave('config_public',
-                    () => _generateConfigCSV(configMap, { public: true }),
+                    () => _generateConfigJSON(configMap, { public: true }),
                     null);
                 debouncedSave('config_private',
-                    () => _generateConfigCSV(configMap, { public: false }),
+                    () => _generateConfigJSON(configMap, { public: false }),
                     null);
             };
 
@@ -2712,10 +2712,10 @@
                 document.getElementById('ret-save-csv').addEventListener('click', () => {
                     Object.keys(retirementParams).forEach(k => { configMap[k] = retirementParams[k]; });
                     saveToServer('config_public',
-                        () => _generateConfigCSV(configMap, { public: true }),
+                        () => _generateConfigJSON(configMap, { public: true }),
                         'ret-save-csv');
                     saveToServer('config_private',
-                        () => _generateConfigCSV(configMap, { public: false }),
+                        () => _generateConfigJSON(configMap, { public: false }),
                         null);
                 });
 
