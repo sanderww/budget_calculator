@@ -948,11 +948,36 @@
                                 </div>
 
                                 <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                                    <label class="text-xs text-slate-500">Nominal return (%)</label>
-                                    <input type="number" id="ra-return-rate" class="input-field text-sm font-bold" min="0" max="100" step="0.1" value="10">
-                                    <div class="text-xs text-slate-500 mt-2">Estimated pot value today:</div>
-                                    <div id="ra-pot-value" class="text-xl font-bold text-indigo-700">R 0</div>
-                                    <div class="text-[10px] text-slate-400 mt-1">monthly compounding</div>
+                                    <h3 class="font-semibold text-slate-700 mb-2">Performance</h3>
+                                    <div class="mb-2">
+                                        <label class="text-xs text-slate-500">Current fund value (R)</label>
+                                        <div class="relative">
+                                            <span class="currency-prefix text-xs">R</span>
+                                            <input type="number" id="ra-current-value" class="input-field amount-input text-sm font-bold" placeholder="0.00" min="0" step="0.01">
+                                        </div>
+                                    </div>
+                                    <div class="text-xs text-slate-500">Invested: <span id="ra-invested" class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="text-xs text-slate-500">Gain/Loss (R): <span id="ra-gain-money" class="font-medium text-slate-700">R 0.00</span></div>
+                                    <div class="flex justify-between items-end mt-2">
+                                        <div>
+                                            <div class="text-xs text-slate-500">Gain/Loss</div>
+                                            <div id="ra-gain" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                        <div class="text-right">
+                                            <div class="text-xs text-slate-500">Annualized</div>
+                                            <div id="ra-ann" class="font-bold text-slate-800">0.00%</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-2 pt-2 border-t border-slate-200 space-y-0.5">
+                                        <div class="flex justify-between text-xs text-slate-400">
+                                            <span>6% savings would be</span>
+                                            <span id="ra-savings-gain">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between text-xs text-slate-400">
+                                            <span>Net vs savings</span>
+                                            <span id="ra-net-savings" class="font-medium">R 0.00</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1351,6 +1376,9 @@
 
             // --- RA STATE ---
             let raTransactions = [];
+            // Actual current fund value reported by the user (from RA statement).
+            // `undefined` means not entered → fall back to the contributions-based estimate.
+            let raCurrentValue;
             let raParams = {
                 tax_refund_rate_pct: 41,
                 nominal_return_pct: 10,
@@ -1358,10 +1386,55 @@
 
             const raMakeId = () => 'ra_' + Math.random().toString(36).slice(2, 9);
             const raFmtZARShort = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA');
+            const raFmtZAR = (n) => `R ${(parseFloat(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+            function updateRaPerformanceDisplay() {
+                const cv = (raCurrentValue !== undefined && raCurrentValue !== null && raCurrentValue !== '')
+                    ? Number(raCurrentValue) || 0
+                    : 0;
+                const r = _calculateInvestmentPerformance(raTransactions, cv, new Date(), 0);
+
+                document.getElementById('ra-invested').textContent = raFmtZAR(r.totalInvested);
+
+                const gainEl     = document.getElementById('ra-gain');
+                const annEl      = document.getElementById('ra-ann');
+                const moneyEl    = document.getElementById('ra-gain-money');
+                const savingsEl  = document.getElementById('ra-savings-gain');
+                const netEl      = document.getElementById('ra-net-savings');
+
+                if (r.totalInvested === 0) {
+                    gainEl.textContent = '0.00%';   gainEl.className = 'font-bold text-slate-800';
+                    annEl.textContent  = '0.00%';   annEl.className  = 'font-bold text-slate-800';
+                    moneyEl.textContent = 'R 0.00'; moneyEl.className = 'font-bold text-slate-800';
+                    savingsEl.textContent = 'R 0.00';
+                    netEl.textContent     = 'R 0.00';
+                    netEl.className       = 'font-medium text-slate-800';
+                    return;
+                }
+
+                gainEl.textContent = `${r.percentageReturn >= 0 ? '+' : ''}${r.percentageReturn.toFixed(2)}%`;
+                gainEl.className   = `font-bold ${r.percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                moneyEl.textContent = `${r.absoluteReturn >= 0 ? '+' : ''}${raFmtZAR(r.absoluteReturn)}`;
+                moneyEl.className   = `font-bold ${r.absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+
+                savingsEl.textContent = `+${raFmtZAR(r.savingsGain)}`;
+
+                netEl.textContent = `${r.netVsSavings >= 0 ? '+' : ''}${raFmtZAR(r.netVsSavings)}`;
+                netEl.className   = `font-bold ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
+
+                if (r.annualizedReturn === null) {
+                    annEl.textContent = 'N/A';
+                    annEl.className   = 'font-bold text-slate-400';
+                } else {
+                    annEl.textContent = `${r.annualizedReturn >= 0 ? '+' : ''}${r.annualizedReturn.toFixed(2)}%`;
+                    annEl.className   = `font-bold ${r.annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
+                }
+            }
 
             function renderRa() {
                 document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
-                document.getElementById('ra-return-rate').value      = raParams.nominal_return_pct;
+                document.getElementById('ra-current-value').value    = (raCurrentValue ?? '');
 
                 const total = raTransactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
                 document.getElementById('ra-total-contributed').textContent = raFmtZARShort(total);
@@ -1385,7 +1458,7 @@
                 const RA_DEDUCTIBLE_CAP = 350000;
                 const expectedCurrentYearRefund = Math.min(currentYearTotal, RA_DEDUCTIBLE_CAP) * (raParams.tax_refund_rate_pct / 100);
                 document.getElementById('ra-current-year-refund').textContent = raFmtZARShort(expectedCurrentYearRefund);
-                document.getElementById('ra-pot-value').textContent       = raFmtZARShort(_calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today));
+                updateRaPerformanceDisplay();
 
                 const yearTotals = new Map();
                 raTransactions.forEach(t => {
@@ -1451,12 +1524,19 @@
                 setConfig('tax_refund_rate_pct', raParams.tax_refund_rate_pct);
                 renderRa();
             });
-            document.getElementById('ra-return-rate').addEventListener('input', (e) => {
-                raParams.nominal_return_pct = parseFloat(e.target.value) || 0;
-                setConfig('nominal_return_pct', raParams.nominal_return_pct);
-                renderRa();
+            document.getElementById('ra-current-value').addEventListener('input', (e) => {
+                const raw = e.target.value;
+                if (raw === '') {
+                    raCurrentValue = undefined;
+                } else {
+                    const v = parseFloat(raw);
+                    raCurrentValue = Number.isNaN(v) ? undefined : v;
+                }
+                raPersist();
+                updateRaPerformanceDisplay();
+                if (typeof renderRetirement === 'function') renderRetirement();
             });
-            const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions);
+            const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions, raCurrentValue);
 
             function raPersist() {
                 debouncedSave('transactions_ra', generateRaCSVFromState, 'save-ra-csv');
@@ -1477,6 +1557,7 @@
                     reader.onload = (ev) => {
                         const parsed = _parseRaCSV(ev.target.result);
                         raTransactions = parsed.transactions;
+                        raCurrentValue = parsed.currentValue;
                         raParams = {
                             tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? parsed.params.tax_refund_rate_pct ?? 41,
                             nominal_return_pct:  configMap.nominal_return_pct  ?? parsed.params.nominal_return_pct  ?? 10,
@@ -1508,12 +1589,15 @@
                         const text = await response.text();
                         const parsed = _parseRaCSV(text);
                         raTransactions = parsed.transactions;
+                        raCurrentValue = parsed.currentValue;
                     } else {
                         raTransactions = [];
+                        raCurrentValue = undefined;
                     }
                 } catch (err) {
                     console.error('Failed to load RA transactions:', err);
                     raTransactions = [];
+                    raCurrentValue = undefined;
                 }
                 raParams = {
                     tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? 41,
@@ -2618,11 +2702,20 @@
             };
 
             // Returns the RA pot today (live read from RA tab state).
-            const retRaPotToday = () => _calculatePotValueToday(
-                raTransactions || [],
-                (raParams && raParams.nominal_return_pct) || retirementParams.return_ra_pct,
-                new Date()
-            );
+            // Prefer the user-entered actual fund value (real situation). Fall back to the
+            // contributions × nominal-return estimate when no actual value has been entered.
+            const retRaPotToday = () => {
+                if (raCurrentValue !== undefined && raCurrentValue !== null && raCurrentValue !== '') {
+                    return Number(raCurrentValue) || 0;
+                }
+                return _calculatePotValueToday(
+                    raTransactions || [],
+                    (raParams && raParams.nominal_return_pct) || retirementParams.return_ra_pct,
+                    new Date()
+                );
+            };
+            const retRaPotTodayIsActual = () =>
+                (raCurrentValue !== undefined && raCurrentValue !== null && raCurrentValue !== '');
 
             // Sum of last-12-months RA contributions for deduction-cap headroom display.
             const retRaAnnualLast12 = () => {
@@ -2964,11 +3057,12 @@
                     <h2 class="text-xl font-semibold text-slate-800 mb-4">RA pot at retirement</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                            <div class="text-xs text-slate-500 uppercase tracking-wider">Today (live from RA tab)</div>
+                            <div class="text-xs text-slate-500 uppercase tracking-wider">${retRaPotTodayIsActual() ? 'Today (actual fund value from RA tab)' : 'Today (estimated from contributions × return)'}</div>
                             <div class="text-xl font-bold text-slate-800">${retFmtZAR(raPotTodayValue)}</div>
                             <div class="text-xs text-slate-500 mt-1">Vested: ${retFmtZAR(ra.vestedToday)}</div>
                             <div class="text-xs text-slate-500">Savings: ${retFmtZAR(ra.savingsToday)}</div>
                             <div class="text-xs text-slate-500">Retirement: ${retFmtZAR(ra.retirementToday)}</div>
+                            ${retRaPotTodayIsActual() ? '' : '<div class="text-[10px] text-slate-400 mt-1">Set a current fund value on the RA tab to use the real situation.</div>'}
                         </div>
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
                             <div class="text-xs text-slate-500 uppercase tracking-wider">At retirement age ${retirementParams.retirement_age}</div>

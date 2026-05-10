@@ -209,19 +209,19 @@ A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
    - Editable **Tax refund rate (%)** input (default 41) and the **expected refund for the current tax year** computed as `min(current_year_contributions, R 350,000) × refund_rate`. Caption: "based on actual contributions to date; deductible capped at R 350,000". When any tax year's bucketed contributions exceed R 350,000, a "cap hit in some year" amber pill appears beneath the value.
-   - Editable **Nominal return (%)** input (default 10) and the estimated pot value today.
+   - **Performance** column (mirrors the Investments tab's per-fund layout): editable **Current fund value (R)** input (the actual statement balance — also the authoritative figure downstream consumers like the Retirement tab use as the projection starting point), then **Invested**, **Gain/Loss (R)**, **Gain/Loss %**, **Annualized %**, **6% savings would be**, and **Net vs savings** — all derived from `calculateInvestmentPerformance(raTransactions, raCurrentValue, today, marginalRate=0)` (CGT is not modelled for RA; pass `marginalRate=0` so no tax-adjusted rows are shown). When `totalInvested === 0`, all metrics render as muted zeros.
 2. **Contributions** — list of contribution rows (date, description, amount, delete button). Sorted by date descending. A `+ Add` button appends a new row defaulting to today's date and `"monthly repayment"` description.
 
 ### 4.2 Persistence
 
 - Auto-saves on any change (debounced 800ms) via POST to `/api/save/transactions_ra` and `/api/save/config_private` (or their `test_` prefixed variants in test mode).
 - Auto-loads `db/transactions/ra.csv` (or `db/test/transactions/ra.csv`) for contribution rows on page open; loads `db/config.private.json` (or `db/test/config.private.json`) for RA settings (`tax_refund_rate_pct`) and `db/config.public.json` (or `db/test/config.public.json`) for shared params (`nominal_return_pct`).
-- RA contribution transactions are stored in `db/transactions/ra.csv`. RA settings are stored as keys in the appropriate config file (a flat JSON object), not inline with the transaction rows.
+- RA contribution transactions are stored in `db/transactions/ra.csv`. The actual current fund value is also stored in that file as a single `current_value,RA,<amount>,` row (mirroring the Investments tab pattern); when the input is blank, the row is omitted on save. RA settings (`tax_refund_rate_pct`, `nominal_return_pct`) are stored as keys in the appropriate config file (a flat JSON object), not inline with the transaction rows.
 
 ### 4.3 Defaults (first run, no saved file)
 
 - `tax_refund_rate_pct = 41`
-- `nominal_return_pct = 10`
+- `nominal_return_pct = 10` — no longer surfaced in the RA tab UI but kept in `db/config.public.json` so the Retirement tab's `retRaPotToday()` fallback (used only when no actual RA current fund value has been entered) can still compound contributions forward at a sensible rate.
 
 ---
 
@@ -302,7 +302,7 @@ Table with one row per source: Discretionary, TFSA (with cap note), Crypto, 1/3 
 
 **Card 3 — RA Pot at Retirement**
 
-Two side-by-side panels: "Today (live from RA tab)" and "At retirement age X", each with a vested / savings / retirement breakdown. Below: pre-retirement savings-pot withdrawal totals (when applicable), 1/3 commutation gross/tax/net, monthly drawdown gross/net, and the living-annuity depletion warning when applicable.
+Two side-by-side panels: a "today" panel and "At retirement age X", each with a vested / savings / retirement breakdown. The today-panel header dynamically reads "Today (actual fund value from RA tab)" when the user has entered a current fund value on the RA tab, or "Today (estimated from contributions × return)" otherwise. When estimated, a muted hint suggests entering the actual value on the RA tab to anchor the projection on the real situation. Below the panels: pre-retirement savings-pot withdrawal totals (when applicable), 1/3 commutation gross/tax/net, monthly drawdown gross/net, and the living-annuity depletion warning when applicable.
 
 **Card 4 — Assumptions** (collapsible `<details>`, default closed)
 
@@ -328,7 +328,7 @@ Read-only key/value table summarising all in-effect assumptions: returns per fun
 
 - `investmentData.currentValues.{Discretionary,TFSA,Crypto}` → seed lump-sum and TFSA growth.
 - `investmentData.transactions.filter(t => t.type === 'TFSA')` → lifetime contributions and current-tax-year contributions for the cap math.
-- `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` → RA pot today.
+- RA pot today: prefer the user-entered actual fund value (`raCurrentValue`, parsed from the `current_value,RA,<amount>,` row in `db/transactions/ra.csv`); fall back to `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` only when no actual value has been entered. The chosen value seeds every RA projection (at retirement, age 55, age 68) so the projection is anchored on the real situation when available.
 - `raTransactions` → contributions in the last 12 months for the deduction-cap headroom display.
 
 All reads happen at render time; the Retirement tab never mutates other tabs' state.
