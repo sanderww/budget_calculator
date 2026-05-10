@@ -1,5 +1,7 @@
 # Config / Transactions Split — Design
 
+> Superseded by `docs/specs/2026-05-10-json-configs-design.md` for the JSON conversion. The `config.public.csv` / `config.private.csv` and `param,key,value,` references below predate that change.
+
 **Date:** 2026-05-06
 **Branch:** dev
 **Status:** approved, pending implementation plan

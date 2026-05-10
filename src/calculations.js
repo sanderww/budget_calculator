@@ -1,4 +1,4 @@
-// Internal helper used by CSV parsers (not exported)
+// Internal id helper used by CSV row parsers
 const _generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
 export const PUBLIC_PARAMS = new Set([
