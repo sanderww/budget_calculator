@@ -641,6 +641,29 @@ param,tax_refund_rate_pct,41,
         expect(result.transactions).toHaveLength(1);
         expect(result.params.tax_refund_rate_pct).toBe(41);
     });
+
+    it('parses an actual current_value row', () => {
+        const csv = `2026-03-15,monthly repayment,5000
+current_value,RA,750000,
+`;
+        const result = parseRaCSV(csv);
+        expect(result.transactions).toHaveLength(1);
+        expect(result.currentValue).toBe(750000);
+    });
+
+    it('returns undefined currentValue when no row is present', () => {
+        const csv = `2026-03-15,monthly repayment,5000
+`;
+        const result = parseRaCSV(csv);
+        expect(result.currentValue).toBeUndefined();
+    });
+
+    it('preserves a zero current_value distinct from missing', () => {
+        const csv = `current_value,RA,0,
+`;
+        const result = parseRaCSV(csv);
+        expect(result.currentValue).toBe(0);
+    });
 });
 
 describe('generateRaTransactionsCSV', () => {
@@ -666,6 +689,34 @@ describe('generateRaTransactionsCSV', () => {
     it('handles empty transactions list', () => {
         const csv = generateRaTransactionsCSV([]);
         expect(csv).toBe('');
+    });
+
+    it('emits a current_value row when provided', () => {
+        const csv = generateRaTransactionsCSV(
+            [{ id: 'a', date: '2026-03-15', description: 'monthly repayment', amount: 5000 }],
+            750000,
+        );
+        expect(csv).toMatch(/^current_value,RA,750000,$/m);
+        const parsed = parseRaCSV(csv);
+        expect(parsed.transactions).toHaveLength(1);
+        expect(parsed.currentValue).toBe(750000);
+    });
+
+    it('omits the current_value row when undefined', () => {
+        const csv = generateRaTransactionsCSV(
+            [{ id: 'a', date: '2026-03-15', description: 'monthly repayment', amount: 5000 }],
+        );
+        expect(csv).not.toMatch(/^current_value,/m);
+    });
+
+    it('omits the current_value row when blank string', () => {
+        const csv = generateRaTransactionsCSV([], '');
+        expect(csv).toBe('');
+    });
+
+    it('emits a current_value of 0 when explicitly set', () => {
+        const csv = generateRaTransactionsCSV([], 0);
+        expect(csv).toMatch(/^current_value,RA,0,$/m);
     });
 });
 

@@ -391,11 +391,17 @@ export function parseRaCSV(text) {
     const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');
     const transactions = [];
     const params = {};
+    let currentValue;
     rows.forEach(row => {
         const cols = row.split(',').map(s => s.trim());
         if (cols[0] === 'param') {
             const v = parseFloat(cols[2]);
             if (!Number.isNaN(v)) params[cols[1]] = v;
+            return;
+        }
+        if (cols[0] === 'current_value' && cols[1] === 'RA') {
+            const v = parseFloat(cols[2]);
+            if (!Number.isNaN(v)) currentValue = v;
             return;
         }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(cols[0])) return;
@@ -408,14 +414,18 @@ export function parseRaCSV(text) {
             amount,
         });
     });
-    return { transactions, params };
+    return { transactions, params, currentValue };
 }
 
-export function generateRaTransactionsCSV(transactions) {
+export function generateRaTransactionsCSV(transactions, currentValue) {
     let csv = '';
     (transactions || []).forEach(t => {
         csv += `${t.date},${t.description},${t.amount}\n`;
     });
+    if (currentValue !== undefined && currentValue !== null && currentValue !== '') {
+        const v = Number(currentValue);
+        if (!Number.isNaN(v)) csv += `current_value,RA,${v},\n`;
+    }
     return csv;
 }
 

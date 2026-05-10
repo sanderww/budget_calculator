@@ -312,13 +312,14 @@ Result is the annualized yield (as a decimal, e.g. 0.12 = 12%).
 
 ### 4.1 Goal
 
-Track contributions to a South African Retirement Annuity, estimate the expected refund for the current tax year (based on actuals to date), and surface the deductible refund per past tax year.
+Track contributions to a South African Retirement Annuity, hold the actual current fund value reported on the user's RA statement, estimate the expected refund for the current tax year (based on actuals to date), and surface the deductible refund per past tax year.
 
 ### 4.2 Domain Concepts
 
 | Concept | Definition |
 |---|---|
 | **Contribution** | A single deposit into the RA. Has a date, description (default: "monthly repayment"), and ZAR amount. |
+| **Current fund value** | The actual ZAR balance of the RA pot, taken from the user's latest RA statement. Stored as a `current_value,RA,<amount>,` row in `db/transactions/ra.csv` (mirroring the Investments tab pattern). Optional — when absent, downstream consumers fall back to the contributions-based estimate. |
 | **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. |
 | **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
@@ -338,16 +339,24 @@ The expected-refund figure is based on actual contributions to date only (no fut
 
 Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 350,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
 
-### 4.5 Estimated Pot Value Today
+### 4.5 Performance Metrics
 
-Sums each contribution forward to today using monthly compounding:
+The RA Summary card mirrors the Investments tab's per-fund performance layout, taking the user-entered **Current fund value** and the contribution history and computing:
 
-```
-r_m = (1 + Nominal Return / 100) ^ (1/12) − 1
-Pot Today = Σ amount × (1 + r_m) ^ months_between(contribution_date, today)
-```
+| Metric | Definition |
+|---|---|
+| **Invested** | `Σ contribution_amount` (sum of all contribution rows). |
+| **Gain/Loss (R)** | `current_value − invested`. |
+| **Gain/Loss %** | `(current_value − invested) / invested × 100`. |
+| **Annualized %** | CAGR over the contribution-weighted average holding period: `(current_value / invested)^(1 / years_held) − 1`. Returns `N/A` when fewer than ~0.1 years of holding history exists. |
+| **6% savings would be** | Hypothetical gain if each contribution had instead earned 6% p.a. with daily compounding from its date to today. |
+| **Net vs savings** | `Gain/Loss − (6% savings)`. |
 
-Future-dated contributions are treated as having grown 0 months.
+All formulas come from the shared `calculateInvestmentPerformance` helper (the same one used by the Investments tab); for RA it is invoked with `marginalRate=0` because RA withdrawals are taxed via the lump-sum / income-tax tables, not CGT, so the tax-adjusted "after tax" rows are not rendered.
+
+### 4.6 Pot-Value Estimate (legacy, internal only)
+
+The contributions × nominal-return estimate (`r_m = (1 + Nominal Return / 100)^(1/12) − 1; Pot = Σ amount × (1 + r_m)^months_between(date, today)`) is no longer surfaced in the RA tab UI. It is still computed inside the Retirement module as a fallback for `retRaPotToday()` when the user has not entered an actual current fund value; in that fallback path, future-dated contributions are treated as having grown 0 months.
 
 ---
 
@@ -516,7 +525,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R25 | TFSA cap is enforced when "TFSA contributions" is enabled: annual R 46,000 (current tax year + future March-start years) and lifetime R 500,000. |
 | R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
 | R27 | Retirement settings persist as keys in `db/config.public.json` (generic modelling assumptions such as `withdrawal_rate_pct`, `cpi_pct`) and `db/config.private.json` (personal data and personal assumptions such as `dob`, `retirement_age`, `effective_tax_rate_pct`, scenario toggles). There is no separate `db/retirement.csv`. |
-| R28 | Retirement tab reads RA pot today live from RA tab state via `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` — where `raTransactions` come from `db/transactions/ra.csv` — and reads TFSA / Discretionary / Crypto current values from the Investments tab — no shared state mutation. |
+| R28 | Retirement tab reads RA pot today live from RA tab state, preferring the user-entered actual fund value (the `current_value,RA,<amount>,` row in `db/transactions/ra.csv`); when no actual value is set, it falls back to `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)`. TFSA / Discretionary / Crypto current values are read from the Investments tab. No shared state mutation. |
 | R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |
 | R30 | Dutch pension start age (`opt_dutch_age`, default 68) and monthly EUR amount (`opt_dutch_eur_monthly`, default 900) are user-configurable in the retirement sidebar, persisted in `db/config.private.json`, and applied throughout the snapshot — including the "Age D" snapshot column header and the "From age D" monthly-income phase title. |
 | R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. |
