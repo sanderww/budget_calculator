@@ -1,9 +1,10 @@
-# Ignore database CSV files
+# Ignore database CSV/JSON files
 db/*.csv
+db/*.json
 db/transactions/*.csv
 db/test/
 db/backups/
-!db/config.public.csv
+!db/config.public.json
 !db/examples/
 
 # MacOS
