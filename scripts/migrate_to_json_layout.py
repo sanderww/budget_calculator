@@ -136,16 +136,22 @@ def migrate(db_dir: Path) -> None:
     (db_dir / 'config.public.json').write_text(_emit_config(public))
     (db_dir / 'config.private.json').write_text(_emit_config(private))
 
-    def _write_tx(rel, rows):
-        body = '\n'.join(rows)
+    def _write_tx(rel, rows, header=''):
+        body_rows = ([header] if header and rows else []) + rows
+        body = '\n'.join(body_rows)
         if body:
             body += '\n'
         (db_dir / rel).write_text(body)
 
+    # Headers must match what the JS parsers expect (parseBudgetCSV /
+    # parseInvestmentCSV blindly slice(1)). RA has no header by convention.
     _write_tx('transactions/ra.csv', _transactions_from(ra))
-    _write_tx('transactions/investments.csv', _transactions_from(investments))
-    _write_tx('transactions/debt.csv', _transactions_from(debt))
-    _write_tx('transactions/budget.csv', _transactions_from(budget_legacy))
+    _write_tx('transactions/investments.csv', _transactions_from(investments),
+              header='Date,Description,amount,account type,crypto_value')
+    _write_tx('transactions/debt.csv', _transactions_from(debt),
+              header='Date,Description,Amount')
+    _write_tx('transactions/budget.csv', _transactions_from(budget_legacy),
+              header='type,description,amount,date')
 
     print(f'Migrated to {db_dir}/:')
     print(f'  config.public.json:  {len(public)} params')

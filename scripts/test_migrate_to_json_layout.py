@@ -115,6 +115,17 @@ class MigrationTests(unittest.TestCase):
         self.assertIn('2026-02-15,Bonus,5000',
                       self._read('transactions/debt.csv'))
 
+        # Headers are emitted on transaction files whose JS parser slices(1).
+        # RA's parser is content-tolerant and the example file has no header.
+        self.assertTrue(self._read('transactions/budget.csv').startswith(
+            'type,description,amount,date\n'))
+        self.assertTrue(self._read('transactions/investments.csv').startswith(
+            'Date,Description,amount,account type,crypto_value\n'))
+        self.assertTrue(self._read('transactions/debt.csv').startswith(
+            'Date,Description,Amount\n'))
+        self.assertFalse(self._read('transactions/ra.csv').startswith(
+            'Date,'))
+
         # Param rows must NOT leak into transaction files
         for rel in ('transactions/ra.csv', 'transactions/investments.csv',
                     'transactions/debt.csv', 'transactions/budget.csv'):
