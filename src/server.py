@@ -8,14 +8,14 @@ FILE_MAP = {
     'transactions_ra':               'db/transactions/ra.csv',
     'transactions_investments':      'db/transactions/investments.csv',
     'transactions_debt':             'db/transactions/debt.csv',
-    'config_public':                 'db/config.public.csv',
-    'config_private':                'db/config.private.csv',
+    'config_public':                 'db/config.public.json',
+    'config_private':                'db/config.private.json',
     'test_transactions_budget':      'db/test/transactions/budget.csv',
     'test_transactions_ra':          'db/test/transactions/ra.csv',
     'test_transactions_investments': 'db/test/transactions/investments.csv',
     'test_transactions_debt':        'db/test/transactions/debt.csv',
-    'test_config_public':            'db/test/config.public.csv',
-    'test_config_private':           'db/test/config.private.csv',
+    'test_config_public':            'db/test/config.public.json',
+    'test_config_private':           'db/test/config.private.json',
 }
 REAL_KEYS = {
     'transactions_budget',
@@ -33,7 +33,8 @@ def backup_file(filepath, name):
         return
     os.makedirs(BACKUP_DIR, exist_ok=True)
     ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-    backup_path = os.path.join(BACKUP_DIR, f'{name}_{ts}.csv')
+    ext = os.path.splitext(filepath)[1] or '.bin'
+    backup_path = os.path.join(BACKUP_DIR, f'{name}_{ts}{ext}')
     shutil.copy2(filepath, backup_path)
 
 class Handler(http.server.SimpleHTTPRequestHandler):
