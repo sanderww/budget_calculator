@@ -508,19 +508,19 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R17 | RA tax year runs 1 March → 28/29 February; bucketing label is `YYYY/YY` (e.g. `2026/27`). |
 | R18 | RA per-tax-year deductible is capped at R 350,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
 | R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 350,000) × refund_rate`. No future projection is performed. |
-| R20 | RA settings (refund rate) are persisted as `param,<key>,<value>,` rows in `db/config.private.csv`; RA contribution transactions are stored in `db/transactions/ra.csv`. The public param `nominal_return_pct` lives in `db/config.public.csv`. |
+| R20 | RA settings (refund rate) are persisted as keys in `db/config.private.json` (a flat JSON object); RA contribution transactions are stored in `db/transactions/ra.csv`. The public param `nominal_return_pct` lives in `db/config.public.json`. |
 | R21 | Retirement two-pot split: post-Sep-2024 RA balance is split 33% savings / 67% retirement; pre-Sep-2024 balance is "vested" and grows passively. |
 | R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. |
 | R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
 | R24 | Retirement lump-sum tax follows the 2026/27 retirement table; first R 550,000 is tax-free. |
 | R25 | TFSA cap is enforced when "TFSA contributions" is enabled: annual R 46,000 (current tax year + future March-start years) and lifetime R 500,000. |
 | R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
-| R27 | Retirement settings persist as `param,<key>,<value>,` rows split across `db/config.public.csv` (generic modelling assumptions such as `withdrawal_rate_pct`, `cpi_pct`) and `db/config.private.csv` (personal data and personal assumptions such as `dob`, `retirement_age`, `effective_tax_rate_pct`, scenario toggles). There is no separate `db/retirement.csv`. |
+| R27 | Retirement settings persist as keys in `db/config.public.json` (generic modelling assumptions such as `withdrawal_rate_pct`, `cpi_pct`) and `db/config.private.json` (personal data and personal assumptions such as `dob`, `retirement_age`, `effective_tax_rate_pct`, scenario toggles). There is no separate `db/retirement.csv`. |
 | R28 | Retirement tab reads RA pot today live from RA tab state via `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)` — where `raTransactions` come from `db/transactions/ra.csv` — and reads TFSA / Discretionary / Crypto current values from the Investments tab — no shared state mutation. |
 | R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |
-| R30 | Dutch pension start age (`opt_dutch_age`, default 68) and monthly EUR amount (`opt_dutch_eur_monthly`, default 900) are user-configurable in the retirement sidebar, persisted in `db/config.private.csv`, and applied throughout the snapshot — including the "Age D" snapshot column header and the "From age D" monthly-income phase title. |
+| R30 | Dutch pension start age (`opt_dutch_age`, default 68) and monthly EUR amount (`opt_dutch_eur_monthly`, default 900) are user-configurable in the retirement sidebar, persisted in `db/config.private.json`, and applied throughout the snapshot — including the "Age D" snapshot column header and the "From age D" monthly-income phase title. |
 | R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. |
-| R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar; `life_expectancy` and `lump_sum_drawdown_return_pct` are public params persisted in `db/config.public.csv`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |
+| R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar; `life_expectancy` and `lump_sum_drawdown_return_pct` are public params persisted in `db/config.public.json`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |
 
 ---
 
@@ -531,9 +531,9 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 Live data lives under `db/`:
 
 - `db/transactions/{budget,ra,investments,debt}.csv` — date-stamped rows and `current_value` snapshots. All gitignored.
-- `db/config.public.csv` — generic modelling assumptions (return rates, CPI, withdrawal rate, etc.). Tracked in git.
-- `db/config.private.csv` — personal data (DOB, balances) and personal assumptions (tax rates, scenario toggles). Gitignored.
+- `db/config.public.json` — generic modelling assumptions (return rates, CPI, withdrawal rate, etc.). Tracked in git.
+- `db/config.private.json` — personal data (DOB, balances) and personal assumptions (tax rates, scenario toggles). Gitignored.
 
 Test mode mirrors the same layout under `db/test/`. Sample seed data lives under `db/examples/`.
 
-The visibility allowlist that decides which params go to `config.public.csv` vs `config.private.csv` lives in `src/calculations.js` as `PUBLIC_PARAMS`.
+The visibility allowlist that decides which params go to `config.public.json` vs `config.private.json` lives in `src/calculations.js` as `PUBLIC_PARAMS`.

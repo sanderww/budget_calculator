@@ -102,7 +102,7 @@ Each account displays:
 
 For the **Discretionary** account specifically (only):
 
-- **Marginal tax rate (%)** — editable numeric input below Current Value. Default `41`. Range `0..100`, step `1`. Persisted in `db/config.private.csv` as a `param,marginal_rate,...` row.
+- **Marginal tax rate (%)** — editable numeric input below Current Value. Default `41`. Range `0..100`, step `1`. Persisted in `db/config.private.json` as the key `marginal_rate`.
 - **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown.
 - **Net vs savings (after tax)** — `Net vs Savings − Estimated Tax`. Green when ≥ 0, red when < 0.
 
@@ -204,7 +204,7 @@ Newton-Raphson method to find the internal rate of return:
 
 ### 4.1 Layout
 
-A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` and `db/config.private.csv`) and a main area with two cards:
+A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` and `db/config.private.json`) and a main area with two cards:
 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
@@ -215,8 +215,8 @@ A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` 
 ### 4.2 Persistence
 
 - Auto-saves on any change (debounced 800ms) via POST to `/api/save/transactions_ra` and `/api/save/config_private` (or their `test_` prefixed variants in test mode).
-- Auto-loads `db/transactions/ra.csv` (or `db/test/transactions/ra.csv`) for contribution rows on page open; loads `db/config.private.csv` (or `db/test/config.private.csv`) for RA settings (`tax_refund_rate_pct`) and `db/config.public.csv` for shared params (`nominal_return_pct`).
-- RA contribution transactions are stored in `db/transactions/ra.csv`. RA settings are stored as `param,<key>,<value>,` rows in the appropriate config file (public or private), not inline with the transaction rows.
+- Auto-loads `db/transactions/ra.csv` (or `db/test/transactions/ra.csv`) for contribution rows on page open; loads `db/config.private.json` (or `db/test/config.private.json`) for RA settings (`tax_refund_rate_pct`) and `db/config.public.json` (or `db/test/config.public.json`) for shared params (`nominal_return_pct`).
+- RA contribution transactions are stored in `db/transactions/ra.csv`. RA settings are stored as keys in the appropriate config file (a flat JSON object), not inline with the transaction rows.
 
 ### 4.3 Defaults (first run, no saved file)
 
@@ -272,7 +272,7 @@ Each scenario has a checkbox + inline inputs (only enabled when checkbox is chec
 
 **Persistence**
 - Load Retirement / Save Retirement buttons hit `/api/save/config_public` and `/api/save/config_private` (or their `test_` prefixed variants in test mode), and on every input change a debounced save (800 ms) fires.
-- On page load the tab loads `db/config.public.csv` and `db/config.private.csv` (merged into a single param map) and falls back to defaults silently when a file is missing.
+- On page load the tab loads `db/config.public.json` and `db/config.private.json` (merged into a single param map) and falls back to defaults silently when a file is missing.
 
 ### 5.3 Cards
 
@@ -322,7 +322,7 @@ Read-only key/value table summarising all in-effect assumptions: returns per fun
 - Savings-pot withdrawal below R 2,000 → inline validation hint (does not block input).
 - Extra RA monthly × 12 > R 430,000 → soft "above SARS deduction cap" hint.
 - Bond balance > total lump sum → total displays in red with an explanatory note.
-- Missing `db/config.public.csv` or `db/config.private.csv` → all retirement settings fall back to defaults silently.
+- Missing `db/config.public.json` or `db/config.private.json` → all retirement settings fall back to defaults silently.
 
 ### 5.5 Data reads from other tabs
 
@@ -377,32 +377,38 @@ current_value,<account_type>,<amount>,
 ```
 - Transaction dates stored in `DD-MM-YYYY` format in CSV, converted to `YYYY-MM-DD` internally.
 - `current_value` rows store per-account current values (Discretionary, TFSA, Crypto).
-- The `param,marginal_rate,...` row is no longer emitted here; `marginal_rate` is stored in `db/config.private.csv`.
+- `marginal_rate` is no longer emitted here; it is stored in `db/config.private.json`.
 
 **Debt transactions** (`db/transactions/debt.csv`):
 ```
 Date,Description,Amount
 <date>,<description>,<amount>
 ```
-- Header row only; one data row per extra repayment. All debt loan parameters (`principal`, `current_balance`, `repayment`, `service_fee`, `interest_rate`, `next_payment`, `loan_start`, `original_term`) are stored in `db/config.private.csv`.
+- Header row only; one data row per extra repayment. All debt loan parameters (`principal`, `current_balance`, `repayment`, `service_fee`, `interest_rate`, `next_payment`, `loan_start`, `original_term`) are stored in `db/config.private.json`.
 
 **RA transactions** (`db/transactions/ra.csv`):
 ```
 <YYYY-MM-DD>,<description>,<amount>
 ```
-- No header row. Each row is a contribution. RA settings (`tax_refund_rate_pct`) are stored in `db/config.private.csv`; the shared param `nominal_return_pct` lives in `db/config.public.csv`.
+- No header row. Each row is a contribution. RA settings (`tax_refund_rate_pct`) are stored in `db/config.private.json`; the shared param `nominal_return_pct` lives in `db/config.public.json`.
 - Legacy `future_years_to_project` and `assumed_future_monthly` param rows in older saves are silently ignored on load and dropped on the next save.
 - Defaults applied when a param row is missing: refund rate 41, return rate 10.
 
-**Public config** (`db/config.public.csv`):
+**Public config** (`db/config.public.json`) — flat JSON object:
 ```
-param,<key>,<value>,
+{
+  "<key>": <value>,
+  ...
+}
 ```
 - Contains 13 generic modelling assumptions (return rates, CPI, withdrawal rate, life expectancy, etc.) that are safe to track in git. The full list is defined by `PUBLIC_PARAMS` in `src/calculations.js`.
 
-**Private config** (`db/config.private.csv`):
+**Private config** (`db/config.private.json`) — flat JSON object:
 ```
-param,<key>,<value>,
+{
+  "<key>": <value>,
+  ...
+}
 ```
 - Contains personal data (DOB, balances), personal assumptions (marginal rate, tax rates), loan parameters, and all scenario toggles. Gitignored.
 
@@ -429,7 +435,7 @@ param,<key>,<value>,
 - Toggle button in the header switches between real data and sample data.
 - When enabled:
   - "SAMPLE DATA" label is displayed.
-  - All CSV reads/writes use `db/test/` directory instead of `db/`, mirroring the same layout (`db/test/transactions/`, `db/test/config.public.csv`, `db/test/config.private.csv`).
+  - All reads/writes use `db/test/` directory instead of `db/`, mirroring the same layout (`db/test/transactions/`, `db/test/config.public.json`, `db/test/config.private.json`).
   - Save keys are prefixed with `test_` (e.g., `test_transactions_budget`, `test_config_private`).
   - Server blocks writes to real data keys when `X-Test-Mode: true` header is present.
 - Toggling reloads all datasets from the appropriate directory — transaction files for every domain plus both config files — so every tab reflects the test data without a page refresh.
