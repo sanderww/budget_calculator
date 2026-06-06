@@ -38,25 +38,22 @@ A single-page web application for personal financial management with six modules
 
 ### 1.5 Financial Summary
 
-Calculated in real time whenever any input changes:
+Right-column sidebar card. Calculated in real time whenever any input changes. Displays only three values plus the future-date picker. The Monthly Money Allocation controls (§1.6) live as a compact subsection inside this same card, below the three values.
 
-- **Current Net Amount** = Savings - Total Debts - Total Provisions
+- **Current Savings** — the savings input value (R), formatted.
+- **Net savings now** = Current Savings − Total Debts − Total Provisions
+  - Underlying value is identical to the previous "Current Net Amount"; only the visible label changes.
   - Displayed green when >= 0, red when < 0.
-- **Future Net Amount** = Current Net Amount - sum of Future Costs whose date <= selected future date
-  - A date picker selects the target date (defaults to 1 year from today).
+- **Net savings on [selected date]** = Net savings now − sum of Future Costs whose date <= selected date
+  - Underlying value is identical to the previous "Future Net Amount"; only the visible label changes.
   - Displayed indigo when >= 0, red when < 0.
-- **Breakdown** showing:
-  - Total Savings
-  - Total Debts
-  - Total Provisions
-  - Total Future Costs (all, regardless of date)
-- **Monthly Savings Target**: the monthly amount needed to reach the Future Net Amount by the selected date.
-  - Calculation: divides the shortfall by the number of months remaining (days / 30, minimum 1 month).
-  - Shows R 0.00 if the future net amount is already positive and >= current net amount.
+- **Future-date picker** — selects the planning date. Defaults to 1 year from today on first load.
+
+The "Breakdown" subsection (Total Savings / Total Debts / Total Provisions / Total Future Costs rows) and the visible "Monthly Savings Needed" row are no longer rendered in the sidebar. The monthly savings target value is still computed by `calculateBudgetSummary` and consumed by §1.6 Monthly Money Allocation; it is just not displayed in the sidebar.
 
 ### 1.6 Monthly Money Allocation
 
-Splits available end-of-month money across investment categories:
+Compact subsection inside the right-column Financial Summary card (no longer a standalone card in the main column). Splits available end-of-month money across investment categories:
 
 - **Inputs**:
   - Available Money at End of Month (R)
@@ -73,6 +70,33 @@ Splits available end-of-month money across investment categories:
   - EFT amount = (Available - Savings Target) * EFT%
   - Crypto amount = (Available - Savings Target) * Crypto%
   - Total Allocated = Savings + Mortgage + EFT + Crypto
+
+### 1.7 Timeline Overview Chart
+
+Full-width card at the bottom of the budget tab. Read-only overview chart, rendered with ApexCharts loaded from CDN. Refreshes whenever the budget summary recalculates (savings input, debt/provision/future-cost edits, future-date change, data load).
+
+**Time window:**
+- X-axis runs from `today` to the user's selected "Future Net Amount by" date (the §1.5 future-date picker).
+- If the future date is missing or in the past, the card shows a short placeholder instead of a chart.
+- If no future cost has a date inside `[today, future-date]`, the card shows a different placeholder (e.g. "Add a future cost with a date inside the planning window to see the timeline.").
+
+**Visual elements** (see core-requirements §1.6 for semantics). Single x-axis with a **single y-axis**:
+
+Single y-axis "Amount (R)":
+- Indigo column bars per in-window future cost (one per dated entry inside `[today, future-date]`).
+- Green savings-trajectory line starting at `(today, Current Savings)`, sloping up by the chart-derived `Required Monthly Savings`, stepping down at each in-window cost, and extending out to `future-date`.
+- Slate dashed line for `Total Debts + Total Provisions` ("floor"), drawn as a regular line series (not an ApexCharts annotation) so it is always visible alongside the trajectory.
+
+**Planned monthly savings override:** numeric input above the chart (id `budget-timeline-planned-savings`), defaulting to the chart-derived `Required Monthly Savings`. Changes fire a handler that re-renders only the chart; the value is **not persisted** anywhere. The savings-trajectory line is drawn at this planned rate (not the required rate), and if the line's lowest point falls below the floor it switches from green to red so the deficit is visible. The headline above the chart still reports the required rate.
+
+X-axis is datetime. Legend at bottom centre. Headline above the chart in plain language: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.`
+
+**Interaction**:
+- Pan and zoom via the chart toolbar (zoom in/out, pan, reset). Selection and image download are disabled.
+- Custom tooltip on bars shows the future-cost description, date, and amount.
+- The user-adjusted time window is not persisted (resets on reload).
+
+**Data source**: pure series-builder `buildBudgetTimelineSeries` in `src/chart_budget_timeline.js`. It does not consume `calculateBudgetSummary` outputs — it derives `requiredMonthlySavings` independently from `savings`, `totalDebts`, `totalProvisions`, `futureCosts`, and `futureDate`.
 
 ---
 
@@ -208,7 +232,7 @@ A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` 
 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
-   - Editable **Tax refund rate (%)** input (default 41) and the **expected refund for the current tax year** computed as `min(current_year_contributions, R 350,000) × refund_rate`. Caption: "based on actual contributions to date; deductible capped at R 350,000". When any tax year's bucketed contributions exceed R 350,000, a "cap hit in some year" amber pill appears beneath the value.
+   - Editable **Tax refund rate (%)** input (default 41) and the **expected refund for the current tax year** computed as `min(current_year_contributions, R 430,000) × refund_rate`. Caption: "based on actual contributions to date; deductible capped at R 430,000". When any tax year's bucketed contributions exceed R 430,000, a "cap hit in some year" amber pill appears beneath the value.
    - **Performance** column (mirrors the Investments tab's per-fund layout): editable **Current fund value (R)** input (the actual statement balance — also the authoritative figure downstream consumers like the Retirement tab use as the projection starting point), then **Invested**, **Gain/Loss (R)**, **Gain/Loss %**, **Annualized %**, **6% savings would be**, and **Net vs savings** — all derived from `calculateInvestmentPerformance(raTransactions, raCurrentValue, today, marginalRate=0)` (CGT is not modelled for RA; pass `marginalRate=0` so no tax-adjusted rows are shown). When `totalInvested === 0`, all metrics render as muted zeros.
 2. **Contributions** — list of contribution rows (date, description, amount, delete button). Sorted by date descending. A `+ Add` button appends a new row defaulting to today's date and `"monthly repayment"` description.
 
@@ -263,7 +287,7 @@ Three sections separated by dividers:
 Each scenario has a checkbox + inline inputs (only enabled when checkbox is checked):
 
 1. Dutch pension: **Start age** (default 68), **EUR / month** (default 900), and **EUR/ZAR rate** (default 20). All three editable when the checkbox is enabled. The monthly figure flowing into the snapshot is `opt_dutch_eur_monthly × opt_dutch_eur_zar`.
-2. TFSA contributions: no extra inputs; annual R 46,000 enforced; lifetime cap auto-checked from Investments transactions.
+2. Max TFSA contributions: no extra inputs. On top of the current TFSA value, assumes the holder tops up to the annual R 46,000 limit every tax year (from 1 March) until the R 500,000 lifetime cap is reached; lifetime cap auto-checked from Investments transactions. (Checkbox labelled "Max TFSA contributions".)
 3. Extra RA monthly: amount R/mo; soft warning when × 12 > R 430,000 deduction cap.
 4. House sale: ZAR value input.
 5. Inheritance: EUR amount, converted at the Dutch EUR/ZAR rate.

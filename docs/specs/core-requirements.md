@@ -102,6 +102,44 @@ Leftover        = Available Money − Total Allocated
 - At least one percentage must be greater than 0%.
 - Available money must exceed the monthly savings target (otherwise there is nothing to allocate).
 
+### 1.6 Timeline Overview Chart
+
+A read-only visualisation at the bottom of the budget tab that answers: "what monthly savings rate do I need so my running balance stays at or above the debts + provisions floor at every in-window future cost, and how does the cumulative savings need grow toward my selected future date?"
+
+**Time window:**
+- X-axis runs from `today → user's selected "Future Net Amount by" date` (the §1.3 `future-date` input).
+- If `future-date` is missing or in the past, the chart card shows a short placeholder.
+- If no future cost has a date inside `[today, future-date]`, a different placeholder is shown.
+
+**Required monthly savings (chart-derived):**
+
+```
+floor = Total Debts + Total Provisions
+in-window costs = future costs with today ≤ cost.date ≤ future-date
+
+For each in-window cost i (and for the future-date endpoint), let
+  t_i      = months between today and this point
+  cum_i    = sum of in-window cost amounts with date ≤ this point
+  needed_i = max(0, (cum_i + floor − Current Savings) / t_i)
+
+Required Monthly Savings = max over all such i of needed_i
+```
+
+This rate is the smallest constant monthly contribution that keeps the running savings balance at or above the floor at every in-window cost date AND at `future-date`. It is computed by the chart and does **not** override §1.4's `Monthly Savings Target` — the two answer different questions.
+
+**Planned monthly savings override:** there is a numeric input above the chart labelled "Monthly savings (test)". It is initialised to `Required Monthly Savings` and is **not persisted** — it only affects the chart. The savings-trajectory line is drawn using this input value (the *effective* monthly rate), not necessarily the required rate. When the line's lowest point dips below the floor (i.e. the chosen rate is too low), the trajectory turns from green to red, making the deficit visible. The headline always reports the *required* rate, so the user can see the gap between what they planned and what the data demands.
+
+**Series shown (single x-axis, single y-axis):**
+
+Single y-axis "Amount (R)":
+- **Future-cost bars** — indigo columns, one per in-window future cost entry, plotted at its date with its amount.
+- **Savings trajectory** — green piecewise-linear line starting at `(today, Current Savings)`, sloping up by `Required Monthly Savings` per month, stepping down by each cost amount on that cost's date, and extending past the last cost out to `future-date`. By construction it just touches the floor at the binding constraint and stays at or above it elsewhere.
+- **Debts + provisions floor** — slate dashed flat line at `Total Debts + Total Provisions`, drawn as a real line series (not an ApexCharts annotation). The per-row dates on debts and provisions are ignored.
+
+**Headline:** above the chart, in plain words: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.`
+
+**Interaction:** pan/zoom enabled via the chart toolbar; the adjusted window is **not** persisted.
+
 ---
 
 ## 2. Investment Tracker Module
@@ -323,21 +361,21 @@ Track contributions to a South African Retirement Annuity, hold the actual curre
 | **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. |
 | **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
-| **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 350,000**. |
+| **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 430,000**. |
 
 ### 4.3 Total Contributed and Expected Refund (Current Tax Year)
 
 ```
 Total Contributed = sum of all contribution amounts
 Current Year Total = sum of contributions whose date falls in the current SA tax year
-Expected Refund (current tax year) = MIN(Current Year Total, R 350,000) × (Refund Rate / 100)
+Expected Refund (current tax year) = MIN(Current Year Total, R 430,000) × (Refund Rate / 100)
 ```
 
-The expected-refund figure is based on actual contributions to date only (no future projection). When `Current Year Total > R 350,000`, a `capHit` warning is shown.
+The expected-refund figure is based on actual contributions to date only (no future projection). When `Current Year Total > R 430,000`, a `capHit` warning is shown.
 
 ### 4.4 Cap-Hit Detection
 
-Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 350,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
+Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 430,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
 
 ### 4.5 Performance Metrics
 
@@ -515,20 +553,20 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R15 | History is grouped by calendar year, sorted ascending, with a totals row. |
 | R16 | All calculations update in real time on any data change (no manual "calculate" step required, except for monthly allocation which is triggered explicitly). |
 | R17 | RA tax year runs 1 March → 28/29 February; bucketing label is `YYYY/YY` (e.g. `2026/27`). |
-| R18 | RA per-tax-year deductible is capped at R 350,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
-| R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 350,000) × refund_rate`. No future projection is performed. |
+| R18 | RA per-tax-year deductible is capped at R 430,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
+| R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 430,000) × refund_rate`. No future projection is performed. |
 | R20 | RA settings (refund rate) are persisted as keys in `db/config.private.json` (a flat JSON object); RA contribution transactions are stored in `db/transactions/ra.csv`. The public param `nominal_return_pct` lives in `db/config.public.json`. |
 | R21 | Retirement two-pot split: post-Sep-2024 RA balance is split 33% savings / 67% retirement; pre-Sep-2024 balance is "vested" and grows passively. |
-| R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. |
+| R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. The same rule applies at age 55 — when the RA pot at 55 is below R 360,000 (and no 1/3 commutation is otherwise taken), the full pot net of lump-sum tax is added to the Age-55 lump sum, an amber note explains monthly RA drawdown is N/A, and `snapshot.lumpSum.ra55IsDeMinimis` is set. |
 | R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
 | R24 | Retirement lump-sum tax follows the 2026/27 retirement table; first R 550,000 is tax-free. |
-| R25 | TFSA cap is enforced when "TFSA contributions" is enabled: annual R 46,000 (current tax year + future March-start years) and lifetime R 500,000. |
+| R25 | TFSA cap is enforced when "Max TFSA contributions" is enabled: on top of the current TFSA value, top up to annual R 46,000 (current tax year + future March-start years) until the lifetime R 500,000 cap is reached. |
 | R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
 | R27 | Retirement settings persist as keys in `db/config.public.json` (generic modelling assumptions such as `withdrawal_rate_pct`, `cpi_pct`) and `db/config.private.json` (personal data and personal assumptions such as `dob`, `retirement_age`, `effective_tax_rate_pct`, scenario toggles). There is no separate `db/retirement.csv`. |
-| R28 | Retirement tab reads RA pot today live from RA tab state, preferring the user-entered actual fund value (the `current_value,RA,<amount>,` row in `db/transactions/ra.csv`); when no actual value is set, it falls back to `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)`. TFSA / Discretionary / Crypto current values are read from the Investments tab. No shared state mutation. |
+| R28 | Retirement tab reads RA pot today live from RA tab state, preferring the user-entered actual fund value (the `current_value,RA,<amount>,` row in `db/transactions/ra.csv`); when no actual value is set, it falls back to `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)`. TFSA / Discretionary / Crypto current values are read from the Investments tab; editing any of these current-value inputs re-renders the retirement snapshot live (no tab switch required). No shared state mutation. |
 | R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |
 | R30 | Dutch pension start age (`opt_dutch_age`, default 68) and monthly EUR amount (`opt_dutch_eur_monthly`, default 900) are user-configurable in the retirement sidebar, persisted in `db/config.private.json`, and applied throughout the snapshot — including the "Age D" snapshot column header and the "From age D" monthly-income phase title. |
-| R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. |
+| R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. These flags persist in `db/config.private.json` and are restored to the checkboxes on load. The "Max TFSA contributions" toggle (`opt_tfsa_enabled`) is dependent on TFSA inclusion: enabling it auto-enables `opt_include_tfsa`, and disabling `opt_include_tfsa` auto-disables `opt_tfsa_enabled`. |
 | R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar; `life_expectancy` and `lump_sum_drawdown_return_pct` are public params persisted in `db/config.public.json`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |
 
 ---

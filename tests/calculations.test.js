@@ -754,7 +754,7 @@ describe('deriveAssumedFutureMonthly', () => {
 
 describe('calculateRaProjection', () => {
     const rate = 41;
-    const cap = 350000;
+    const cap = 430000;
 
     it('returns empty rows when no transactions and no future projection', () => {
         const today = new Date('2026-04-29');
@@ -790,18 +790,18 @@ describe('calculateRaProjection', () => {
         expect(past.capHit).toBe(false);
     });
 
-    it('caps deductible at R350k and flags capHit', () => {
+    it('caps deductible at R430k and flags capHit', () => {
         const today = new Date('2027-04-29');
         const result = calculateRaProjection({
             transactions: [
-                { date: '2025-06-15', amount: 400000 },
+                { date: '2025-06-15', amount: 500000 },
             ],
             taxRefundRatePct: rate,
             assumedFutureMonthly: 0,
             futureYearsToProject: 0,
         }, today);
         const past = result.rows.find(r => r.taxYear === '2025/26');
-        expect(past.contributions).toBe(400000);
+        expect(past.contributions).toBe(500000);
         expect(past.deductible).toBe(cap);
         expect(past.refund).toBe(cap * 0.41);
         expect(past.capHit).toBe(true);

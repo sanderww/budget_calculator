@@ -79,6 +79,12 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                 return src_path
         return result
 
-with socketserver.TCPServer(("", PORT), Handler) as httpd:
+class Server(socketserver.TCPServer):
+    # Set SO_REUSEADDR so a quick stop/start (e.g. `make restart`) can rebind the
+    # port immediately instead of failing with "Address already in use" while the
+    # previous socket lingers in TIME_WAIT.
+    allow_reuse_address = True
+
+with Server(("", PORT), Handler) as httpd:
     print(f"Budget Calculator running on http://localhost:{PORT}")
     httpd.serve_forever()
