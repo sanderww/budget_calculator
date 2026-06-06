@@ -980,6 +980,15 @@ export function calculateRetirementSnapshot({
     const commutation55 = raCommutationLumpSum(raAt55.total, commute);
     const commutationRet = raCommutationLumpSum(raAtRetirement.total, commute);
 
+    // De minimis at 55: when the RA pot at 55 is below R360k the law requires full commutation
+    // regardless of the ra_commute_third flag. Show the net full-pot lump sum so the snapshot
+    // reflects the money that is actually accessible, not zero.
+    const ra55DeMinimis = raAt55.total > 0 && raAt55.total < RETIREMENT_CONSTANTS.DE_MINIMIS
+        && commutation55.net === 0;
+    const commutation55Net = ra55DeMinimis
+        ? Math.max(0, raAt55.total - lumpSumTax(raAt55.total))
+        : commutation55.net;
+
     // Lump-sum totals
     const projectedFundsAtRet =
         liquidAtRet.discretionary + liquidAtRet.tfsa + liquidAtRet.crypto
@@ -989,15 +998,16 @@ export function calculateRetirementSnapshot({
         - bondPayoff;
     const projectedFunds55 =
         liquid55.discretionary + liquid55.tfsa + liquid55.crypto
-        + commutation55.net
+        + commutation55Net
         + raAt55.savingsPotWithdrawnNet
         + houseSale + inheritanceZar
         - bondPayoff;
     const currentFunds55 =
-        liquid55.discretionary + liquid55.tfsaCurrent + liquid55.crypto;
+        liquid55.discretionary + liquid55.tfsaCurrent + liquid55.crypto
+        + (ra55DeMinimis ? commutation55Net : 0);
     const projectedFunds68 =
         liquid68.discretionary + liquid68.tfsa + liquid68.crypto
-        + commutation55.net  // commutation taken at 55
+        + commutation55Net  // commutation taken at 55
         + raAt55.savingsPotWithdrawnNet
         + houseSale + inheritanceZar
         - bondPayoff;
@@ -1095,6 +1105,7 @@ export function calculateRetirementSnapshot({
             atRetirement: deflate(projectedFundsAtRet, yearsToRet),
             houseSale, inheritanceZar, bondPayoff,
             ra55Commutation: commutation55,
+            ra55IsDeMinimis: ra55DeMinimis,
             raCommutationAtRetirement: commutationRet,
         },
         monthly: {

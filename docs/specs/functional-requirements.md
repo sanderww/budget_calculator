@@ -287,7 +287,7 @@ Three sections separated by dividers:
 Each scenario has a checkbox + inline inputs (only enabled when checkbox is checked):
 
 1. Dutch pension: **Start age** (default 68), **EUR / month** (default 900), and **EUR/ZAR rate** (default 20). All three editable when the checkbox is enabled. The monthly figure flowing into the snapshot is `opt_dutch_eur_monthly × opt_dutch_eur_zar`.
-2. TFSA contributions: no extra inputs; annual R 46,000 enforced; lifetime cap auto-checked from Investments transactions.
+2. Max TFSA contributions: no extra inputs. On top of the current TFSA value, assumes the holder tops up to the annual R 46,000 limit every tax year (from 1 March) until the R 500,000 lifetime cap is reached; lifetime cap auto-checked from Investments transactions. (Checkbox labelled "Max TFSA contributions".)
 3. Extra RA monthly: amount R/mo; soft warning when × 12 > R 430,000 deduction cap.
 4. House sale: ZAR value input.
 5. Inheritance: EUR amount, converted at the Dutch EUR/ZAR rate.

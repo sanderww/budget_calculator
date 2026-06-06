@@ -1079,7 +1079,8 @@
                                     </div>
                                 </div>
 
-                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-tfsa" class="rounded"> TFSA contributions (R46k/yr)</label>
+                                <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-tfsa" class="rounded"> Max TFSA contributions</label>
+                                <div class="ml-5 text-[10px] text-slate-400 mt-1">On top of your current TFSA value, assumes you top up to the annual TFSA limit every tax year (from 1 March) until the R500k lifetime cap is reached.</div>
 
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-3"><input type="checkbox" id="ret-opt-ra-monthly" class="rounded"> Extra RA monthly</label>
                                 <div class="ml-5 mt-1">
@@ -2132,6 +2133,8 @@
                     if (id === 'val-tfsa') investmentData.currentValues.TFSA = e.target.value;
                     if (id === 'val-crypto') investmentData.currentValues.Crypto = e.target.value;
                     updatePerformanceDisplay();
+                    // Retirement projection reads these current values live — keep it in sync.
+                    if (typeof renderRetirement === 'function') renderRetirement();
                     debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
                 });
             });
@@ -2781,6 +2784,18 @@
                     const evt = (type === 'checkbox') ? 'change' : 'input';
                     el.addEventListener(evt, () => {
                         retirementParams[key] = retReadInput(el, type);
+                        // Enabling TFSA contributions implies including TFSA in the projection.
+                        if (id === 'ret-opt-tfsa' && retirementParams.opt_tfsa_enabled && !retirementParams.opt_include_tfsa) {
+                            retirementParams.opt_include_tfsa = 1;
+                            const incEl = document.getElementById('ret-include-tfsa');
+                            if (incEl) incEl.checked = true;
+                        }
+                        // Excluding TFSA from projection disables its contribution projection too.
+                        if (id === 'ret-include-tfsa' && !retirementParams.opt_include_tfsa && retirementParams.opt_tfsa_enabled) {
+                            retirementParams.opt_tfsa_enabled = 0;
+                            const contribEl = document.getElementById('ret-opt-tfsa');
+                            if (contribEl) contribEl.checked = false;
+                        }
                         retPersist();
                         renderRetirement();
                     });
@@ -2882,7 +2897,10 @@
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.lumpSum.projected68, snap.lumpSum.projected68)}</div>
 
                         <div class="text-xs text-slate-600 self-center">Monthly income (net)</div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.monthly.current55.net, snap.monthly.projected55.net)}</div>
+                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            ${cell(snap.monthly.current55.net, snap.monthly.projected55.net)}
+                            ${snap.lumpSum.ra55IsDeMinimis ? `<div class="text-[10px] text-amber-700 mt-1">RA pot below R360k at 55 — full pot shown as lump sum above; monthly RA drawdown N/A.</div>` : ''}
+                        </div>
                         <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.monthly.projected68.net, snap.monthly.projected68.net)}</div>
 
                         <div class="text-xs text-slate-600 self-center">Monthly from lump sum<div class="text-[10px] text-slate-400">PMT to age ${snap.monthly.lifeExpectancy} @ ${snap.monthly.lumpSumDrawdownReturnPct}%</div></div>
