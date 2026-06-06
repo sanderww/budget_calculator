@@ -14,5 +14,10 @@ db/backups/
 server.log
 .server.pid
 
+# Dependencies, build artifacts, and transfer bundles
+node_modules/
+__pycache__/
+*.bundle
+
 # ignore to_do.md
 to_do.md
