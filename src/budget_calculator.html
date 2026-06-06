@@ -943,7 +943,7 @@
                                     <input type="number" id="ra-refund-rate" class="input-field text-sm font-bold" min="0" max="100" step="0.1" value="41">
                                     <div class="text-xs text-slate-500 mt-2">Expected refund (current tax year):</div>
                                     <div id="ra-current-year-refund" class="text-xl font-bold text-green-700">R 0</div>
-                                    <div class="text-[10px] text-slate-400 mt-1">based on actual contributions to date; deductible capped at R 350,000</div>
+                                    <div class="text-[10px] text-slate-400 mt-1">based on actual contributions to date; deductible capped at R 430,000</div>
                                     <div id="ra-cap-warning" class="hidden mt-2 inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">cap hit in some year</div>
                                 </div>
 
@@ -1455,7 +1455,7 @@
                     .reduce((s, t) => s + (Number(t.amount) || 0), 0);
                 document.getElementById('ra-current-year-total').textContent = raFmtZARShort(currentYearTotal);
 
-                const RA_DEDUCTIBLE_CAP = 350000;
+                const RA_DEDUCTIBLE_CAP = 430000;
                 const expectedCurrentYearRefund = Math.min(currentYearTotal, RA_DEDUCTIBLE_CAP) * (raParams.tax_refund_rate_pct / 100);
                 document.getElementById('ra-current-year-refund').textContent = raFmtZARShort(expectedCurrentYearRefund);
                 updateRaPerformanceDisplay();

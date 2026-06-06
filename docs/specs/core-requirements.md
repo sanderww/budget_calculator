@@ -323,21 +323,21 @@ Track contributions to a South African Retirement Annuity, hold the actual curre
 | **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. |
 | **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
-| **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 350,000**. |
+| **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 430,000**. |
 
 ### 4.3 Total Contributed and Expected Refund (Current Tax Year)
 
 ```
 Total Contributed = sum of all contribution amounts
 Current Year Total = sum of contributions whose date falls in the current SA tax year
-Expected Refund (current tax year) = MIN(Current Year Total, R 350,000) × (Refund Rate / 100)
+Expected Refund (current tax year) = MIN(Current Year Total, R 430,000) × (Refund Rate / 100)
 ```
 
-The expected-refund figure is based on actual contributions to date only (no future projection). When `Current Year Total > R 350,000`, a `capHit` warning is shown.
+The expected-refund figure is based on actual contributions to date only (no future projection). When `Current Year Total > R 430,000`, a `capHit` warning is shown.
 
 ### 4.4 Cap-Hit Detection
 
-Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 350,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
+Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 430,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
 
 ### 4.5 Performance Metrics
 
@@ -515,8 +515,8 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R15 | History is grouped by calendar year, sorted ascending, with a totals row. |
 | R16 | All calculations update in real time on any data change (no manual "calculate" step required, except for monthly allocation which is triggered explicitly). |
 | R17 | RA tax year runs 1 March → 28/29 February; bucketing label is `YYYY/YY` (e.g. `2026/27`). |
-| R18 | RA per-tax-year deductible is capped at R 350,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
-| R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 350,000) × refund_rate`. No future projection is performed. |
+| R18 | RA per-tax-year deductible is capped at R 430,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
+| R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 430,000) × refund_rate`. No future projection is performed. |
 | R20 | RA settings (refund rate) are persisted as keys in `db/config.private.json` (a flat JSON object); RA contribution transactions are stored in `db/transactions/ra.csv`. The public param `nominal_return_pct` lives in `db/config.public.json`. |
 | R21 | Retirement two-pot split: post-Sep-2024 RA balance is split 33% savings / 67% retirement; pre-Sep-2024 balance is "vested" and grows passively. |
 | R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. |

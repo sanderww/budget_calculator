@@ -437,7 +437,7 @@ export function deriveAssumedFutureMonthly(transactions) {
     return sum / recent.length;
 }
 
-const RA_ANNUAL_CAP = 350000;
+const RA_ANNUAL_CAP = 430000;
 
 function _isLeapYear(y) {
     return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
