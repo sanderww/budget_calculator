@@ -102,6 +102,44 @@ Leftover        = Available Money − Total Allocated
 - At least one percentage must be greater than 0%.
 - Available money must exceed the monthly savings target (otherwise there is nothing to allocate).
 
+### 1.6 Timeline Overview Chart
+
+A read-only visualisation at the bottom of the budget tab that answers: "what monthly savings rate do I need so my running balance stays at or above the debts + provisions floor at every in-window future cost, and how does the cumulative savings need grow toward my selected future date?"
+
+**Time window:**
+- X-axis runs from `today → user's selected "Future Net Amount by" date` (the §1.3 `future-date` input).
+- If `future-date` is missing or in the past, the chart card shows a short placeholder.
+- If no future cost has a date inside `[today, future-date]`, a different placeholder is shown.
+
+**Required monthly savings (chart-derived):**
+
+```
+floor = Total Debts + Total Provisions
+in-window costs = future costs with today ≤ cost.date ≤ future-date
+
+For each in-window cost i (and for the future-date endpoint), let
+  t_i      = months between today and this point
+  cum_i    = sum of in-window cost amounts with date ≤ this point
+  needed_i = max(0, (cum_i + floor − Current Savings) / t_i)
+
+Required Monthly Savings = max over all such i of needed_i
+```
+
+This rate is the smallest constant monthly contribution that keeps the running savings balance at or above the floor at every in-window cost date AND at `future-date`. It is computed by the chart and does **not** override §1.4's `Monthly Savings Target` — the two answer different questions.
+
+**Planned monthly savings override:** there is a numeric input above the chart labelled "Monthly savings (test)". It is initialised to `Required Monthly Savings` and is **not persisted** — it only affects the chart. The savings-trajectory line is drawn using this input value (the *effective* monthly rate), not necessarily the required rate. When the line's lowest point dips below the floor (i.e. the chosen rate is too low), the trajectory turns from green to red, making the deficit visible. The headline always reports the *required* rate, so the user can see the gap between what they planned and what the data demands.
+
+**Series shown (single x-axis, single y-axis):**
+
+Single y-axis "Amount (R)":
+- **Future-cost bars** — indigo columns, one per in-window future cost entry, plotted at its date with its amount.
+- **Savings trajectory** — green piecewise-linear line starting at `(today, Current Savings)`, sloping up by `Required Monthly Savings` per month, stepping down by each cost amount on that cost's date, and extending past the last cost out to `future-date`. By construction it just touches the floor at the binding constraint and stays at or above it elsewhere.
+- **Debts + provisions floor** — slate dashed flat line at `Total Debts + Total Provisions`, drawn as a real line series (not an ApexCharts annotation). The per-row dates on debts and provisions are ignored.
+
+**Headline:** above the chart, in plain words: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.`
+
+**Interaction:** pan/zoom enabled via the chart toolbar; the adjusted window is **not** persisted.
+
 ---
 
 ## 2. Investment Tracker Module

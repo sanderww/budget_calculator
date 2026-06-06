@@ -7,6 +7,7 @@
     <title>South African Budget Calculator</title>
     <link rel="icon" type="image/png" href="assets/favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.54.1/dist/apexcharts.min.js" defer></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -311,87 +312,6 @@
                                 <div id="future-cost-list" class="space-y-3"></div>
                             </div>
 
-                            <!-- Monthly Allocation -->
-                            <div class="card">
-                                <h2 class="text-xl font-semibold text-slate-800 mb-4">Monthly Money Allocation</h2>
-
-                                <!-- Available Money Input -->
-                                <div class="mb-4">
-                                    <label class="block text-sm font-medium text-slate-700 mb-2">Available Money at End
-                                        of Month</label>
-                                    <div class="relative">
-                                        <span class="currency-prefix">R</span>
-                                        <input type="number" id="available-money" class="input-field amount-input"
-                                            placeholder="0.00">
-                                    </div>
-                                </div>
-
-                                <!-- Allocation Percentages -->
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-2">Mortgage Repayment
-                                            (%)</label>
-                                        <div class="relative">
-                                            <input type="number" id="mortgage-percentage" class="input-field"
-                                                placeholder="50" value="50" min="0" max="100" step="0.1">
-                                            <span
-                                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-2">EFT (%)</label>
-                                        <div class="relative">
-                                            <input type="number" id="eft-percentage" class="input-field"
-                                                placeholder="50" value="50" min="0" max="100" step="0.1">
-                                            <span
-                                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-medium text-slate-700 mb-2">Crypto (%)</label>
-                                        <div class="relative">
-                                            <input type="number" id="crypto-percentage" class="input-field"
-                                                placeholder="0" min="0" max="100" step="0.1">
-                                            <span
-                                                class="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-500">%</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Calculate Button -->
-                                <button id="calculate-allocation" class="btn btn-primary w-full mb-4">Calculate
-                                    Allocation</button>
-
-                                <!-- Results Display -->
-                                <div id="allocation-results" class="hidden">
-                                    <h3 class="font-semibold text-slate-700 mb-3">Monthly Allocation Results</h3>
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between p-2 bg-green-50 rounded">
-                                            <span class="text-slate-600">Required Savings:</span>
-                                            <span id="allocation-savings" class="font-medium text-green-600">R
-                                                0.00</span>
-                                        </div>
-                                        <div class="flex justify-between p-2 bg-blue-50 rounded">
-                                            <span class="text-slate-600">Mortgage Repayment:</span>
-                                            <span id="allocation-mortgage" class="font-medium text-blue-600">R
-                                                0.00</span>
-                                        </div>
-                                        <div class="flex justify-between p-2 bg-purple-50 rounded">
-                                            <span class="text-slate-600">EFT:</span>
-                                            <span id="allocation-eft" class="font-medium text-purple-600">R 0.00</span>
-                                        </div>
-                                        <div class="flex justify-between p-2 bg-orange-50 rounded">
-                                            <span class="text-slate-600">Crypto:</span>
-                                            <span id="allocation-crypto" class="font-medium text-orange-600">R
-                                                0.00</span>
-                                        </div>
-                                        <div class="flex justify-between p-2 bg-slate-50 rounded border-t">
-                                            <span class="font-medium text-slate-700">Total Allocated:</span>
-                                            <span id="allocation-total" class="font-bold text-slate-800">R 0.00</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
 
                         <!-- Right Column: Summary -->
@@ -399,68 +319,104 @@
                             <div class="card sticky top-8">
                                 <h2 class="text-xl font-semibold text-slate-800 mb-4">Financial Summary</h2>
 
-                                <div class="space-y-6">
-                                    <!-- Current Net Amount -->
+                                <div class="space-y-4">
+                                    <!-- Current Savings -->
                                     <div class="p-4 bg-slate-50 rounded-lg">
-                                        <p class="text-sm font-medium text-slate-500">Current Net Amount</p>
-                                        <p id="current-net-amount" class="text-3xl font-bold text-green-600">R 0.00</p>
-                                        <p class="text-xs text-slate-400 mt-1">Savings - (Debts + Provisions)</p>
+                                        <p class="text-sm font-medium text-slate-500">Current Savings</p>
+                                        <p id="current-savings" class="text-2xl font-bold text-slate-700">R 0.00</p>
                                     </div>
 
-                                    <!-- Future Net Amount -->
+                                    <!-- Net Savings Now -->
                                     <div class="p-4 bg-slate-50 rounded-lg">
-                                        <label for="future-date" class="text-sm font-medium text-slate-500">Future Net
-                                            Amount by</label>
+                                        <p class="text-sm font-medium text-slate-500">Net savings now</p>
+                                        <p id="current-net-amount" class="text-3xl font-bold text-green-600">R 0.00</p>
+                                        <p class="text-xs text-slate-400 mt-1">Savings − (Debts + Provisions)</p>
+                                    </div>
+
+                                    <!-- Net Savings on selected date -->
+                                    <div class="p-4 bg-slate-50 rounded-lg">
+                                        <label for="future-date" class="text-sm font-medium text-slate-500">Net savings on</label>
                                         <input type="date" id="future-date" class="input-field w-full mt-1">
-                                        <p id="future-net-amount" class="text-3xl font-bold text-indigo-600 mt-2">R 0.00
-                                        </p>
-                                        <p class="text-xs text-slate-400 mt-1">Current Net - Future Costs up to selected
-                                            date</p>
+                                        <p id="future-net-amount" class="text-3xl font-bold text-indigo-600 mt-2">R 0.00</p>
+                                        <p class="text-xs text-slate-400 mt-1">Net savings now − Future costs up to date</p>
                                     </div>
                                 </div>
 
-                                <hr class="my-6">
+                                <hr class="my-5">
 
-                                <!-- Breakdown -->
-                                <div>
-                                    <h3 class="font-semibold text-slate-700 mb-2">Breakdown</h3>
-                                    <div class="space-y-2 text-sm">
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-600">Total Savings:</span>
-                                            <span id="summary-savings" class="font-medium text-slate-800">R 0.00</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-600">Total Debts:</span>
-                                            <span id="summary-debts" class="font-medium text-red-500">R 0.00</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-600">Total Provisions:</span>
-                                            <span id="summary-provisions" class="font-medium text-orange-500">R
-                                                0.00</span>
-                                        </div>
-                                        <div class="flex justify-between">
-                                            <span class="text-slate-600">Total Future Costs:</span>
-                                            <span id="summary-future-costs" class="font-medium text-blue-500">R
-                                                0.00</span>
+                                <!-- Monthly Allocation (compact) -->
+                                <h3 class="text-sm font-semibold text-slate-700 mb-3">Monthly Money Allocation</h3>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="block text-xs font-medium text-slate-500 mb-1">Available end-of-month money</label>
+                                        <div class="relative">
+                                            <span class="currency-prefix">R</span>
+                                            <input type="number" id="available-money" class="input-field amount-input text-sm" placeholder="0.00">
                                         </div>
                                     </div>
-
-                                    <!-- Monthly Savings Target -->
-                                    <div class="mt-4 pt-3 border-t border-slate-200">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-sm font-medium text-slate-600">Monthly Savings
-                                                Needed:</span>
-                                            <span id="monthly-savings-target"
-                                                class="text-sm font-bold text-purple-600">R 0.00</span>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-slate-500 mb-1">Mortgage %</label>
+                                            <input type="number" id="mortgage-percentage" class="input-field text-sm" placeholder="50" value="50" min="0" max="100" step="0.1">
                                         </div>
-                                        <p class="text-xs text-slate-400 mt-1">To reach future net amount by selected
-                                            date</p>
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-slate-500 mb-1">EFT %</label>
+                                            <input type="number" id="eft-percentage" class="input-field text-sm" placeholder="50" value="50" min="0" max="100" step="0.1">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] font-medium text-slate-500 mb-1">Crypto %</label>
+                                            <input type="number" id="crypto-percentage" class="input-field text-sm" placeholder="0" min="0" max="100" step="0.1">
+                                        </div>
+                                    </div>
+                                    <button id="calculate-allocation" class="btn btn-primary w-full text-sm py-2">Calculate Allocation</button>
+                                    <div id="allocation-results" class="hidden space-y-1 text-xs">
+                                        <div class="flex justify-between p-1.5 bg-green-50 rounded">
+                                            <span class="text-slate-600">Required Savings</span>
+                                            <span id="allocation-savings" class="font-medium text-green-600">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-1.5 bg-blue-50 rounded">
+                                            <span class="text-slate-600">Mortgage</span>
+                                            <span id="allocation-mortgage" class="font-medium text-blue-600">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-1.5 bg-purple-50 rounded">
+                                            <span class="text-slate-600">EFT</span>
+                                            <span id="allocation-eft" class="font-medium text-purple-600">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-1.5 bg-orange-50 rounded">
+                                            <span class="text-slate-600">Crypto</span>
+                                            <span id="allocation-crypto" class="font-medium text-orange-600">R 0.00</span>
+                                        </div>
+                                        <div class="flex justify-between p-1.5 bg-slate-50 rounded border-t">
+                                            <span class="font-medium text-slate-700">Total</span>
+                                            <span id="allocation-total" class="font-bold text-slate-800">R 0.00</span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+
+            <!-- Timeline Overview Chart -->
+            <div class="card mt-6">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-xl font-semibold text-slate-800">Timeline Overview</h2>
+                    <p class="text-xs text-slate-500">Drag to pan, scroll or use toolbar to zoom. Not saved.</p>
+                </div>
+                <p id="budget-timeline-headline" class="text-sm text-slate-600 mb-3"></p>
+                <div class="flex flex-wrap items-end gap-3 mb-3">
+                    <div>
+                        <label for="budget-timeline-planned-savings" class="block text-xs font-medium text-slate-500 mb-1">Monthly savings (test)</label>
+                        <div class="relative">
+                            <span class="currency-prefix">R</span>
+                            <input type="number" id="budget-timeline-planned-savings" class="input-field amount-input text-sm" min="0" step="100" placeholder="0">
+                        </div>
+                    </div>
+                    <button id="budget-timeline-reset-planned" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Use required</button>
+                    <p class="text-xs text-slate-500">Trajectory uses this rate. Required value is shown above. Not saved.</p>
+                </div>
+                <div id="budget-timeline-chart" class="min-h-[340px]"></div>
             </div>
         </div>
 
@@ -1208,6 +1164,7 @@
             generateConfigJSON as _generateConfigJSON,
             PUBLIC_PARAMS as _PUBLIC_PARAMS,
         } from './calculations.js';
+        import { renderBudgetTimeline as _renderBudgetTimeline } from './chart_budget_timeline.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -1709,6 +1666,8 @@
             const createProvisionItem = (item) => createGenericItem(item, true);
             const createFutureCostItem = (item) => createGenericItem(item, true);
 
+            let currentMonthlySavingsTarget = 0;
+
             const calculateAndDisplaySummary = () => {
                 const savings = parseFloat(budgetData.savings) || 0;
                 const futureDate = futureDateInput.value ? new Date(futureDateInput.value) : null;
@@ -1722,23 +1681,36 @@
                     new Date()
                 );
 
+                document.getElementById('current-savings').textContent = formatCurrency(savings);
+
                 document.getElementById('current-net-amount').textContent = formatCurrency(r.currentNetAmount);
                 document.getElementById('current-net-amount').style.color = r.currentNetAmount >= 0 ? '#16a34a' : '#ef4444';
 
                 document.getElementById('future-net-amount').textContent = formatCurrency(r.futureNetAmount);
                 document.getElementById('future-net-amount').style.color = r.futureNetAmount >= 0 ? '#4f46e5' : '#ef4444';
 
-                document.getElementById('summary-savings').textContent = formatCurrency(savings);
-                document.getElementById('summary-debts').textContent = `- ${formatCurrency(r.totalDebts)}`;
-                document.getElementById('summary-provisions').textContent = `- ${formatCurrency(r.totalProvisions)}`;
-                document.getElementById('summary-future-costs').textContent = formatCurrency(
-                    budgetData.futureCosts.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0)
-                );
+                currentMonthlySavingsTarget = r.monthlySavingsTarget;
 
-                const monthlySavingsTargetEl = document.getElementById('monthly-savings-target');
-                monthlySavingsTargetEl.textContent = formatCurrency(r.monthlySavingsTarget);
-                monthlySavingsTargetEl.dataset.value = r.monthlySavingsTarget;
-                monthlySavingsTargetEl.style.color = r.monthlySavingsTarget > 0 ? '#7c3aed' : '#64748b';
+                try {
+                    const plannedInput = document.getElementById('budget-timeline-planned-savings');
+                    const plannedRaw = plannedInput && plannedInput.value !== '' ? parseFloat(plannedInput.value) : NaN;
+                    const planned = Number.isFinite(plannedRaw) && plannedRaw >= 0 ? plannedRaw : undefined;
+                    const result = _renderBudgetTimeline({
+                        container: document.getElementById('budget-timeline-chart'),
+                        headline: document.getElementById('budget-timeline-headline'),
+                        savings,
+                        totalDebts: r.totalDebts,
+                        totalProvisions: r.totalProvisions,
+                        futureCosts: budgetData.futureCosts,
+                        futureDate,
+                        plannedMonthlySavings: planned,
+                    });
+                    if (plannedInput && plannedInput.value === '' && result && Number.isFinite(result.requiredMonthlySavings)) {
+                        plannedInput.value = Math.round(result.requiredMonthlySavings);
+                    }
+                } catch (err) {
+                    console.error('Timeline chart failed:', err);
+                }
             };
 
             const calculateMonthlyAllocation = () => {
@@ -1746,7 +1718,7 @@
                 const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
                 const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
                 const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
-                const monthlySavingsTarget = parseFloat(document.getElementById('monthly-savings-target').dataset.value) || 0;
+                const monthlySavingsTarget = currentMonthlySavingsTarget || 0;
 
                 const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
 
@@ -1825,6 +1797,18 @@
             });
 
             futureDateInput.addEventListener('input', calculateAndDisplaySummary);
+
+            const plannedSavingsInput = document.getElementById('budget-timeline-planned-savings');
+            const plannedSavingsReset = document.getElementById('budget-timeline-reset-planned');
+            if (plannedSavingsInput) {
+                plannedSavingsInput.addEventListener('input', calculateAndDisplaySummary);
+            }
+            if (plannedSavingsReset) {
+                plannedSavingsReset.addEventListener('click', () => {
+                    if (plannedSavingsInput) plannedSavingsInput.value = '';
+                    calculateAndDisplaySummary();
+                });
+            }
 
             debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
             provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
