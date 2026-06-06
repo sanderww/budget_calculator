@@ -402,19 +402,19 @@
             <div class="card mt-6">
                 <div class="flex items-center justify-between mb-2">
                     <h2 class="text-xl font-semibold text-slate-800">Timeline Overview</h2>
-                    <p class="text-xs text-slate-500">Drag to pan, scroll or use toolbar to zoom. Not saved.</p>
+                    <p class="text-xs text-slate-500">Drag to pan, scroll or use toolbar to zoom.</p>
                 </div>
                 <p id="budget-timeline-headline" class="text-sm text-slate-600 mb-3"></p>
                 <div class="flex flex-wrap items-end gap-3 mb-3">
                     <div>
-                        <label for="budget-timeline-planned-savings" class="block text-xs font-medium text-slate-500 mb-1">Monthly savings (test)</label>
+                        <label for="budget-timeline-planned-savings" class="block text-xs font-medium text-slate-500 mb-1">Monthly savings (planned)</label>
                         <div class="relative">
                             <span class="currency-prefix">R</span>
                             <input type="number" id="budget-timeline-planned-savings" class="input-field amount-input text-sm" min="0" step="100" placeholder="0">
                         </div>
                     </div>
-                    <button id="budget-timeline-reset-planned" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Use required</button>
-                    <p class="text-xs text-slate-500">Trajectory uses this rate. Required value is shown above. Not saved.</p>
+                    <button id="budget-timeline-reset-planned" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Use recommended</button>
+                    <p class="text-xs text-slate-500">The solid <span class="font-medium text-emerald-700">Planned</span> line uses this saved amount; the dashed <span class="font-medium text-amber-600">Recommended</span> line always shows the calculated target. Leave blank to follow the recommendation.</p>
                 </div>
                 <div id="budget-timeline-chart" class="min-h-[340px]"></div>
             </div>
@@ -1706,8 +1706,10 @@
                         futureDate,
                         plannedMonthlySavings: planned,
                     });
-                    if (plannedInput && plannedInput.value === '' && result && Number.isFinite(result.requiredMonthlySavings)) {
-                        plannedInput.value = Math.round(result.requiredMonthlySavings);
+                    // Show the recommended amount as the placeholder so the default is
+                    // visible when the input is blank (blank = follow the recommendation).
+                    if (plannedInput && result && Number.isFinite(result.requiredMonthlySavings)) {
+                        plannedInput.placeholder = String(Math.round(result.requiredMonthlySavings));
                     }
                 } catch (err) {
                     console.error('Timeline chart failed:', err);
@@ -1801,15 +1803,43 @@
 
             const plannedSavingsInput = document.getElementById('budget-timeline-planned-savings');
             const plannedSavingsReset = document.getElementById('budget-timeline-reset-planned');
+            // Persist the planned monthly-savings override to config.private.json
+            // (auto-save, same mechanism as the rest of the page). Blank/invalid
+            // removes the override so the chart follows the recommended amount.
+            const persistPlannedSavings = () => {
+                if (!plannedSavingsInput) return;
+                const raw = plannedSavingsInput.value;
+                const val = raw !== '' ? parseFloat(raw) : NaN;
+                if (Number.isFinite(val) && val >= 0) {
+                    setConfig('budget_planned_monthly_savings', val);
+                } else if ('budget_planned_monthly_savings' in configMap) {
+                    delete configMap.budget_planned_monthly_savings;
+                    persistConfig();
+                }
+            };
             if (plannedSavingsInput) {
-                plannedSavingsInput.addEventListener('input', calculateAndDisplaySummary);
+                plannedSavingsInput.addEventListener('input', () => {
+                    persistPlannedSavings();
+                    calculateAndDisplaySummary();
+                });
             }
             if (plannedSavingsReset) {
                 plannedSavingsReset.addEventListener('click', () => {
                     if (plannedSavingsInput) plannedSavingsInput.value = '';
+                    if ('budget_planned_monthly_savings' in configMap) {
+                        delete configMap.budget_planned_monthly_savings;
+                        persistConfig();
+                    }
                     calculateAndDisplaySummary();
                 });
             }
+            // Prefill the planned-savings input from the saved override (config.private.json).
+            // Must run after loadConfigFromServer and before the first chart render.
+            const applyPlannedSavingsFromConfig = () => {
+                if (!plannedSavingsInput) return;
+                const saved = configMap.budget_planned_monthly_savings;
+                plannedSavingsInput.value = (saved !== undefined && saved !== null && saved !== '') ? saved : '';
+            };
 
             debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
             provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
@@ -2647,6 +2677,7 @@
                 updateTestModeUI();
                 try {
                     await loadConfigFromServer();           // configMap first — tabs read it
+                    applyPlannedSavingsFromConfig();        // prefill planned-savings input
                     await Promise.all([
                         loadBudgetCSVFromServer(),
                         loadInvestmentCSVFromServer(),
@@ -2664,6 +2695,7 @@
             // --- INITIALIZATION ---
             (async () => {
                 await loadConfigFromServer();          // must run before tabs that read configMap
+                applyPlannedSavingsFromConfig();       // prefill planned-savings input
                 try {
                     await loadBudgetCSVFromServer();
                 } catch (err) {

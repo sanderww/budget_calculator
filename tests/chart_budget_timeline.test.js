@@ -390,4 +390,70 @@ describe('buildBudgetTimelineSeries', () => {
         });
         expect(result).not.toHaveProperty('cumulativeSavingsNeeded');
     });
+
+    it('exposes a recommendedLine built from requiredMonthlySavings', () => {
+        const result = buildBudgetTimelineSeries({
+            savings: 33333,
+            totalDebts: 333,
+            totalProvisions: 12222,
+            futureCosts: [{ description: 'A', amount: 213213, date: '2026-09-06' }],
+            futureDate: new Date('2026-12-06T00:00:00Z'),
+            today: TODAY,
+        });
+        expect(result).toHaveProperty('recommendedLine');
+        expect(Array.isArray(result.recommendedLine)).toBe(true);
+        // Same shape (point count + x positions) as the planned savingsLine.
+        expect(result.recommendedLine).toHaveLength(result.savingsLine.length);
+        result.recommendedLine.forEach((p, i) => {
+            expect(p.x).toBe(result.savingsLine[i].x);
+        });
+        // The recommended trajectory uses requiredMonthlySavings: post-cost point
+        // sits exactly at the floor at the binding constraint.
+        const costMs = day('2026-09-06');
+        const m = monthsBetween(costMs, TODAY.getTime());
+        const expectedAfterCost = 33333 + result.requiredMonthlySavings * m - 213213;
+        expect(result.recommendedLine[2].y).toBeCloseTo(expectedAfterCost, 6);
+    });
+
+    it('recommendedLine and savingsLine coincide when no plannedMonthlySavings is given', () => {
+        const result = buildBudgetTimelineSeries({
+            savings: 50000,
+            totalDebts: 333,
+            totalProvisions: 12222,
+            futureCosts: [
+                { description: 'tight', amount: 200000, date: '2026-07-06' },
+                { description: 'loose', amount: 50000, date: '2027-06-06' },
+            ],
+            futureDate: new Date('2027-06-06T00:00:00Z'),
+            today: TODAY,
+        });
+        expect(result.recommendedLine).toHaveLength(result.savingsLine.length);
+        result.recommendedLine.forEach((p, i) => {
+            expect(p.x).toBe(result.savingsLine[i].x);
+            expect(p.y).toBeCloseTo(result.savingsLine[i].y, 6);
+        });
+    });
+
+    it('with a planned rate below required, the planned line ends below the recommended line', () => {
+        const inputs = {
+            savings: 33333,
+            totalDebts: 333,
+            totalProvisions: 12222,
+            futureCosts: [{ description: 'A', amount: 213213, date: '2026-09-06' }],
+            futureDate: new Date('2026-12-06T00:00:00Z'),
+            today: TODAY,
+        };
+        const base = buildBudgetTimelineSeries(inputs);
+        const result = buildBudgetTimelineSeries({
+            ...inputs,
+            plannedMonthlySavings: Math.max(0, base.requiredMonthlySavings - 2000),
+        });
+        const lastIdx = result.savingsLine.length - 1;
+        // Recommended is unchanged by the planned override.
+        expect(result.recommendedLine[lastIdx].y).toBeCloseTo(base.savingsLine[lastIdx].y, 6);
+        // Planned (lower rate) ends strictly below recommended.
+        expect(result.savingsLine[lastIdx].y).toBeLessThan(result.recommendedLine[lastIdx].y);
+        // belowFloor reflects the planned line, which dips under the floor.
+        expect(result.belowFloor).toBe(true);
+    });
 });
