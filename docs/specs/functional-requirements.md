@@ -84,10 +84,11 @@ Full-width card at the bottom of the budget tab. Read-only overview chart, rende
 
 Single y-axis "Amount (R)":
 - Indigo column bars per in-window future cost (one per dated entry inside `[today, future-date]`).
-- Green savings-trajectory line starting at `(today, Current Savings)`, sloping up by the chart-derived `Required Monthly Savings`, stepping down at each in-window cost, and extending out to `future-date`.
-- Slate dashed line for `Total Debts + Total Provisions` ("floor"), drawn as a regular line series (not an ApexCharts annotation) so it is always visible alongside the trajectory.
+- Solid **Planned trajectory** line starting at `(today, Current Savings)`, sloping up by the *planned* monthly rate, stepping down at each in-window cost, and extending out to `future-date`. Green normally; red if its lowest point dips below the floor.
+- Dashed amber **Recommended trajectory** line built the same way but always using the chart-derived `Required Monthly Savings`. Always drawn; when no planned override is set it coincides with (overlaps) the Planned line.
+- Slate dashed line for `Total Debts + Total Provisions` ("floor"), drawn as a regular line series (not an ApexCharts annotation) so it is always visible alongside the trajectories.
 
-**Planned monthly savings override:** numeric input above the chart (id `budget-timeline-planned-savings`), defaulting to the chart-derived `Required Monthly Savings`. Changes fire a handler that re-renders only the chart; the value is **not persisted** anywhere. The savings-trajectory line is drawn at this planned rate (not the required rate), and if the line's lowest point falls below the floor it switches from green to red so the deficit is visible. The headline above the chart still reports the required rate.
+**Planned monthly savings override:** numeric input above the chart (id `budget-timeline-planned-savings`, labelled "Monthly savings (planned)"). It drives the Planned line. It is **persisted** to `db/config.private.json` under `budget_planned_monthly_savings` using the app's standard debounced auto-save (same as other config inputs) — entering an amount saves it and it reloads next session. When blank, the input shows the rounded recommended amount as a placeholder and the Planned line follows the recommendation. Clearing the input, or pressing the **"Use recommended"** button, removes the saved override and reverts to the recommended default.
 
 X-axis is datetime. Legend at bottom centre. Headline above the chart in plain language: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.`
 

@@ -70,22 +70,32 @@ export function buildBudgetTimelineSeries({ savings, totalDebts, totalProvisions
 
     const bars = dated.map(fc => ({ x: fc.x, y: fc.amount, description: fc.description }));
 
-    // Savings trajectory: piecewise with step-downs at each cost date.
-    const savingsLine = [{ x: todayMs, y: startSavings }];
-    let runningCosts = 0;
-    for (const fc of dated) {
-        const t = monthsBetween(todayMs, fc.x);
-        const before = startSavings + effectiveMonthlySavings * t - runningCosts;
-        savingsLine.push({ x: fc.x, y: before });
-        runningCosts += fc.amount;
-        savingsLine.push({ x: fc.x, y: before - fc.amount });
-    }
-    const lastCostX = dated[dated.length - 1].x;
-    if (futureDateMs > lastCostX) {
-        const tEnd = monthsBetween(todayMs, futureDateMs);
-        const endBalance = startSavings + effectiveMonthlySavings * tEnd - runningCosts;
-        savingsLine.push({ x: futureDateMs, y: endBalance });
-    }
+    // Build a piecewise savings trajectory (step-downs at each cost date) for a
+    // given monthly-savings rate. Both the planned and recommended lines share
+    // the same step-down dates; only the slope differs.
+    const buildTrajectory = (monthlyRate) => {
+        const line = [{ x: todayMs, y: startSavings }];
+        let runningCosts = 0;
+        for (const fc of dated) {
+            const t = monthsBetween(todayMs, fc.x);
+            const before = startSavings + monthlyRate * t - runningCosts;
+            line.push({ x: fc.x, y: before });
+            runningCosts += fc.amount;
+            line.push({ x: fc.x, y: before - fc.amount });
+        }
+        const lastCostX = dated[dated.length - 1].x;
+        if (futureDateMs > lastCostX) {
+            const tEnd = monthsBetween(todayMs, futureDateMs);
+            const endBalance = startSavings + monthlyRate * tEnd - runningCosts;
+            line.push({ x: futureDateMs, y: endBalance });
+        }
+        return line;
+    };
+
+    // savingsLine = the planned trajectory (driven by the user's input, or the
+    // required rate when no plan is set). recommendedLine = always the required rate.
+    const savingsLine = buildTrajectory(effectiveMonthlySavings);
+    const recommendedLine = buildTrajectory(requiredMonthlySavings);
 
     const floorLine = [
         { x: todayMs, y: floor },
@@ -105,6 +115,7 @@ export function buildBudgetTimelineSeries({ savings, totalDebts, totalProvisions
         totalFutureCosts,
         bars,
         savingsLine,
+        recommendedLine,
         floorLine,
         minBalance,
         belowFloor,
@@ -112,8 +123,10 @@ export function buildBudgetTimelineSeries({ savings, totalDebts, totalProvisions
 }
 
 function buildChartOptions(data) {
-    const trajectoryColor = data.belowFloor ? '#ef4444' : '#16a34a';
-    const colors = ['#6366f1', trajectoryColor, '#64748b'];
+    const plannedColor = data.belowFloor ? '#ef4444' : '#16a34a';
+    // Series order: Future cost (bars), Planned (input-driven), Recommended
+    // (calculated), Floor. Bars stay at index 0 so the custom tooltip is unaffected.
+    const colors = ['#6366f1', plannedColor, '#f59e0b', '#64748b'];
     return {
         chart: {
             type: 'line',
@@ -128,17 +141,18 @@ function buildChartOptions(data) {
         },
         series: [
             { name: 'Future cost', type: 'column', data: data.bars },
-            { name: 'Savings trajectory', type: 'line', data: data.savingsLine },
+            { name: 'Planned trajectory', type: 'line', data: data.savingsLine },
+            { name: 'Recommended trajectory', type: 'line', data: data.recommendedLine },
             { name: 'Debts + provisions floor', type: 'line', data: data.floorLine },
         ],
         stroke: {
-            width: [0, 3, 2],
-            curve: ['smooth', 'straight', 'straight'],
-            dashArray: [0, 0, 6],
+            width: [0, 3, 2, 2],
+            curve: ['smooth', 'straight', 'straight', 'straight'],
+            dashArray: [0, 0, 6, 6],
         },
         colors,
         plotOptions: { bar: { columnWidth: '22%', borderRadius: 2 } },
-        markers: { size: [0, 0, 0], hover: { size: 5 } },
+        markers: { size: [0, 0, 0, 0], hover: { size: 5 } },
         xaxis: {
             type: 'datetime',
             min: data.startDate,
