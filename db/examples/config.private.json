@@ -31,6 +31,6 @@
   "repayment": 4500,
   "retirement_age": 65,
   "service_fee": 69,
-  "show_real_terms": 0,
+  "show_real_terms": 1,
   "tax_refund_rate_pct": 41
 }

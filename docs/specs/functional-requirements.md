@@ -266,7 +266,7 @@ Three sections separated by dividers:
 - **Life expectancy** (number input, default 95). Drives the lump-sum drawdown horizon. Helper label shows the resulting drawdown years.
 - **Lump-sum drawdown return %** (number input, default 6). Annual return assumed on the residual lump sum during PMT-style drawdown.
 - Withdrawal rate %, Effective retirement income tax rate %, CPI assumption %, all numeric.
-- Toggle: "Show in today's money" — applies CPI deflation to all displayed figures.
+- Toggle: "Show in today's money" — applies CPI deflation to all displayed figures. On by default (`show_real_terms` defaults to 1).
 
 **Per-fund nominal return %**
 - Discretionary, TFSA, Crypto (note: "expected nominal return, no default consensus"), RA.

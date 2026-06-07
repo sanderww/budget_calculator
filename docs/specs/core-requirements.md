@@ -444,7 +444,7 @@ r_m = (1 + annualRate/100)^(1/12) − 1
 FV  = pv × (1 + r_m)^months [+ contrib × ((1+r_m)^months − 1) / r_m]
 ```
 
-**Real-terms deflation** (when "Show in today's money" is on):
+**Real-terms deflation** (when "Show in today's money" is on, which is the default):
 ```
 realValue = nominal / (1 + cpi/100)^years
 ```
@@ -571,7 +571,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
 | R24 | Retirement lump-sum tax follows the 2026/27 retirement table; first R 550,000 is tax-free. |
 | R25 | TFSA cap is enforced when "Max TFSA contributions" is enabled: on top of the current TFSA value, top up to annual R 46,000 (current tax year + future March-start years) until the lifetime R 500,000 cap is reached. |
-| R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
+| R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. Defaults to on (`show_real_terms: 1`). |
 | R27 | Retirement settings persist as keys in `db/config.public.json` (generic modelling assumptions such as `withdrawal_rate_pct`, `cpi_pct`) and `db/config.private.json` (personal data and personal assumptions such as `dob`, `retirement_age`, `effective_tax_rate_pct`, scenario toggles). There is no separate `db/retirement.csv`. |
 | R28 | Retirement tab reads RA pot today live from RA tab state, preferring the user-entered actual fund value (the `current_value,RA,<amount>,` row in `db/transactions/ra.csv`); when no actual value is set, it falls back to `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)`. TFSA / Discretionary / Crypto current values are read from the Investments tab; editing any of these current-value inputs re-renders the retirement snapshot live (no tab switch required). No shared state mutation. |
 | R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |

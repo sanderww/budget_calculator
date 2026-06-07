@@ -1239,6 +1239,7 @@ describe('calculateRetirementSnapshot', () => {
             ...getDefaultRetirementParams(),
             dob: '1985-08-08',
             retirement_age: 65,
+            show_real_terms: 0, // base case asserts nominal math; real-terms test overrides to 1
         },
         discretionaryToday: 100_000,
         tfsaToday: 50_000,

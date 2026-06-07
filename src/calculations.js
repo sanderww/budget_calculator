@@ -809,7 +809,7 @@ const RETIREMENT_DEFAULT_PARAMS = {
     lump_sum_drawdown_return_pct: 6,
     withdrawal_rate_pct: 4,
     cpi_pct: 5,
-    show_real_terms: 0,
+    show_real_terms: 1,
     effective_tax_rate_pct: 18,
 
     return_discretionary_pct: 10,
