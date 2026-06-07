@@ -444,7 +444,7 @@ r_m = (1 + annualRate/100)^(1/12) − 1
 FV  = pv × (1 + r_m)^months [+ contrib × ((1+r_m)^months − 1) / r_m]
 ```
 
-**Real-terms deflation** (when "Show in today's money" is on):
+**Real-terms deflation** (when "Show in today's money" is on, which is the default):
 ```
 realValue = nominal / (1 + cpi/100)^years
 ```
@@ -498,6 +498,16 @@ else:                           PMT = PV × r / (1 − (1 + r)^−N)
 | **Monthly from lump sum** | PMT annuity over `life_expectancy − retirement_age` years at `lump_sum_drawdown_return_pct` on the at-retirement lump sum (see §5.4). Same value displayed against both age columns. |
 | **Max estimated monthly income (Age 55)** | `Projected monthly at 55` (RA drawdown net) + `Monthly from lump sum`. |
 | **Max estimated monthly income (Age D)** | `Projected monthly at 68` (RA drawdown net + Dutch pension net) + `Monthly from lump sum`. |
+
+### 5.5a Retirement-at-a-glance charts
+
+Two stacked-bar charts visualise the Snapshot across three ages: Age 55, Age D (`opt_dutch_age`), Retirement age. When two ages coincide the bars collapse and the label combines (e.g. `Age 55 · Retirement (age 55)`).
+
+**Chart 1 — Monthly income (net) by age.** Each bar stacks the contribution per source: RA drawdown net, Dutch pension net, and a per-vehicle PMT amortisation of each lump-sum component (Discretionary, TFSA, Crypto, RA commuted, one-off events). The PMT formula matches §5.4 and is applied **per age**: `N = round((life_expectancy − bar_age) × 12)`, `r = (1 + lump_sum_drawdown_return_pct/100)^(1/12) − 1`. The retirement-age bar matches Card 0's `Max estimated monthly income` value exactly; the Age-55 and Age-D bars use the same formula with each bar's own pool, so they intentionally differ from `maxAt55` / `maxAt68` (which the Snapshot computes with a single at-retirement-age PMT — a known simplification of the Snapshot card).
+
+**Chart 2 — Capital available by age.** Each bar stacks the lump-sum capital available at that age: Discretionary, TFSA, Crypto, RA commuted lump sum (de minimis full-pot at 55 or 1/3 at retirement, per R22 and R24), one-off events net (`house_sale + inheritance_zar + savings_pot_withdrawals_net − bond_payoff`). A negative one-off net collapses to 0 with a tooltip note rather than rendering as a negative segment.
+
+Both charts respect the **Show in today's money** toggle (R26) by deflating each bar value by `(1 + cpi/100)^years_from_today_to_bar_age`, and re-render on the same triggers as Card 0 (R28).
 
 ### 5.6 Out of scope (v1)
 
@@ -561,7 +571,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
 | R24 | Retirement lump-sum tax follows the 2026/27 retirement table; first R 550,000 is tax-free. |
 | R25 | TFSA cap is enforced when "Max TFSA contributions" is enabled: on top of the current TFSA value, top up to annual R 46,000 (current tax year + future March-start years) until the lifetime R 500,000 cap is reached. |
-| R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. |
+| R26 | Show in today's money toggle deflates all displayed retirement figures by `(1 + cpi/100)^years_from_today`. Defaults to on (`show_real_terms: 1`). |
 | R27 | Retirement settings persist as keys in `db/config.public.json` (generic modelling assumptions such as `withdrawal_rate_pct`, `cpi_pct`) and `db/config.private.json` (personal data and personal assumptions such as `dob`, `retirement_age`, `effective_tax_rate_pct`, scenario toggles). There is no separate `db/retirement.csv`. |
 | R28 | Retirement tab reads RA pot today live from RA tab state, preferring the user-entered actual fund value (the `current_value,RA,<amount>,` row in `db/transactions/ra.csv`); when no actual value is set, it falls back to `calculatePotValueToday(raTransactions, raParams.nominal_return_pct, today)`. TFSA / Discretionary / Crypto current values are read from the Investments tab; editing any of these current-value inputs re-renders the retirement snapshot live (no tab switch required). No shared state mutation. |
 | R29 | TFSA card on the Investment Tracker shows lifetime-cap usage: lifetime-contributed amount, percent of R 500,000 used (clamped 0–100), remaining headroom, and a tri-coloured progress bar (emerald < 80%, amber 80–<100%, red ≥ 100%). |
@@ -569,6 +579,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R31 | Each of Discretionary, TFSA, and Crypto can be excluded from the retirement projection via `opt_include_discretionary`, `opt_include_tfsa`, `opt_include_crypto` (each default 1). When a flag is 0 the fund's value at every snapshot age (`liquid.at55`, `liquid.at68`, `liquid.atRetirement`) is forced to 0 and disappears from the lump-sum totals; the fund's Investment-tab value is unaffected. These flags persist in `db/config.private.json` and are restored to the checkboxes on load. The "Max TFSA contributions" toggle (`opt_tfsa_enabled`) is dependent on TFSA inclusion: enabling it auto-enables `opt_include_tfsa`, and disabling `opt_include_tfsa` auto-disables `opt_tfsa_enabled`. |
 | R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar; `life_expectancy` and `lump_sum_drawdown_return_pct` are public params persisted in `db/config.public.json`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |
 | R33 | The Budget Timeline chart draws two savings trajectories: a solid **Planned** line (the user's planned monthly rate) and a dashed **Recommended** line (always the `requiredMonthlySavings`). `buildBudgetTimelineSeries` returns both `savingsLine` (planned) and `recommendedLine`; they coincide when no planned override is set. The planned amount persists in `db/config.private.json` under `budget_planned_monthly_savings` (non-public; absent → follow the recommendation) and is restored to the input on load. |
+| R34 | The Retirement tab renders two stacked-bar charts ("Retirement at a glance") between the Snapshot card and the Monthly Income card: Chart 1 (monthly income net by age) and Chart 2 (capital by age) — both keyed on Age 55 / Age D / Retirement age with bar collapse when ages coincide. Pure render from the retirement snapshot (no new persisted state). Chart 1's lump-sum layers use per-age PMT amortisation over `life_expectancy − bar_age` at `lump_sum_drawdown_return_pct`; the retirement-age bar matches `monthly.atRetirement.net + monthly.lumpSumDrawdown`. Both charts respect the real-terms toggle and re-render on the same triggers as Card 0. |
 
 ---
 
