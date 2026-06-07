@@ -1126,6 +1126,16 @@
                 <div class="lg:col-span-3">
                     <div class="grid grid-cols-1 gap-6">
                         <div id="retirement-card-snapshot" class="card"></div>
+                        <div id="retirement-card-charts" class="card">
+                            <div class="flex items-center justify-between mb-4">
+                                <h2 class="text-xl font-semibold text-slate-800">Retirement at a glance</h2>
+                                <span id="retirement-charts-badge" class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">nominal</span>
+                            </div>
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div id="retirement-chart-income" class="min-h-[360px]"></div>
+                                <div id="retirement-chart-capital" class="min-h-[360px]"></div>
+                            </div>
+                        </div>
                         <div id="retirement-card-monthly" class="card"></div>
                         <div id="retirement-card-lumpsum" class="card"></div>
                         <div id="retirement-card-rapot" class="card"></div>
@@ -1166,6 +1176,7 @@
             PUBLIC_PARAMS as _PUBLIC_PARAMS,
         } from './calculations.js';
         import { renderBudgetTimeline as _renderBudgetTimeline } from './chart_budget_timeline.js';
+        import { renderRetirementCharts as _renderRetirementCharts } from './chart_retirement.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -3158,6 +3169,13 @@
                 `;
 
                 window.__retirementSnapshot = snap; // Exposed for manual debugging only.
+
+                _renderRetirementCharts({
+                    containerIncome: document.getElementById('retirement-chart-income'),
+                    containerCapital: document.getElementById('retirement-chart-capital'),
+                    badge: document.getElementById('retirement-charts-badge'),
+                    snapshot: snap,
+                });
             }
 
             retApplyParamsToInputs();

@@ -36,7 +36,9 @@ Each layer is gated by its scenario flag; gated-out layers contribute 0 and disa
 | **Dutch pension (net, ZAR)** | `opt_dutch_eur_monthly × opt_dutch_eur_zar × (1 − effective_tax_rate_pct/100)` | Bar at **Age D** and at **Retirement** if `retirement_age ≥ opt_dutch_age`. Zero on the Age-55 bar (unless `opt_dutch_age = 55`, which would be an unusual config). |
 | **Lump-sum drawdown (PMT, net)** | `PMT(L, N, r)` where `L` is the lump-sum pool *available at that age* (see §2.3), `N = max(0, round((life_expectancy − age) × 12))`, `r = (1 + lump_sum_drawdown_return_pct/100)^(1/12) − 1`. Net by `× (1 − effective_tax_rate_pct/100)`. | One stacked sub-layer per vehicle (Discretionary, TFSA, Crypto, RA-commuted, one-off). All four use the same PMT machinery — the only thing that differs is `L`. |
 
-PMT formula and edge cases follow §5.4 verbatim (`PMT = 0` when `N == 0` or `L ≤ 0`; zero-return fallback when `|r| < 1e-9`). Using PMT (not simple division) keeps Chart 1 numerically consistent with Card 0's "Monthly from lump sum" row.
+PMT formula and edge cases follow §5.4 verbatim (`PMT = 0` when `N == 0` or `L ≤ 0`; zero-return fallback when `|r| < 1e-9`).
+
+**Numerical reconciliation with Card 0:** the retirement-age bar matches Card 0 exactly (same PMT inputs). The Age-55 and Age-D bars use the same PMT *formula* but with **per-age** inputs (each bar's lump-sum pool, amortised from that age to `life_expectancy`). They therefore differ from Card 0's `maxAt55` / `maxAt68` figures, which use a single at-retirement-age PMT across both columns — a known simplification in the Snapshot card. Per-age PMT is the intent here: "what monthly income do these funds support if accessed at this age and drawn down to age `life_expectancy`?"
 
 ### 2.2 RA-drawdown layer per bar
 
@@ -58,7 +60,9 @@ The lump-sum drawdown layer is itself **sub-stacked** by vehicle. The pool feedi
 | **TFSA** | `liquid.at55.tfsa` × `opt_include_tfsa` (uses Max-TFSA growth path when `opt_tfsa_enabled`, else passive) | same projection at D | same at retirement |
 | **Crypto** | `liquid.at55.crypto` × `opt_include_crypto` | same at D | same at retirement |
 | **RA-commuted** | If `raPot55 < R 360k`: full pot net of lump-sum tax. Else 0 (no commutation pre-retirement). | If D ≥ retirement_age: the at-retirement commuted/de-minimis slice projected forward to D at `lump_sum_drawdown_return_pct`. If D < retirement_age: 0 (RA is still accumulating, commutation hasn't happened yet). | If de minimis → full pot net of tax. Else if commute toggle on → `1/3 pot` net of lump-sum tax. Else 0. |
-| **One-off events** | 0 (one-offs only land at retirement) | If D ≥ retirement_age: the retirement-age one-off lump sum projected forward to D at `lump_sum_drawdown_return_pct`. If D < retirement_age: 0. | `house_sale + inheritance_zar + savings_pot_withdrawals_net − bond_payoff` (single netted figure; if negative, sub-layer is 0 and a tooltip flags the shortfall). |
+| **One-off events** | `house_sale + inheritance_zar + raAt55.savingsPotWithdrawnNet − bond_payoff` (matches Snapshot's `projectedFunds55`). | Same as Age 55 (matches Snapshot's `projectedFunds68`). | `house_sale + inheritance_zar + raAtRetirement.savingsPotWithdrawnNet − bond_payoff`. |
+
+**Note on one-off events**: the existing Snapshot card already includes house sale / inheritance / bond payoff / savings-pot withdrawals at every age column. The chart matches that convention to keep totals reconcilable. If the netted figure is negative, the sub-layer is 0 and a tooltip flags the shortfall.
 
 Notes:
 - **TFSA actual vs max** is a *single layer*, not two. Which growth path is used is determined by `opt_tfsa_enabled` (the existing "Max TFSA contributions" toggle). The sidebar already owns that switch — no new control needed.

@@ -312,6 +312,15 @@ Three-column × four-row grid (label | Age 55 | Age `opt_dutch_age`):
 
 A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
 
+**Card 0a — Retirement at a glance**
+
+Two side-by-side stacked-bar ApexCharts (stacked vertically on narrow viewports). The card header carries a `nominal` / `today's money` badge that mirrors Card 0.
+
+- **Chart 1: Monthly income (net)** — one bar per canonical age (Age 55, Age `opt_dutch_age`, Retirement age). When two ages coincide the bars collapse and the label combines (e.g. `Age 55 · Retirement (age 55)`). Each bar stacks: RA drawdown (net), Dutch pension (net), and a per-vehicle PMT amortisation of every lump-sum component (Discretionary, TFSA, Crypto, RA commuted, one-off events). PMT formula is §5.4's "Lump-sum monthly drawdown" applied per age — each bar amortises its own pool from that age to `life_expectancy`. Title row shows `PMT to age <life_expectancy> @ <rate>%`.
+- **Chart 2: Capital available by age** — same bars, stacked by Discretionary, TFSA, Crypto, RA commuted lump sum, and one-off events net (`house_sale + inheritance_zar + savings_pot_withdrawals_net − bond_payoff`). Negative one-off net renders as 0 with a tooltip note rather than a negative segment.
+
+Empty layers (gated-out funds, Dutch disabled, etc.) are filtered out of the legend entirely. Both charts re-render on every retirement-input change and every Investments/RA-tab edit that changes a current value, on the same triggers as Card 0.
+
 **Card 1 — Monthly income (net of tax)**
 
 Phases vary by retirement age (let `D = opt_dutch_age`):
