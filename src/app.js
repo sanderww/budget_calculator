@@ -1105,6 +1105,17 @@
             const debtLoanStartInput = document.getElementById('debt-loan-start');
             const debtOriginalTermInput = document.getElementById('debt-original-term');
 
+            const DEBT_INPUT_BINDINGS = [
+                ['principal',       debtAmountInput],
+                ['current_balance', debtCurrentBalanceInput],
+                ['repayment',       debtRepaymentInput],
+                ['service_fee',     debtServiceFeeInput],
+                ['interest_rate',   debtInterestRateInput],
+                ['next_payment',    debtNextPaymentInput],
+                ['loan_start',      debtLoanStartInput],
+                ['original_term',   debtOriginalTermInput],
+            ];
+
             // Results
             const debtSavedAmountEl = document.getElementById('debt-saved-amount');
             const debtTotalExtraEl = document.getElementById('debt-total-extra');
@@ -1307,17 +1318,7 @@
                 }
             });
 
-            const _debtInputBindings = [
-                ['principal',       debtAmountInput],
-                ['current_balance', debtCurrentBalanceInput],
-                ['repayment',       debtRepaymentInput],
-                ['service_fee',     debtServiceFeeInput],
-                ['interest_rate',   debtInterestRateInput],
-                ['next_payment',    debtNextPaymentInput],
-                ['loan_start',      debtLoanStartInput],
-                ['original_term',   debtOriginalTermInput],
-            ];
-            _debtInputBindings.forEach(([key, input]) => {
+            DEBT_INPUT_BINDINGS.forEach(([key, input]) => {
                 input.addEventListener('input', () => {
                     setConfig(key, input.value);
                     calculateDebtProjection();
@@ -1336,17 +1337,7 @@
                         const parsed = parseDebtCSV(text);
                         debtData.repayments = parsed.repayments;
 
-                        const _debtKeys = [
-                            ['principal',       debtAmountInput],
-                            ['current_balance', debtCurrentBalanceInput],
-                            ['repayment',       debtRepaymentInput],
-                            ['service_fee',     debtServiceFeeInput],
-                            ['interest_rate',   debtInterestRateInput],
-                            ['next_payment',    debtNextPaymentInput],
-                            ['loan_start',      debtLoanStartInput],
-                            ['original_term',   debtOriginalTermInput],
-                        ];
-                        _debtKeys.forEach(([k, el]) => {
+                        DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
                             const v = configMap[k] ?? parsed.params[k];
                             if (v !== undefined && v !== '') el.value = v;
                         });
@@ -1392,21 +1383,11 @@
                     const parsed = parseDebtCSV(text);
                     debtData.repayments = parsed.repayments;
 
-                    const _debtKeys = [
-                        ['principal',       debtAmountInput],
-                        ['current_balance', debtCurrentBalanceInput],
-                        ['repayment',       debtRepaymentInput],
-                        ['service_fee',     debtServiceFeeInput],
-                        ['interest_rate',   debtInterestRateInput],
-                        ['next_payment',    debtNextPaymentInput],
-                        ['loan_start',      debtLoanStartInput],
-                        ['original_term',   debtOriginalTermInput],
-                    ];
-                    _debtKeys.forEach(([k, el]) => {
+                    DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
                         const v = parsed.params[k];
                         if (v !== undefined && v !== '') el.value = v;
                     });
-                    _debtKeys.forEach(([k, el]) => {
+                    DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
                         if (el.value !== '') configMap[k] = el.value;
                     });
                     persistConfig();
