@@ -911,6 +911,16 @@
                 ['original_term',   debtOriginalTermInput],
             ];
 
+            // Seed data shown only when db/transactions/debt.csv does not exist yet.
+            const defaultDebtRepayments = () => [
+                { id: generateId(), date: '2025-11-25', description: 'Extra Repayment', amount: 9500 },
+                { id: generateId(), date: '2025-10-25', description: 'Extra Repayment', amount: 8600 },
+                { id: generateId(), date: '2025-09-05', description: 'Extra Repayment', amount: 4000 },
+                { id: generateId(), date: '2025-07-25', description: 'Extra Repayment', amount: 4000 },
+                { id: generateId(), date: '2025-07-01', description: 'Extra Repayment', amount: 4000 },
+                { id: generateId(), date: '2025-05-31', description: 'Extra Repayment', amount: 4000 },
+            ];
+
             // Results
             const debtSavedAmountEl = document.getElementById('debt-saved-amount');
             const debtTotalExtraEl = document.getElementById('debt-total-extra');
@@ -1097,20 +1107,7 @@
 
                         renderRepayments();
                     } else {
-                        // Initialize with default extra repayments from prompt if file not found?
-                        // "Add extra repayments to the csv: ..."
-                        // The prompt lists specific repayments. I should pre-populate them if starting fresh?
-                        // "Add extra repayments to the csv:" implies I should add them to the file or the initial state.
-                        // I will add them to the initial state if no CSV is found.
-
-                        debtData.repayments = [
-                            { id: generateId(), date: '2025-11-25', description: 'Extra Repayment', amount: 9500 },
-                            { id: generateId(), date: '2025-10-25', description: 'Extra Repayment', amount: 8600 },
-                            { id: generateId(), date: '2025-09-05', description: 'Extra Repayment', amount: 4000 },
-                            { id: generateId(), date: '2025-07-25', description: 'Extra Repayment', amount: 4000 },
-                            { id: generateId(), date: '2025-07-01', description: 'Extra Repayment', amount: 4000 },
-                            { id: generateId(), date: '2025-05-31', description: 'Extra Repayment', amount: 4000 }
-                        ];
+                        debtData.repayments = defaultDebtRepayments();
                         debtNextPaymentInput.value = getUpcoming25th();
                         renderRepayments();
                     }
@@ -1290,7 +1287,6 @@
                     await loadBudgetCSVFromServer();
                 } catch (err) {
                     console.warn('Automatic Budget CSV load failed.', err);
-                    // initializeEmptyState(); // Already empty by default
                     renderBudget();
                 }
 
