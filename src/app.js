@@ -732,12 +732,14 @@
                     if (cryptoValEl) cryptoValEl.textContent = r.totalCryptoValue.toFixed(8);
                 }
 
+                const invEl = document.getElementById(invId);
+                if (invEl) invEl.textContent = fmtZAR(r.totalInvested);
+
                 const typeKey = type.toLowerCase();
                 const gainEl = document.getElementById(gainId);
                 if (!gainEl) return;
 
                 renderPerformancePanel(r, {
-                    invested:     document.getElementById(invId),
                     gain:         gainEl,
                     ann:          document.getElementById(annId),
                     money:        document.getElementById(moneyGainId),
