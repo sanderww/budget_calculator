@@ -14,10 +14,7 @@ function monthsBetween(aMs, bMs) {
     return (bMs - aMs) / MONTH_MS;
 }
 
-function formatRand(value) {
-    const n = Math.round(parseFloat(value) || 0);
-    return 'R ' + n.toLocaleString('en-ZA').replace(/,/g, ' ');
-}
+import { fmtZARAxis as formatRand } from './format.js';
 
 function formatDayMonthYear(ms) {
     return new Date(ms).toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric' });

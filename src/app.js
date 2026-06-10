@@ -27,6 +27,7 @@
         } from './calculations.js';
         import { renderBudgetTimeline as _renderBudgetTimeline } from './chart_budget_timeline.js';
         import { renderRetirementCharts as _renderRetirementCharts } from './chart_retirement.js';
+        import { fmtZAR, fmtZARWhole, fmtZARSigned } from './format.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -204,8 +205,8 @@
             };
 
             const raMakeId = () => 'ra_' + Math.random().toString(36).slice(2, 9);
-            const raFmtZARShort = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA');
-            const raFmtZAR = (n) => `R ${(parseFloat(n) || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const raFmtZARShort = fmtZARWhole;
+            const raFmtZAR = fmtZAR;
 
             function updateRaPerformanceDisplay() {
                 const cv = (raCurrentValue !== undefined && raCurrentValue !== null && raCurrentValue !== '')
@@ -455,10 +456,7 @@
             const calculateAllocationBtn = document.getElementById('calculate-allocation');
             const allocationResults = document.getElementById('allocation-results');
 
-            const formatCurrency = (value) => {
-                const num = parseFloat(value) || 0;
-                return `R ${num.toLocaleString('en-ZA', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-            };
+            const formatCurrency = fmtZAR;
 
             const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -1574,12 +1572,8 @@
             // --- RETIREMENT STATE ---
             let retirementParams = _getDefaultRetirementParams();
 
-            const retFmtZAR = (n) => 'R ' + Math.round(Number(n) || 0).toLocaleString('en-ZA');
-            const retFmtZARSign = (n) => {
-                const v = Math.round(Number(n) || 0);
-                const sign = v < 0 ? '-' : '';
-                return sign + 'R ' + Math.abs(v).toLocaleString('en-ZA');
-            };
+            const retFmtZAR = fmtZARWhole;
+            const retFmtZARSign = fmtZARSigned;
 
             // Returns the RA pot today (live read from RA tab state).
             // Prefer the user-entered actual fund value (real situation). Fall back to the
