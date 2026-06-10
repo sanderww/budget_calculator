@@ -1,6 +1,5 @@
 // Budget tab: inputs, summary card, monthly allocation, timeline chart.
 import {
-    getUpcoming25th as _getUpcoming25th,
     calculateBudgetSummary as _calculateBudgetSummary,
     calculateMonthlyAllocation as _calcMonthlyAllocation,
     parseBudgetCSV as _parseBudgetCSV,
@@ -36,8 +35,6 @@ const eftPercentageInput = document.getElementById('eft-percentage');
 const cryptoPercentageInput = document.getElementById('crypto-percentage');
 const calculateAllocationBtn = document.getElementById('calculate-allocation');
 const allocationResults = document.getElementById('allocation-results');
-
-const getUpcoming25th = () => _getUpcoming25th(new Date());
 
 const renderBudget = () => {
     savingsInput.value = budgetData.savings || '';
