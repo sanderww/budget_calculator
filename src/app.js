@@ -21,7 +21,6 @@
             parseRetirementCSV as _parseRetirementCSV,
             calculateRetirementSnapshot as _calculateRetirementSnapshot,
             tfsaLifetimeContributions as _tfsaLifetimeContributions,
-            parseConfigJSON as _parseConfigJSON,
             generateConfigJSON as _generateConfigJSON,
             PUBLIC_PARAMS as _PUBLIC_PARAMS,
         } from './calculations.js';
@@ -30,6 +29,8 @@
         import { fmtZAR, fmtZARWhole, fmtZARSigned } from './format.js';
         import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './app/rows.js';
         import { renderPerformancePanel } from './app/perf-panel.js';
+        import { isTestMode, setTestMode, dbPath, debouncedSave, saveToServer,
+                 getConfigMap, loadConfigFromServer, persistConfig, setConfig } from './app/persistence.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -105,77 +106,6 @@
                 switchTab('retirement');
                 renderRetirement();
             });
-
-            // --- TEST MODE ---
-            let testMode = false;
-            const dbPath = (filename) => testMode ? `db/test/${filename}` : `db/${filename}`;
-            const saveKey = (name) => testMode ? `test_${name}` : name;
-
-            // --- SERVER SAVE HELPERS ---
-            const _saveTimers = {};
-            const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
-                clearTimeout(_saveTimers[name]);
-                _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn, btnId), delayMs);
-            };
-
-            const saveToServer = async (name, csvFn, btnId) => {
-                const csv = csvFn();
-                try {
-                    const headers = { 'Content-Type': 'text/csv' };
-                    if (testMode) headers['X-Test-Mode'] = 'true';
-                    const res = await fetch(`/api/save/${saveKey(name)}`, {
-                        method: 'POST',
-                        headers,
-                        body: csv
-                    });
-                    if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-                    if (btnId) {
-                        const btn = document.getElementById(btnId);
-                        if (btn) {
-                            const orig = btn.innerHTML;
-                            btn.innerHTML = 'Saved!';
-                            setTimeout(() => btn.innerHTML = orig, 1500);
-                        }
-                    }
-                } catch (err) {
-                    console.error(`Failed to save ${name}:`, err);
-                }
-            };
-
-            // --- SHARED CONFIG LAYER ---
-            // Single source of truth for every param-style value. Loaded from
-            // db/config.public.json + db/config.private.json at startup and
-            // rewritten on any change.
-            let configMap = {};
-
-            const loadConfigFromServer = async () => {
-                try {
-                    const [pubRes, privRes] = await Promise.all([
-                        fetch(dbPath('config.public.json'), { cache: 'no-store' }),
-                        fetch(dbPath('config.private.json'), { cache: 'no-store' }),
-                    ]);
-                    const pubText  = pubRes.ok  ? await pubRes.text()  : '';
-                    const privText = privRes.ok ? await privRes.text() : '';
-                    configMap = { ..._parseConfigJSON(pubText), ..._parseConfigJSON(privText) };
-                } catch (err) {
-                    console.error('Failed to load config:', err);
-                    configMap = {};
-                }
-            };
-
-            const persistConfig = () => {
-                debouncedSave('config_public',
-                    () => _generateConfigJSON(configMap, { public: true }),
-                    null);
-                debouncedSave('config_private',
-                    () => _generateConfigJSON(configMap, { public: false }),
-                    null);
-            };
-
-            const setConfig = (key, value) => {
-                configMap[key] = value;
-                persistConfig();
-            };
 
             // --- RA STATE ---
             let raTransactions = [];
@@ -332,16 +262,16 @@
                         raTransactions = parsed.transactions;
                         raCurrentValue = parsed.currentValue;
                         raParams = {
-                            tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? parsed.params.tax_refund_rate_pct ?? 41,
-                            nominal_return_pct:  configMap.nominal_return_pct  ?? parsed.params.nominal_return_pct  ?? 10,
+                            tax_refund_rate_pct: getConfigMap().tax_refund_rate_pct ?? parsed.params.tax_refund_rate_pct ?? 41,
+                            nominal_return_pct:  getConfigMap().nominal_return_pct  ?? parsed.params.nominal_return_pct  ?? 10,
                         };
                         let dirty = false;
-                        if (configMap.tax_refund_rate_pct === undefined && parsed.params.tax_refund_rate_pct !== undefined) {
-                            configMap.tax_refund_rate_pct = parsed.params.tax_refund_rate_pct;
+                        if (getConfigMap().tax_refund_rate_pct === undefined && parsed.params.tax_refund_rate_pct !== undefined) {
+                            getConfigMap().tax_refund_rate_pct = parsed.params.tax_refund_rate_pct;
                             dirty = true;
                         }
-                        if (configMap.nominal_return_pct === undefined && parsed.params.nominal_return_pct !== undefined) {
-                            configMap.nominal_return_pct = parsed.params.nominal_return_pct;
+                        if (getConfigMap().nominal_return_pct === undefined && parsed.params.nominal_return_pct !== undefined) {
+                            getConfigMap().nominal_return_pct = parsed.params.nominal_return_pct;
                             dirty = true;
                         }
                         if (dirty) persistConfig();
@@ -373,13 +303,13 @@
                     raCurrentValue = undefined;
                 }
                 raParams = {
-                    tax_refund_rate_pct: configMap.tax_refund_rate_pct ?? 41,
-                    nominal_return_pct:  configMap.nominal_return_pct  ?? 10,
+                    tax_refund_rate_pct: getConfigMap().tax_refund_rate_pct ?? 41,
+                    nominal_return_pct:  getConfigMap().nominal_return_pct  ?? 10,
                 };
                 renderRa();
             };
             // Note: do NOT call loadRaCSVFromServer() here. It depends on
-            // configMap being loaded first; the init IIFE invokes it.
+            // the config being loaded first; the init IIFE invokes it.
 
             // --- BUDGET CALCULATOR LOGIC ---
             // (Existing Logic Wrapped)
@@ -582,8 +512,8 @@
                 const val = raw !== '' ? parseFloat(raw) : NaN;
                 if (Number.isFinite(val) && val >= 0) {
                     setConfig('budget_planned_monthly_savings', val);
-                } else if ('budget_planned_monthly_savings' in configMap) {
-                    delete configMap.budget_planned_monthly_savings;
+                } else if ('budget_planned_monthly_savings' in getConfigMap()) {
+                    delete getConfigMap().budget_planned_monthly_savings;
                     persistConfig();
                 }
             };
@@ -596,8 +526,8 @@
             if (plannedSavingsReset) {
                 plannedSavingsReset.addEventListener('click', () => {
                     if (plannedSavingsInput) plannedSavingsInput.value = '';
-                    if ('budget_planned_monthly_savings' in configMap) {
-                        delete configMap.budget_planned_monthly_savings;
+                    if ('budget_planned_monthly_savings' in getConfigMap()) {
+                        delete getConfigMap().budget_planned_monthly_savings;
                         persistConfig();
                     }
                     calculateAndDisplaySummary();
@@ -607,7 +537,7 @@
             // Must run after loadConfigFromServer and before the first chart render.
             const applyPlannedSavingsFromConfig = () => {
                 if (!plannedSavingsInput) return;
-                const saved = configMap.budget_planned_monthly_savings;
+                const saved = getConfigMap().budget_planned_monthly_savings;
                 plannedSavingsInput.value = (saved !== undefined && saved !== null && saved !== '') ? saved : '';
             };
 
@@ -844,7 +774,7 @@
                         const parsed = parseInvestmentCSV(text);
                         investmentData.transactions = parsed.transactions;
                         investmentData.currentValues = parsed.currentValues;
-                        investmentData.marginalRate = (configMap.marginal_rate ?? parsed.marginalRate ?? 41);
+                        investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
                         renderFullInvestmentUI();
                     }
                 } catch (e) {
@@ -866,9 +796,9 @@
                     const parsed = parseInvestmentCSV(text);
                     investmentData.transactions = parsed.transactions;
                     investmentData.currentValues = parsed.currentValues;
-                    investmentData.marginalRate = (configMap.marginal_rate ?? parsed.marginalRate ?? 41);
-                    if (configMap.marginal_rate === undefined && parsed.marginalRate !== undefined) {
-                        configMap.marginal_rate = parsed.marginalRate;
+                    investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
+                    if (getConfigMap().marginal_rate === undefined && parsed.marginalRate !== undefined) {
+                        getConfigMap().marginal_rate = parsed.marginalRate;
                         persistConfig();
                     }
                     renderFullInvestmentUI();
@@ -1098,7 +1028,7 @@
                         debtData.repayments = parsed.repayments;
 
                         DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
-                            const v = configMap[k] ?? parsed.params[k];
+                            const v = getConfigMap()[k] ?? parsed.params[k];
                             if (v !== undefined && v !== '') el.value = v;
                         });
 
@@ -1135,7 +1065,7 @@
                         if (v !== undefined && v !== '') el.value = v;
                     });
                     DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
-                        if (el.value !== '') configMap[k] = el.value;
+                        if (el.value !== '') getConfigMap()[k] = el.value;
                     });
                     persistConfig();
 
@@ -1244,7 +1174,7 @@
                 const btn = document.getElementById('test-mode-btn');
                 const dot = document.getElementById('test-mode-dot');
                 const label = document.getElementById('test-mode-label');
-                if (testMode) {
+                if (isTestMode()) {
                     btn.classList.remove('border-slate-200', 'text-slate-400', 'hover:text-slate-500', 'hover:border-slate-300');
                     btn.classList.add('border-amber-300', 'bg-amber-50', 'text-amber-700');
                     dot.classList.remove('bg-slate-300');
@@ -1260,10 +1190,10 @@
             };
 
             document.getElementById('test-mode-btn').addEventListener('click', async () => {
-                testMode = !testMode;
+                setTestMode(!isTestMode());
                 updateTestModeUI();
                 try {
-                    await loadConfigFromServer();           // configMap first — tabs read it
+                    await loadConfigFromServer();           // config first — tabs read it
                     applyPlannedSavingsFromConfig();        // prefill planned-savings input
                     await Promise.all([
                         loadBudgetCSVFromServer(),
@@ -1271,17 +1201,17 @@
                         loadDebtCSVFromServer(),
                         loadRaCSVFromServer(),
                     ]);
-                    loadRetirementFromConfig();             // synchronous — uses configMap
+                    loadRetirementFromConfig();             // synchronous — uses getConfigMap()
                 } catch (err) {
                     console.error('Test mode load failed, reverting:', err);
-                    testMode = !testMode;
+                    setTestMode(!isTestMode());
                     updateTestModeUI();
                 }
             });
 
             // --- INITIALIZATION ---
             (async () => {
-                await loadConfigFromServer();          // must run before tabs that read configMap
+                await loadConfigFromServer();          // must run before tabs that read the config
                 applyPlannedSavingsFromConfig();       // prefill planned-savings input
                 try {
                     await loadBudgetCSVFromServer();
@@ -1387,7 +1317,7 @@
             }
 
             function retPersist() {
-                Object.keys(retirementParams).forEach(k => { configMap[k] = retirementParams[k]; });
+                Object.keys(retirementParams).forEach(k => { getConfigMap()[k] = retirementParams[k]; });
                 persistConfig();
             }
 
@@ -1416,12 +1346,12 @@
                 });
 
                 document.getElementById('ret-save-csv').addEventListener('click', () => {
-                    Object.keys(retirementParams).forEach(k => { configMap[k] = retirementParams[k]; });
+                    Object.keys(retirementParams).forEach(k => { getConfigMap()[k] = retirementParams[k]; });
                     saveToServer('config_public',
-                        () => _generateConfigJSON(configMap, { public: true }),
+                        () => _generateConfigJSON(getConfigMap(), { public: true }),
                         'ret-save-csv');
                     saveToServer('config_private',
-                        () => _generateConfigJSON(configMap, { public: false }),
+                        () => _generateConfigJSON(getConfigMap(), { public: false }),
                         null);
                 });
 
@@ -1753,10 +1683,10 @@
             retWireInputs();
 
             const loadRetirementFromConfig = () => {
-                retirementParams = { ..._getDefaultRetirementParams(), ...configMap };
+                retirementParams = { ..._getDefaultRetirementParams(), ...getConfigMap() };
                 retApplyParamsToInputs();
                 renderRetirement();
             };
             // Note: do NOT call loadRetirementFromConfig() here. It depends
-            // on configMap being loaded; the init IIFE invokes it.
+            // on the config being loaded; the init IIFE invokes it.
         });
