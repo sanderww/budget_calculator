@@ -72,3 +72,8 @@ export const setConfig = (key, value) => {
     configMap[key] = value;
     persistConfig();
 };
+
+export const unsetConfig = (key) => {
+    delete configMap[key];
+    persistConfig();
+};

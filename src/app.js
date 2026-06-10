@@ -30,7 +30,7 @@
         import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './app/rows.js';
         import { renderPerformancePanel } from './app/perf-panel.js';
         import { isTestMode, setTestMode, dbPath, debouncedSave, saveToServer,
-                 getConfigMap, loadConfigFromServer, persistConfig, setConfig } from './app/persistence.js';
+                 getConfigMap, loadConfigFromServer, persistConfig, setConfig, unsetConfig } from './app/persistence.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -513,8 +513,7 @@
                 if (Number.isFinite(val) && val >= 0) {
                     setConfig('budget_planned_monthly_savings', val);
                 } else if ('budget_planned_monthly_savings' in getConfigMap()) {
-                    delete getConfigMap().budget_planned_monthly_savings;
-                    persistConfig();
+                    unsetConfig('budget_planned_monthly_savings');
                 }
             };
             if (plannedSavingsInput) {
@@ -527,8 +526,7 @@
                 plannedSavingsReset.addEventListener('click', () => {
                     if (plannedSavingsInput) plannedSavingsInput.value = '';
                     if ('budget_planned_monthly_savings' in getConfigMap()) {
-                        delete getConfigMap().budget_planned_monthly_savings;
-                        persistConfig();
+                        unsetConfig('budget_planned_monthly_savings');
                     }
                     calculateAndDisplaySummary();
                 });
