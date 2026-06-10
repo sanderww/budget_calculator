@@ -732,6 +732,8 @@
                     if (cryptoValEl) cryptoValEl.textContent = r.totalCryptoValue.toFixed(8);
                 }
 
+                // invEl is written here (not via renderPerformancePanel) so it updates even
+                // when gainEl is absent — matching the pre-refactor order.
                 const invEl = document.getElementById(invId);
                 if (invEl) invEl.textContent = fmtZAR(r.totalInvested);
 
