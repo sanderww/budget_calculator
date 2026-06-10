@@ -29,6 +29,7 @@
         import { renderRetirementCharts as _renderRetirementCharts } from './chart_retirement.js';
         import { fmtZAR, fmtZARWhole, fmtZARSigned } from './format.js';
         import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './app/rows.js';
+        import { renderPerformancePanel } from './app/perf-panel.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -195,43 +196,14 @@
                     ? Number(raCurrentValue) || 0
                     : 0;
                 const r = _calculateInvestmentPerformance(raTransactions, cv, new Date(), 0);
-
-                document.getElementById('ra-invested').textContent = raFmtZAR(r.totalInvested);
-
-                const gainEl     = document.getElementById('ra-gain');
-                const annEl      = document.getElementById('ra-ann');
-                const moneyEl    = document.getElementById('ra-gain-money');
-                const savingsEl  = document.getElementById('ra-savings-gain');
-                const netEl      = document.getElementById('ra-net-savings');
-
-                if (r.totalInvested === 0) {
-                    gainEl.textContent = '0.00%';   gainEl.className = 'font-bold text-slate-800';
-                    annEl.textContent  = '0.00%';   annEl.className  = 'font-bold text-slate-800';
-                    moneyEl.textContent = 'R 0.00'; moneyEl.className = 'font-bold text-slate-800';
-                    savingsEl.textContent = 'R 0.00';
-                    netEl.textContent     = 'R 0.00';
-                    netEl.className       = 'font-medium text-slate-800';
-                    return;
-                }
-
-                gainEl.textContent = `${r.percentageReturn >= 0 ? '+' : ''}${r.percentageReturn.toFixed(2)}%`;
-                gainEl.className   = `font-bold ${r.percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-
-                moneyEl.textContent = `${r.absoluteReturn >= 0 ? '+' : ''}${raFmtZAR(r.absoluteReturn)}`;
-                moneyEl.className   = `font-bold ${r.absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-
-                savingsEl.textContent = `+${raFmtZAR(r.savingsGain)}`;
-
-                netEl.textContent = `${r.netVsSavings >= 0 ? '+' : ''}${raFmtZAR(r.netVsSavings)}`;
-                netEl.className   = `font-bold ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
-
-                if (r.annualizedReturn === null) {
-                    annEl.textContent = 'N/A';
-                    annEl.className   = 'font-bold text-slate-400';
-                } else {
-                    annEl.textContent = `${r.annualizedReturn >= 0 ? '+' : ''}${r.annualizedReturn.toFixed(2)}%`;
-                    annEl.className   = `font-bold ${r.annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-                }
+                renderPerformancePanel(r, {
+                    invested:     document.getElementById('ra-invested'),
+                    gain:         document.getElementById('ra-gain'),
+                    ann:          document.getElementById('ra-ann'),
+                    money:        document.getElementById('ra-gain-money'),
+                    savingsGain:  document.getElementById('ra-savings-gain'),
+                    netVsSavings: document.getElementById('ra-net-savings'),
+                }, { fmt: fmtZAR });
             }
 
             function renderRa() {
@@ -755,75 +727,25 @@
                 const rate = (type === 'Discretionary') ? (parseFloat(investmentData.marginalRate) || 0) : 0;
                 const r = _calculateInvestmentPerformance(txs, currentValue, new Date(), rate);
 
-                const invEl = document.getElementById(invId);
-                if (invEl) invEl.textContent = formatCurrency(r.totalInvested);
-
                 if (type === 'Crypto') {
                     const cryptoValEl = document.getElementById('total-crypto-value');
                     if (cryptoValEl) cryptoValEl.textContent = r.totalCryptoValue.toFixed(8);
                 }
 
+                const typeKey = type.toLowerCase();
                 const gainEl = document.getElementById(gainId);
-                const annEl = document.getElementById(annId);
-                const moneyGainEl = document.getElementById(moneyGainId);
-
                 if (!gainEl) return;
 
-                const typeKey = type.toLowerCase();
-                const taxEl = document.getElementById(`tax-${typeKey}`);
-                const netAfterTaxEl = document.getElementById(`net-savings-after-tax-${typeKey}`);
-
-                if (r.totalInvested === 0) {
-                    gainEl.textContent = '0.00%';
-                    gainEl.className = 'font-bold text-slate-800';
-                    if (annEl) { annEl.textContent = '0.00%'; annEl.className = 'font-bold text-slate-800'; }
-                    if (moneyGainEl) { moneyGainEl.textContent = 'R 0.00'; moneyGainEl.className = 'font-bold text-slate-800'; }
-                    const sg0 = document.getElementById(`savings-gain-${typeKey}`);
-                    const ns0 = document.getElementById(`net-savings-${typeKey}`);
-                    if (sg0) sg0.textContent = 'R 0.00';
-                    if (ns0) { ns0.textContent = 'R 0.00'; ns0.className = (typeKey === 'discretionary' ? 'font-medium text-slate-400' : 'font-bold text-slate-800'); }
-                    if (taxEl) { taxEl.textContent = 'R 0.00'; taxEl.className = 'font-medium text-red-500'; }
-                    if (netAfterTaxEl) { netAfterTaxEl.textContent = 'R 0.00'; netAfterTaxEl.className = 'font-bold text-slate-800'; }
-                    return;
-                }
-
-                gainEl.textContent = `${r.percentageReturn >= 0 ? '+' : ''}${r.percentageReturn.toFixed(2)}%`;
-                gainEl.className = `font-bold ${r.percentageReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-
-                if (moneyGainEl) {
-                    moneyGainEl.textContent = `${r.absoluteReturn >= 0 ? '+' : ''}${formatCurrency(r.absoluteReturn)}`;
-                    moneyGainEl.className = `font-bold ${r.absoluteReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-                }
-
-                const savingsGainEl = document.getElementById(`savings-gain-${typeKey}`);
-                const netSavingsEl = document.getElementById(`net-savings-${typeKey}`);
-                if (savingsGainEl) savingsGainEl.textContent = `+${formatCurrency(r.savingsGain)}`;
-                if (netSavingsEl) {
-                    netSavingsEl.textContent = `${r.netVsSavings >= 0 ? '+' : ''}${formatCurrency(r.netVsSavings)}`;
-                    if (typeKey === 'discretionary') {
-                        netSavingsEl.className = 'font-medium text-slate-400';
-                    } else {
-                        netSavingsEl.className = `font-bold ${r.netVsSavings >= 0 ? 'text-green-600' : 'text-red-500'}`;
-                    }
-                }
-
-                if (taxEl) {
-                    taxEl.textContent = r.estimatedTax > 0 ? `-${formatCurrency(r.estimatedTax)}` : 'R 0.00';
-                    taxEl.className = 'font-medium text-red-500';
-                }
-                if (netAfterTaxEl) {
-                    netAfterTaxEl.textContent = `${r.netVsSavingsAfterTax >= 0 ? '+' : ''}${formatCurrency(r.netVsSavingsAfterTax)}`;
-                    netAfterTaxEl.className = `font-bold ${r.netVsSavingsAfterTax >= 0 ? 'text-green-600' : 'text-red-500'}`;
-                }
-
-                if (r.annualizedReturn === null) {
-                    if (annEl) { annEl.textContent = 'N/A'; annEl.className = 'font-bold text-slate-400'; }
-                } else {
-                    if (annEl) {
-                        annEl.textContent = `${r.annualizedReturn >= 0 ? '+' : ''}${r.annualizedReturn.toFixed(2)}%`;
-                        annEl.className = `font-bold ${r.annualizedReturn >= 0 ? 'text-green-600' : 'text-red-600'}`;
-                    }
-                }
+                renderPerformancePanel(r, {
+                    invested:     document.getElementById(invId),
+                    gain:         gainEl,
+                    ann:          document.getElementById(annId),
+                    money:        document.getElementById(moneyGainId),
+                    savingsGain:  document.getElementById(`savings-gain-${typeKey}`),
+                    netVsSavings: document.getElementById(`net-savings-${typeKey}`),
+                    tax:          document.getElementById(`tax-${typeKey}`),
+                    netAfterTax:  document.getElementById(`net-savings-after-tax-${typeKey}`),
+                }, { fmt: fmtZAR, mutedNet: typeKey === 'discretionary' });
             };
 
             // Investment Event Handlers
