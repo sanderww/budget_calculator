@@ -12,14 +12,29 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f8fafc;
-            /* slate-50 */
+            background-color: #f1f5f9;
+            /* slate-100 with a soft indigo glow at the top */
+            background-image:
+                radial-gradient(1100px 420px at 50% -120px, rgb(99 102 241 / 0.08), transparent),
+                linear-gradient(to bottom, #f8fafc, #f1f5f9);
+            background-attachment: fixed;
+            color: #0f172a;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::selection {
+            background-color: #c7d2fe;
+            /* indigo-200 */
         }
 
         .card {
             background-color: white;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+            border: 1px solid #e2e8f0;
+            /* slate-200 */
+            border-radius: 1rem;
+            box-shadow:
+                0 1px 2px rgb(15 23 42 / 0.04),
+                0 12px 24px -16px rgb(15 23 42 / 0.12);
             padding: 1.5rem;
             margin-bottom: 1.5rem;
         }
@@ -27,32 +42,51 @@
         .input-field {
             width: 100%;
             padding: 0.5rem 0.75rem;
+            background-color: white;
             border: 1px solid #cbd5e1;
             /* slate-300 */
-            border-radius: 0.375rem;
-            transition: border-color 0.2s, box-shadow 0.2s;
+            border-radius: 0.5rem;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .input-field:hover {
+            border-color: #94a3b8;
+            /* slate-400 */
         }
 
         .input-field:focus {
             outline: none;
-            border-color: #4f46e5;
-            /* indigo-600 */
-            box-shadow: 0 0 0 2px #c7d2fe;
-            /* indigo-200 */
+            border-color: #6366f1;
+            /* indigo-500 */
+            box-shadow: 0 0 0 3px rgb(99 102 241 / 0.15);
+        }
+
+        input[type="number"].input-field {
+            font-variant-numeric: tabular-nums;
         }
 
         .btn {
             padding: 0.5rem 1rem;
-            border-radius: 0.375rem;
+            border-radius: 0.5rem;
             font-weight: 500;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.05s;
+        }
+
+        .btn:focus-visible {
+            outline: 2px solid #6366f1;
+            outline-offset: 2px;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
         }
 
         .btn-primary {
             background-color: #4f46e5;
             /* indigo-600 */
             color: white;
+            box-shadow: 0 1px 2px rgb(79 70 229 / 0.35);
         }
 
         .btn-primary:hover {
@@ -61,26 +95,35 @@
         }
 
         .btn-secondary {
-            background-color: #e2e8f0;
-            /* slate-200 */
-            color: #1e293b;
-            /* slate-800 */
+            background-color: white;
+            color: #334155;
+            /* slate-700 */
+            border: 1px solid #cbd5e1;
+            /* slate-300 */
+            box-shadow: 0 1px 2px rgb(15 23 42 / 0.05);
         }
 
         .btn-secondary:hover {
-            background-color: #cbd5e1;
-            /* slate-300 */
+            background-color: #f8fafc;
+            /* slate-50 */
+            border-color: #94a3b8;
+            /* slate-400 */
         }
 
         .btn-danger {
-            background-color: #ef4444;
-            /* red-500 */
-            color: white;
+            background-color: #fef2f2;
+            /* red-50 */
+            color: #dc2626;
+            /* red-600 */
+            border: 1px solid #fecaca;
+            /* red-200 */
         }
 
         .btn-danger:hover {
             background-color: #dc2626;
             /* red-600 */
+            border-color: #dc2626;
+            color: white;
         }
 
         .currency-prefix {
@@ -90,6 +133,7 @@
             transform: translateY(-50%);
             color: #64748b;
             /* slate-500 */
+            pointer-events: none;
         }
 
         .amount-input {
@@ -98,14 +142,14 @@
         }
 
         .refresh-icon {
-            transition: transform 0.3s;
+            transition: transform 0.3s, color 0.15s;
             color: #94a3b8;
             /* slate-400 */
         }
 
         .refresh-icon:hover {
-            color: #475569;
-            /* slate-600 */
+            color: #4f46e5;
+            /* indigo-600 */
             transform: rotate(180deg);
         }
     </style>
@@ -113,13 +157,38 @@
 
 <body class="p-4 sm:p-6 md:p-8">
 
+    <!-- Shared SVG icon definitions (referenced via <use href="#icon-..."/>) -->
+    <svg xmlns="http://www.w3.org/2000/svg" class="hidden" aria-hidden="true">
+        <symbol id="icon-refresh" viewBox="0 0 24 24">
+            <path d="M21 2v6h-6"/>
+            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
+            <path d="M3 22v-6h6"/>
+            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
+        </symbol>
+        <symbol id="icon-save" viewBox="0 0 24 24">
+            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+            <polyline points="17 21 17 13 7 13 7 21"/>
+            <polyline points="7 3 7 8 15 8"/>
+        </symbol>
+    </svg>
+
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
-        <header class="mb-6 flex items-start justify-between">
-            <div>
-                <h1 class="text-3xl font-bold text-slate-800">Personal Finance Dashboard</h1>
-                <p class="text-slate-500 mt-1">Manage your budget and track your investments.</p>
-                <p id="test-mode-label" class="hidden text-xs text-amber-600 mt-1 font-medium tracking-wide">SAMPLE DATA</p>
+        <header class="mb-8 flex items-start justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="hidden sm:flex w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white items-center justify-center shadow-lg shadow-indigo-200 shrink-0"
+                    aria-hidden="true">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 3v18h18"/>
+                        <path d="M7 14l4-4 3 3 5-6"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-3xl font-bold tracking-tight text-slate-900">Personal Finance Dashboard</h1>
+                    <p class="text-slate-500 mt-0.5">Manage your budget and track your investments.</p>
+                    <p id="test-mode-label" class="hidden text-xs text-amber-600 mt-1 font-medium tracking-wide">SAMPLE DATA</p>
+                </div>
             </div>
             <button id="test-mode-btn"
                 class="mt-1 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors border-slate-200 text-slate-400 hover:text-slate-500 hover:border-slate-300"
@@ -130,81 +199,56 @@
         </header>
 
         <!-- Tab Navigation -->
-        <div class="mb-6 border-b border-slate-200">
+        <div class="mb-6 border-b border-slate-200 overflow-x-auto">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
                 <div class="inline-flex items-center gap-1">
                     <button id="tab-budget"
-                        class="border-indigo-500 text-indigo-600 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        class="border-indigo-500 text-indigo-600 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
                         Budget Calculator
                     </button>
                     <button id="refresh-budget" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh budget calculations">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2v6h-6"/>
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-                            <path d="M3 22v-6h6"/>
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                        </svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
                     <button id="tab-investment"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
                         Investment Tracker
                     </button>
                     <button id="refresh-investment" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh investment calculations">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2v6h-6"/>
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-                            <path d="M3 22v-6h6"/>
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                        </svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
                     <button id="tab-debt"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
                         Debt Calculator
                     </button>
                     <button id="refresh-debt" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh debt calculations">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2v6h-6"/>
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-                            <path d="M3 22v-6h6"/>
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                        </svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
                     <button id="tab-ra"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
                         RA
                     </button>
                     <button id="refresh-ra" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh RA calculations">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2v6h-6"/>
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-                            <path d="M3 22v-6h6"/>
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                        </svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
                     <button id="tab-retirement"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
                         Retirement
                     </button>
                     <button id="refresh-retirement" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh retirement calculations">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M21 2v6h-6"/>
-                            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-                            <path d="M3 22v-6h6"/>
-                            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-                        </svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
                     </button>
                 </div>
                 <div class="inline-flex items-center gap-1">
                     <button id="tab-history"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm">
+                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
                         History
                     </button>
                 </div>
@@ -252,14 +296,7 @@
                                 </div>
                                 <div class="text-xs text-slate-600 mb-3">db/calulator_data.csv</div>
                                 <button id="save-csv" class="btn btn-primary text-xs w-full">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="inline-block mr-2">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
-                                        </path>
-                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                        <polyline points="7 3 7 8 15 8"></polyline>
-                                    </svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><use href="#icon-save"/></svg>
                                     Save Budget
                                 </button>
                             </div>
@@ -321,24 +358,24 @@
 
                                 <div class="space-y-4">
                                     <!-- Current Savings -->
-                                    <div class="p-4 bg-slate-50 rounded-lg">
+                                    <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                         <p class="text-sm font-medium text-slate-500">Current Savings</p>
-                                        <p id="current-savings" class="text-2xl font-bold text-slate-700">R 0.00</p>
+                                        <p id="current-savings" class="text-2xl font-bold text-slate-700 tabular-nums">R 0.00</p>
                                     </div>
 
                                     <!-- Net Savings Now -->
-                                    <div class="p-4 bg-slate-50 rounded-lg">
-                                        <p class="text-sm font-medium text-slate-500">Net savings now</p>
-                                        <p id="current-net-amount" class="text-3xl font-bold text-green-600">R 0.00</p>
-                                        <p class="text-xs text-slate-400 mt-1">Savings − (Debts + Provisions)</p>
+                                    <div class="p-4 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl border border-emerald-200">
+                                        <p class="text-sm font-medium text-emerald-800">Net savings now</p>
+                                        <p id="current-net-amount" class="text-3xl font-bold text-green-600 tabular-nums">R 0.00</p>
+                                        <p class="text-xs text-emerald-700/60 mt-1">Savings − (Debts + Provisions)</p>
                                     </div>
 
                                     <!-- Net Savings on selected date -->
-                                    <div class="p-4 bg-slate-50 rounded-lg">
-                                        <label for="future-date" class="text-sm font-medium text-slate-500">Net savings on</label>
+                                    <div class="p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border border-indigo-200">
+                                        <label for="future-date" class="text-sm font-medium text-indigo-800">Net savings on</label>
                                         <input type="date" id="future-date" class="input-field w-full mt-1">
-                                        <p id="future-net-amount" class="text-3xl font-bold text-indigo-600 mt-2">R 0.00</p>
-                                        <p class="text-xs text-slate-400 mt-1">Net savings now − Future costs up to date</p>
+                                        <p id="future-net-amount" class="text-3xl font-bold text-indigo-600 mt-2 tabular-nums">R 0.00</p>
+                                        <p class="text-xs text-indigo-700/60 mt-1">Net savings now − Future costs up to date</p>
                                     </div>
                                 </div>
 
@@ -456,14 +493,7 @@
                                     Load Investments
                                 </button>
                                 <button id="save-inv-csv" class="btn btn-primary text-xs w-full">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="inline-block mr-2">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
-                                        </path>
-                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                        <polyline points="7 3 7 8 15 8"></polyline>
-                                    </svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><use href="#icon-save"/></svg>
                                     Save Investments
                                 </button>
                             </div>
@@ -480,7 +510,7 @@
                             <h2 class="text-xl font-semibold text-slate-800 mb-4">Portfolio Performance</h2>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <!-- Discretionary -->
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <h3 class="font-semibold text-slate-700 mb-2">Discretionary</h3>
                                     <div class="mb-2">
                                         <label class="text-xs text-slate-500">Current Value</label>
@@ -531,7 +561,7 @@
                                 </div>
 
                                 <!-- TFSA -->
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <h3 class="font-semibold text-slate-700 mb-2">TFSA</h3>
                                     <div class="mb-2">
                                         <label class="text-xs text-slate-500">Current Value</label>
@@ -581,7 +611,7 @@
                                 </div>
 
                                 <!-- Crypto -->
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <div class="flex justify-between items-start mb-2">
                                         <h3 class="font-semibold text-slate-700">Crypto</h3>
                                         <div class="text-right">
@@ -693,14 +723,7 @@
                                     Load Debt Data
                                 </button>
                                 <button id="save-debt-csv" class="btn btn-primary text-xs w-full">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="inline-block mr-2">
-                                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z">
-                                        </path>
-                                        <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                        <polyline points="7 3 7 8 15 8"></polyline>
-                                    </svg>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><use href="#icon-save"/></svg>
                                     Save Debt Data
                                 </button>
                             </div>
@@ -782,36 +805,36 @@
                             <h2 class="text-xl font-semibold text-slate-800 mb-4">Projection Results</h2>
                             <div class="space-y-4">
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div class="p-3 bg-white rounded shadow-sm">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div class="text-xs text-slate-500">Interest Saved</div>
                                         <div id="debt-saved-amount" class="text-lg font-bold text-green-600">R 0.00
                                         </div>
                                     </div>
-                                    <div class="p-3 bg-white rounded shadow-sm">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div class="text-xs text-slate-500">Total Extra Paid</div>
                                         <div id="debt-total-extra" class="text-lg font-bold text-slate-700">R 0.00</div>
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div class="p-3 bg-white rounded shadow-sm">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div class="text-xs text-slate-500">Net Return (Cash)</div>
                                         <div id="debt-net-return" class="text-lg font-bold text-indigo-600">R 0.00</div>
                                     </div>
-                                    <div class="p-3 bg-white rounded shadow-sm">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div class="text-xs text-slate-500">Annualised Yield</div>
                                         <div id="debt-yield" class="text-lg font-bold text-orange-600">0.00%</div>
                                     </div>
                                 </div>
-                                <div class="p-3 bg-white rounded shadow-sm border border-green-100 bg-green-50">
+                                <div class="p-3 rounded-xl shadow-sm border border-green-200 bg-green-50">
                                     <div class="text-xs text-slate-600">Time Reduced</div>
                                     <div id="debt-time-reduced" class="text-xl font-bold text-green-700">-</div>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
-                                    <div class="p-3 bg-white rounded shadow-sm">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div class="text-xs text-slate-500">New End Date</div>
                                         <div id="debt-new-end-date" class="text-sm font-bold text-indigo-600">-</div>
                                     </div>
-                                    <div class="p-3 bg-white rounded shadow-sm">
+                                    <div class="p-3 bg-white rounded-xl shadow-sm border border-slate-200">
                                         <div class="text-xs text-slate-500">Original End Date</div>
                                         <div id="debt-original-end-date" class="text-sm font-medium text-slate-600">-
                                         </div>
@@ -880,7 +903,7 @@
                         <div class="card">
                             <h2 class="text-xl font-semibold text-slate-800 mb-4">RA Summary</h2>
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <div class="text-xs text-slate-500">Total contributed</div>
                                     <div id="ra-total-contributed" class="text-xl font-bold text-slate-800">R 0</div>
                                     <div class="text-xs text-slate-400 mt-1">
@@ -894,7 +917,7 @@
                                     </div>
                                 </div>
 
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <label class="text-xs text-slate-500">Tax refund rate (%)</label>
                                     <input type="number" id="ra-refund-rate" class="input-field text-sm font-bold" min="0" max="100" step="0.1" value="41">
                                     <div class="text-xs text-slate-500 mt-2">Expected refund (current tax year):</div>
@@ -903,7 +926,7 @@
                                     <div id="ra-cap-warning" class="hidden mt-2 inline-block text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">cap hit in some year</div>
                                 </div>
 
-                                <div class="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                                     <h3 class="font-semibold text-slate-700 mb-2">Performance</h3>
                                     <div class="mb-2">
                                         <label class="text-xs text-slate-500">Current fund value (R)</label>
@@ -1625,7 +1648,7 @@
             const renderList = (container, items, createItemFn) => {
                 container.innerHTML = '';
                 if (items.length === 0) {
-                    container.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No items added yet.</p>`;
+                    container.innerHTML = `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">No items added yet.</p>`;
                 } else {
                     items.forEach(item => container.appendChild(createItemFn(item)));
                 }
@@ -1935,7 +1958,7 @@
             const renderTransactions = () => {
                 transactionList.innerHTML = '';
                 if (investmentData.transactions.length === 0) {
-                    transactionList.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No transactions added yet.</p>`;
+                    transactionList.innerHTML = `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">No transactions added yet.</p>`;
                 } else {
                     // Sort by date descending (latest on top), then by ID (creation time) descending
                     const sorted = [...investmentData.transactions].sort((a, b) => {
@@ -2357,7 +2380,7 @@
             const renderRepayments = () => {
                 repaymentList.innerHTML = '';
                 if (debtData.repayments.length === 0) {
-                    repaymentList.innerHTML = `<p class="text-sm text-slate-400 text-center py-2">No extra repayments added.</p>`;
+                    repaymentList.innerHTML = `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">No extra repayments added.</p>`;
                 } else {
                     // Sort by date descending (latest on top)
                     const sorted = [...debtData.repayments].sort((a, b) => {
@@ -2620,13 +2643,13 @@
                     totalTFSA += tfsa;
                     totalDisc += disc;
                     totalCrypto += crypto;
-                    return `<tr class="border-t border-slate-200 hover:bg-slate-50">
+                    return `<tr class="border-t border-slate-200 hover:bg-slate-50 transition-colors">
                         <td class="py-2.5 px-4 font-medium text-slate-700">${year}</td>
-                        <td class="py-2.5 px-4 text-slate-600">${fmt(debt)}</td>
-                        <td class="py-2.5 px-4 font-medium text-slate-700">${fmt(invTotal)}</td>
-                        <td class="py-2.5 px-4 text-slate-600">${fmt(tfsa)}</td>
-                        <td class="py-2.5 px-4 text-slate-600">${fmt(disc)}</td>
-                        <td class="py-2.5 px-4 text-slate-600">${fmt(crypto)}</td>
+                        <td class="py-2.5 px-4 text-slate-600 text-right tabular-nums">${fmt(debt)}</td>
+                        <td class="py-2.5 px-4 font-medium text-slate-700 text-right tabular-nums">${fmt(invTotal)}</td>
+                        <td class="py-2.5 px-4 text-slate-600 text-right tabular-nums">${fmt(tfsa)}</td>
+                        <td class="py-2.5 px-4 text-slate-600 text-right tabular-nums">${fmt(disc)}</td>
+                        <td class="py-2.5 px-4 text-slate-600 text-right tabular-nums">${fmt(crypto)}</td>
                     </tr>`;
                 }).join('');
 
@@ -2638,24 +2661,24 @@
                         <div class="overflow-x-auto">
                             <table class="w-full text-sm">
                                 <thead>
-                                    <tr class="text-left text-xs text-slate-500 uppercase tracking-wide">
-                                        <th class="py-2 px-4 font-medium">Year</th>
-                                        <th class="py-2 px-4 font-medium">Debt Repaid</th>
-                                        <th class="py-2 px-4 font-medium">Investments Total</th>
-                                        <th class="py-2 px-4 font-medium">TFSA</th>
-                                        <th class="py-2 px-4 font-medium">Discretionary</th>
-                                        <th class="py-2 px-4 font-medium">Crypto</th>
+                                    <tr class="text-xs text-slate-500 uppercase tracking-wide">
+                                        <th class="py-2 px-4 font-medium text-left">Year</th>
+                                        <th class="py-2 px-4 font-medium text-right">Debt Repaid</th>
+                                        <th class="py-2 px-4 font-medium text-right">Investments Total</th>
+                                        <th class="py-2 px-4 font-medium text-right">TFSA</th>
+                                        <th class="py-2 px-4 font-medium text-right">Discretionary</th>
+                                        <th class="py-2 px-4 font-medium text-right">Crypto</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${rowsHtml}
                                     <tr class="border-t-2 border-slate-300 font-semibold text-slate-800 bg-slate-50">
                                         <td class="py-2.5 px-4">Total</td>
-                                        <td class="py-2.5 px-4">${fmt(totalDebt)}</td>
-                                        <td class="py-2.5 px-4">${fmt(totalInvTotal)}</td>
-                                        <td class="py-2.5 px-4">${fmt(totalTFSA)}</td>
-                                        <td class="py-2.5 px-4">${fmt(totalDisc)}</td>
-                                        <td class="py-2.5 px-4">${fmt(totalCrypto)}</td>
+                                        <td class="py-2.5 px-4 text-right tabular-nums">${fmt(totalDebt)}</td>
+                                        <td class="py-2.5 px-4 text-right tabular-nums">${fmt(totalInvTotal)}</td>
+                                        <td class="py-2.5 px-4 text-right tabular-nums">${fmt(totalTFSA)}</td>
+                                        <td class="py-2.5 px-4 text-right tabular-nums">${fmt(totalDisc)}</td>
+                                        <td class="py-2.5 px-4 text-right tabular-nums">${fmt(totalCrypto)}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -2936,22 +2959,22 @@
                         <div class="text-center text-xs font-semibold text-slate-500 uppercase tracking-wider">Age ${Number(retirementParams.opt_dutch_age) || 68}</div>
 
                         <div class="text-xs text-slate-600 self-center">Funds available (lump sum)</div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.lumpSum.current55, snap.lumpSum.projected55)}</div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.lumpSum.projected68, snap.lumpSum.projected68)}</div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">${cell(snap.lumpSum.current55, snap.lumpSum.projected55)}</div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">${cell(snap.lumpSum.projected68, snap.lumpSum.projected68)}</div>
 
                         <div class="text-xs text-slate-600 self-center">Monthly income (net)</div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                             ${cell(snap.monthly.current55.net, snap.monthly.projected55.net)}
                             ${snap.lumpSum.ra55IsDeMinimis ? `<div class="text-[10px] text-amber-700 mt-1">RA pot below R360k at 55 — full pot shown as lump sum above; monthly RA drawdown N/A.</div>` : ''}
                         </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">${cell(snap.monthly.projected68.net, snap.monthly.projected68.net)}</div>
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">${cell(snap.monthly.projected68.net, snap.monthly.projected68.net)}</div>
 
                         <div class="text-xs text-slate-600 self-center">Monthly from lump sum<div class="text-[10px] text-slate-400">PMT to age ${snap.monthly.lifeExpectancy} @ ${snap.monthly.lumpSumDrawdownReturnPct}%</div></div>
-                        <div class="md:col-span-2 p-3 bg-slate-50 rounded-lg border border-slate-200"><div class="text-2xl font-bold text-indigo-700">${retFmtZAR(snap.monthly.lumpSumDrawdown)}</div><div class="text-xs text-slate-500">over ${snap.monthly.lumpSumDrawdownMonths} months (${(snap.monthly.lumpSumDrawdownMonths/12).toFixed(0)} yrs)</div></div>
+                        <div class="md:col-span-2 p-3 bg-slate-50 rounded-xl border border-slate-200"><div class="text-2xl font-bold text-indigo-700">${retFmtZAR(snap.monthly.lumpSumDrawdown)}</div><div class="text-xs text-slate-500">over ${snap.monthly.lumpSumDrawdownMonths} months (${(snap.monthly.lumpSumDrawdownMonths/12).toFixed(0)} yrs)</div></div>
 
                         <div class="text-xs text-slate-700 font-semibold self-center">Max estimated monthly income<div class="text-[10px] text-slate-400 font-normal">RA + lump-sum drawdown; assumes all funds depleted by age ${snap.monthly.lifeExpectancy}</div></div>
-                        <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-200"><div class="text-2xl font-bold text-emerald-700">${retFmtZAR(snap.monthly.maxAt55)}</div></div>
-                        <div class="p-3 bg-emerald-50 rounded-lg border border-emerald-200"><div class="text-2xl font-bold text-emerald-700">${retFmtZAR(snap.monthly.maxAt68)}</div></div>
+                        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200"><div class="text-2xl font-bold text-emerald-700">${retFmtZAR(snap.monthly.maxAt55)}</div></div>
+                        <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-200"><div class="text-2xl font-bold text-emerald-700">${retFmtZAR(snap.monthly.maxAt68)}</div></div>
                     </div>
                 `;
                 const retAge = Number(retirementParams.retirement_age) || 65;
@@ -3000,7 +3023,7 @@
                     ${deMinimisBanner}
                     <div class="space-y-3">
                         ${monthlyPhases.map(ph => `
-                            <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                                 <div class="text-xs text-slate-500">${ph.title}</div>
                                 <div class="text-xl font-bold text-indigo-700">${retFmtZAR(ph.net)}</div>
                                 <div class="text-xs text-slate-500">gross: ${retFmtZAR(ph.gross)}</div>
@@ -3101,7 +3124,7 @@
                 document.getElementById('retirement-card-rapot').innerHTML = `
                     <h2 class="text-xl font-semibold text-slate-800 mb-4">RA pot at retirement</h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                             <div class="text-xs text-slate-500 uppercase tracking-wider">${retRaPotTodayIsActual() ? 'Today (actual fund value from RA tab)' : 'Today (estimated from contributions × return)'}</div>
                             <div class="text-xl font-bold text-slate-800">${retFmtZAR(raPotTodayValue)}</div>
                             <div class="text-xs text-slate-500 mt-1">Vested: ${retFmtZAR(ra.vestedToday)}</div>
@@ -3109,7 +3132,7 @@
                             <div class="text-xs text-slate-500">Retirement: ${retFmtZAR(ra.retirementToday)}</div>
                             ${retRaPotTodayIsActual() ? '' : '<div class="text-[10px] text-slate-400 mt-1">Set a current fund value on the RA tab to use the real situation.</div>'}
                         </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                             <div class="text-xs text-slate-500 uppercase tracking-wider">At retirement age ${retirementParams.retirement_age}</div>
                             <div class="text-xl font-bold text-indigo-700">${retFmtZAR(ra.atRetirement.total)}</div>
                             <div class="text-xs text-slate-500 mt-1">Vested: ${retFmtZAR(ra.atRetirement.vested)}</div>
@@ -3119,7 +3142,7 @@
                     </div>
                     ${savingsWdLine}
                     <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                             <div class="text-xs text-slate-500 uppercase tracking-wider">${retirementParams.ra_commute_third ? '1/3 commuted (gross / tax / net)' : 'Commutation off'}</div>
                             <div class="text-sm font-medium text-slate-800">
                                 ${retirementParams.ra_commute_third
@@ -3127,7 +3150,7 @@
                                     : '—'}
                             </div>
                         </div>
-                        <div class="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                        <div class="p-3 bg-slate-50 rounded-xl border border-slate-200">
                             <div class="text-xs text-slate-500 uppercase tracking-wider">Monthly drawdown</div>
                             <div class="text-sm font-medium text-slate-800">gross ${retFmtZAR(_drawdownGross)} / net ${retFmtZAR(_drawdownNet)}</div>
                         </div>
