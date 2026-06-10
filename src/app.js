@@ -28,6 +28,7 @@
         import { renderBudgetTimeline as _renderBudgetTimeline } from './chart_budget_timeline.js';
         import { renderRetirementCharts as _renderRetirementCharts } from './chart_retirement.js';
         import { fmtZAR, fmtZARWhole, fmtZARSigned } from './format.js';
+        import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './app/rows.js';
 
         document.addEventListener('DOMContentLoaded', () => {
             // --- TAB NAVIGATION ---
@@ -439,8 +440,6 @@
 
             const formatCurrency = fmtZAR;
 
-            const generateId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
             const getUpcoming25th = () => _getUpcoming25th(new Date());
 
             const renderBudget = () => {
@@ -454,58 +453,18 @@
             const renderList = (container, items, createItemFn) => {
                 container.innerHTML = '';
                 if (items.length === 0) {
-                    container.innerHTML = `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">No items added yet.</p>`;
+                    container.innerHTML = emptyStateHTML('No items added yet.');
                 } else {
                     items.forEach(item => container.appendChild(createItemFn(item)));
                 }
             };
 
-            const createGenericItem = (item, hasDate = false) => {
-                const div = document.createElement('div');
-                div.className = 'grid gap-2 items-center';
-                div.style.gridTemplateColumns = hasDate ? '1fr 1fr 1fr auto' : '1fr 1fr auto';
-                div.dataset.id = item.id;
-
-                const descInput = document.createElement('input');
-                descInput.type = 'text';
-                descInput.value = item.description;
-                descInput.placeholder = 'Description';
-                descInput.className = 'input-field description-input';
-
-                const amountDiv = document.createElement('div');
-                amountDiv.className = 'relative';
-                const amountPrefix = document.createElement('span');
-                amountPrefix.className = 'currency-prefix';
-                amountPrefix.textContent = 'R';
-                const amountInput = document.createElement('input');
-                amountInput.type = 'number';
-                amountInput.value = item.amount;
-                amountInput.placeholder = '0.00';
-                amountInput.className = 'input-field amount-input';
-                amountDiv.append(amountPrefix, amountInput);
-
-                div.appendChild(descInput);
-                div.appendChild(amountDiv);
-
-                if (hasDate) {
-                    const dateInput = document.createElement('input');
-                    dateInput.type = 'date';
-                    dateInput.value = item.date || '';
-                    dateInput.className = 'input-field date-input';
-                    div.appendChild(dateInput);
-                }
-
-                const removeBtn = document.createElement('button');
-                removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-                removeBtn.className = 'btn btn-danger remove-btn p-2';
-                div.appendChild(removeBtn);
-
-                return div;
-            };
-
-            const createDebtItem = (item) => createGenericItem(item, false);
-            const createProvisionItem = (item) => createGenericItem(item, true);
-            const createFutureCostItem = (item) => createGenericItem(item, true);
+            const createDebtItem = (item) => createRowElement(item, {
+                gridTemplateColumns: '1fr 1fr auto', fields: ['description', 'amount'] });
+            const createProvisionItem = (item) => createRowElement(item, {
+                gridTemplateColumns: '1fr 1fr 1fr auto', fields: ['description', 'amount', 'date'] });
+            const createFutureCostItem = (item) => createRowElement(item, {
+                gridTemplateColumns: '1fr 1fr 1fr auto', fields: ['description', 'amount', 'date'] });
 
             let currentMonthlySavingsTarget = 0;
 
@@ -764,19 +723,10 @@
             const renderTransactions = () => {
                 transactionList.innerHTML = '';
                 if (investmentData.transactions.length === 0) {
-                    transactionList.innerHTML = `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">No transactions added yet.</p>`;
+                    transactionList.innerHTML = emptyStateHTML('No transactions added yet.');
                 } else {
                     // Sort by date descending (latest on top), then by ID (creation time) descending
-                    const sorted = [...investmentData.transactions].sort((a, b) => {
-                        const dateA = new Date(a.date);
-                        const dateB = new Date(b.date);
-                        if (dateA > dateB) return -1;
-                        if (dateA < dateB) return 1;
-                        // If dates are equal, sort by ID descending (assuming ID contains timestamp)
-                        if (a.id > b.id) return -1;
-                        if (a.id < b.id) return 1;
-                        return 0;
-                    });
+                    const sorted = [...investmentData.transactions].sort(sortByDateThenIdDesc);
                     sorted.forEach(t => transactionList.appendChild(createTransactionItem(t)));
                 }
             };
@@ -792,72 +742,11 @@
                 updatePerformanceDisplay();
             };
 
-            const createTransactionItem = (item) => {
-                const div = document.createElement('div');
-                div.className = 'grid gap-2 items-center';
-                div.style.gridTemplateColumns = '1fr 2fr 1fr 0.8fr 1fr auto';
-                div.dataset.id = item.id;
-
-                // Date
-                const dateInput = document.createElement('input');
-                dateInput.type = 'date';
-                dateInput.value = item.date;
-                dateInput.className = 'input-field date-input text-xs';
-                div.appendChild(dateInput);
-
-                // Description
-                const descInput = document.createElement('input');
-                descInput.type = 'text';
-                descInput.value = item.description;
-                descInput.placeholder = 'Description';
-                descInput.className = 'input-field description-input text-xs';
-                div.appendChild(descInput);
-
-                // Amount
-                const amountDiv = document.createElement('div');
-                amountDiv.className = 'relative';
-                const amountPrefix = document.createElement('span');
-                amountPrefix.className = 'currency-prefix text-xs';
-                amountPrefix.textContent = 'R';
-                const amountInput = document.createElement('input');
-                amountInput.type = 'number';
-                amountInput.value = item.amount;
-                amountInput.placeholder = '0.00';
-                amountInput.className = 'input-field amount-input text-xs';
-                amountDiv.append(amountPrefix, amountInput);
-                div.appendChild(amountDiv);
-
-                // Crypto Value (BTC)
-                const cryptoValDiv = document.createElement('div');
-                cryptoValDiv.className = `relative ${item.type === 'Crypto' ? '' : 'invisible'}`;
-                const cryptoValInput = document.createElement('input');
-                cryptoValInput.type = 'number';
-                cryptoValInput.value = item.cryptoValue || '';
-                cryptoValInput.placeholder = 'BTC';
-                cryptoValInput.className = 'input-field crypto-value-input text-xs';
-                cryptoValDiv.appendChild(cryptoValInput);
-                div.appendChild(cryptoValDiv);
-
-                // Account Type
-                const typeSelect = document.createElement('select');
-                typeSelect.className = 'input-field type-input text-xs';
-                ['Discretionary', 'TFSA', 'Crypto'].forEach(opt => {
-                    const option = document.createElement('option');
-                    option.value = opt;
-                    option.textContent = opt;
-                    if (item.type === opt) option.selected = true;
-                    typeSelect.appendChild(option);
-                });
-                div.appendChild(typeSelect);
-
-                // Remove
-                const removeBtn = document.createElement('button');
-                removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-                removeBtn.className = 'btn btn-danger remove-btn p-1.5';
-                div.appendChild(removeBtn);
-
-                return div;
-            };
+            const createTransactionItem = (item) => createRowElement(item, {
+                gridTemplateColumns: '1fr 2fr 1fr 0.8fr 1fr auto',
+                fields: ['date', 'description', 'amount', 'cryptoValue', { select: ['Discretionary', 'TFSA', 'Crypto'] }],
+                compact: true,
+            });
 
             const calculatePerformance = (type, currentValueStr, invId, gainId, annId, moneyGainId) => {
                 const currentValue = parseFloat(currentValueStr) || 0;
@@ -1197,61 +1086,16 @@
             const renderRepayments = () => {
                 repaymentList.innerHTML = '';
                 if (debtData.repayments.length === 0) {
-                    repaymentList.innerHTML = `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">No extra repayments added.</p>`;
+                    repaymentList.innerHTML = emptyStateHTML('No extra repayments added.');
                 } else {
                     // Sort by date descending (latest on top)
-                    const sorted = [...debtData.repayments].sort((a, b) => {
-                        const dateA = new Date(a.date);
-                        const dateB = new Date(b.date);
-                        if (dateA > dateB) return -1;
-                        if (dateA < dateB) return 1;
-                        // If dates are equal, sort by ID descending (newest added first)
-                        if (a.id > b.id) return -1;
-                        if (a.id < b.id) return 1;
-                        return 0;
-                    });
+                    const sorted = [...debtData.repayments].sort(sortByDateThenIdDesc);
                     sorted.forEach(item => {
-                        const div = document.createElement('div');
-                        div.className = 'grid gap-2 items-center';
-                        div.style.gridTemplateColumns = '1fr 2fr 1fr auto';
-                        div.dataset.id = item.id;
-
-                        // Date
-                        const dateInput = document.createElement('input');
-                        dateInput.type = 'date';
-                        dateInput.value = item.date;
-                        dateInput.className = 'input-field date-input text-xs';
-                        div.appendChild(dateInput);
-
-                        // Description
-                        const descInput = document.createElement('input');
-                        descInput.type = 'text';
-                        descInput.value = item.description;
-                        descInput.placeholder = 'Description';
-                        descInput.className = 'input-field description-input text-xs';
-                        div.appendChild(descInput);
-
-                        // Amount
-                        const amountDiv = document.createElement('div');
-                        amountDiv.className = 'relative';
-                        const amountPrefix = document.createElement('span');
-                        amountPrefix.className = 'currency-prefix text-xs';
-                        amountPrefix.textContent = 'R';
-                        const amountInput = document.createElement('input');
-                        amountInput.type = 'number';
-                        amountInput.value = item.amount;
-                        amountInput.placeholder = '0.00';
-                        amountInput.className = 'input-field amount-input text-xs';
-                        amountDiv.append(amountPrefix, amountInput);
-                        div.appendChild(amountDiv);
-
-                        // Remove
-                        const removeBtn = document.createElement('button');
-                        removeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
-                        removeBtn.className = 'btn btn-danger remove-btn p-1.5';
-                        div.appendChild(removeBtn);
-
-                        repaymentList.appendChild(div);
+                        repaymentList.appendChild(createRowElement(item, {
+                            gridTemplateColumns: '1fr 2fr 1fr auto',
+                            fields: ['date', 'description', 'amount'],
+                            compact: true,
+                        }));
                     });
                 }
                 calculateDebtProjection();
