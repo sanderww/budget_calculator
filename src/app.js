@@ -246,39 +246,38 @@
 
                 const list = document.getElementById('ra-list');
                 const sortedDesc = [...raTransactions].sort((a, b) => b.date.localeCompare(a.date));
-                list.innerHTML = sortedDesc.map(t => `
-                    <div class="grid gap-2 items-center bg-slate-50 p-2 rounded" style="grid-template-columns: 1fr 2fr 1fr auto;" data-id="${t.id}">
-                        <input type="date" class="input-field text-sm ra-row-date" value="${t.date}">
-                        <input type="text" class="input-field text-sm ra-row-desc" value="${(t.description || '').replace(/"/g, '&quot;')}">
-                        <div class="relative">
-                            <span class="currency-prefix text-sm">R</span>
-                            <input type="number" class="input-field amount-input text-sm ra-row-amount" value="${t.amount}" step="0.01" min="0">
-                        </div>
-                        <button class="btn btn-danger text-xs ra-row-delete">×</button>
-                    </div>
-                `).join('');
-
-                list.querySelectorAll('[data-id]').forEach(row => {
-                    const id = row.getAttribute('data-id');
-                    row.querySelector('.ra-row-date').addEventListener('change', (e) => {
-                        const tx = raTransactions.find(t => t.id === id);
-                        if (tx) { tx.date = e.target.value; raPersist(); renderRa(); }
-                    });
-                    row.querySelector('.ra-row-desc').addEventListener('change', (e) => {
-                        const tx = raTransactions.find(t => t.id === id);
-                        if (tx) { tx.description = e.target.value; raPersist(); }
-                    });
-                    row.querySelector('.ra-row-amount').addEventListener('change', (e) => {
-                        const tx = raTransactions.find(t => t.id === id);
-                        if (tx) { tx.amount = parseFloat(e.target.value) || 0; raPersist(); renderRa(); }
-                    });
-                    row.querySelector('.ra-row-delete').addEventListener('click', () => {
-                        raTransactions = raTransactions.filter(t => t.id !== id);
-                        raPersist();
-                        renderRa();
-                    });
+                list.innerHTML = '';
+                sortedDesc.forEach(t => {
+                    list.appendChild(createRowElement(t, {
+                        gridTemplateColumns: '1fr 2fr 1fr auto',
+                        fields: ['date', 'description', 'amount'],
+                        compact: true,
+                    }));
                 });
             }
+
+            const raList = document.getElementById('ra-list');
+            raList.addEventListener('change', (e) => {
+                const row = e.target.closest('[data-id]');
+                if (!row) return;
+                const tx = raTransactions.find(t => t.id === row.dataset.id);
+                if (!tx) return;
+                if (e.target.classList.contains('date-input')) {
+                    tx.date = e.target.value; raPersist(); renderRa();
+                } else if (e.target.classList.contains('description-input')) {
+                    tx.description = e.target.value; raPersist();
+                } else if (e.target.classList.contains('amount-input')) {
+                    tx.amount = parseFloat(e.target.value) || 0; raPersist(); renderRa();
+                }
+            });
+            raList.addEventListener('click', (e) => {
+                if (!e.target.closest('.remove-btn')) return;
+                const row = e.target.closest('[data-id]');
+                if (!row) return;
+                raTransactions = raTransactions.filter(t => t.id !== row.dataset.id);
+                raPersist();
+                renderRa();
+            });
 
             const raTodayIso = () => new Date().toISOString().slice(0, 10);
 
