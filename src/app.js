@@ -44,51 +44,32 @@
             const contentRa = document.getElementById('ra-content');
             const contentRetirement = document.getElementById('retirement-content');
 
-            const switchTab = (tab) => {
-                // Reset all tabs
-                [tabBudget, tabInvestment, tabDebt, tabHistory, tabRa, tabRetirement].forEach(t => {
-                    t.classList.remove('border-indigo-500', 'text-indigo-600');
-                    t.classList.add('border-transparent', 'text-slate-500');
-                });
-                [contentBudget, contentInvestment, contentDebt, contentHistory, contentRa, contentRetirement].forEach(c => c.classList.add('hidden'));
-
-                // Activate selected tab
-                if (tab === 'budget') {
-                    tabBudget.classList.add('border-indigo-500', 'text-indigo-600');
-                    tabBudget.classList.remove('border-transparent', 'text-slate-500');
-                    contentBudget.classList.remove('hidden');
-                } else if (tab === 'investment') {
-                    tabInvestment.classList.add('border-indigo-500', 'text-indigo-600');
-                    tabInvestment.classList.remove('border-transparent', 'text-slate-500');
-                    contentInvestment.classList.remove('hidden');
-                } else if (tab === 'debt') {
-                    tabDebt.classList.add('border-indigo-500', 'text-indigo-600');
-                    tabDebt.classList.remove('border-transparent', 'text-slate-500');
-                    contentDebt.classList.remove('hidden');
-                } else if (tab === 'ra') {
-                    tabRa.classList.add('border-indigo-500', 'text-indigo-600');
-                    tabRa.classList.remove('border-transparent', 'text-slate-500');
-                    contentRa.classList.remove('hidden');
-                    renderRa();
-                } else if (tab === 'retirement') {
-                    tabRetirement.classList.add('border-indigo-500', 'text-indigo-600');
-                    tabRetirement.classList.remove('border-transparent', 'text-slate-500');
-                    contentRetirement.classList.remove('hidden');
-                    renderRetirement();
-                } else if (tab === 'history') {
-                    tabHistory.classList.add('border-indigo-500', 'text-indigo-600');
-                    tabHistory.classList.remove('border-transparent', 'text-slate-500');
-                    contentHistory.classList.remove('hidden');
-                    renderHistory();
-                }
+            // onShow thunks are evaluated at click time, so they may reference render
+            // functions defined later in this file.
+            const TABS = {
+                budget:     { tab: tabBudget,     content: contentBudget },
+                investment: { tab: tabInvestment, content: contentInvestment },
+                debt:       { tab: tabDebt,       content: contentDebt },
+                ra:         { tab: tabRa,         content: contentRa,         onShow: () => renderRa() },
+                retirement: { tab: tabRetirement, content: contentRetirement, onShow: () => renderRetirement() },
+                history:    { tab: tabHistory,    content: contentHistory,    onShow: () => renderHistory() },
             };
 
-            tabBudget.addEventListener('click', () => switchTab('budget'));
-            tabInvestment.addEventListener('click', () => switchTab('investment'));
-            tabDebt.addEventListener('click', () => switchTab('debt'));
-            tabRa.addEventListener('click', () => switchTab('ra'));
-            tabRetirement.addEventListener('click', () => switchTab('retirement'));
-            tabHistory.addEventListener('click', () => switchTab('history'));
+            const switchTab = (name) => {
+                Object.values(TABS).forEach(({ tab, content }) => {
+                    tab.classList.remove('border-indigo-500', 'text-indigo-600');
+                    tab.classList.add('border-transparent', 'text-slate-500');
+                    content.classList.add('hidden');
+                });
+                const target = TABS[name];
+                target.tab.classList.add('border-indigo-500', 'text-indigo-600');
+                target.tab.classList.remove('border-transparent', 'text-slate-500');
+                target.content.classList.remove('hidden');
+                if (target.onShow) target.onShow();
+            };
+
+            Object.entries(TABS).forEach(([name, { tab }]) =>
+                tab.addEventListener('click', () => switchTab(name)));
 
             document.getElementById('refresh-budget').addEventListener('click', (e) => {
                 e.stopPropagation();
