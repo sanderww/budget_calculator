@@ -10,6 +10,37 @@ Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, 
 
 ---
 
+## 0. Application Shell
+
+### 0.1 Header
+
+- Title, subtitle, and (when test mode is on) the "SAMPLE DATA" label on the left.
+- Right-hand control group:
+  - **Save-status chip** (`#save-status`, desktop only): reflects the auto-save state across all modules — `Saving…` (muted) while one or more POSTs are in flight, `All changes saved` (emerald) after the last one succeeds, `⚠ Save failed` (red) when a save errors. A failure stays visible until the next successful save.
+  - **Refresh button** (`#refresh-current`): the single refresh control for the whole app. Clicking it re-renders/recalculates whichever tab is currently active. There are no longer per-tab refresh icons in the tab bar.
+  - **Test Mode toggle** (see §8).
+
+### 0.2 KPI Strip
+
+A row of four read-only cards between the header and the tab bar, giving at-a-glance oversight without opening a tab (2 columns on mobile, 4 on desktop). Values are mirrored from where the tabs already compute them — the strip performs no calculations of its own:
+
+| KPI | Source |
+|---|---|
+| Net savings now (green ≥ 0, red < 0) | Budget summary (`calculateAndDisplaySummary`) |
+| Net savings on [selected date] | Budget summary; label shows the §1.5 future-date picker value |
+| Portfolio value | Sum of the three Investments current-value inputs |
+| Debt-free by (month + year; `Never` when the loan never amortises) | Debt projection's new end date |
+
+### 0.3 Tabs
+
+Tab bar labels: **Budget**, **Investments**, **Debt**, **RA**, **Retirement**, **History**. Each tab button only switches tabs (no embedded refresh icons).
+
+### 0.4 Database Toolbars
+
+The Budget, Investments, Debt, and RA tabs each open with a slim full-width toolbar (replacing the former left sidebar "Database" cards): a database icon in the tab's accent colour, the backing file path (e.g. `db/transactions/budget.csv`), and the tab's Load/Save buttons on the right. Save buttons carry the shared save icon. The main content of these tabs spans the full page width.
+
+---
+
 ## 1. Budget Calculator
 
 ### 1.1 Current Savings
@@ -64,7 +95,7 @@ Compact subsection inside the right-column Financial Summary card (no longer a s
   - Mortgage Repayment (%, default 50)
   - EFT (%, default 50)
   - Crypto (%, default 0)
-- **Validation**:
+- **Validation** (failures render as an inline red message below the Calculate button — element `#allocation-error` — instead of a browser `alert()`; the results list is hidden while an error is shown):
   - Total percentage must not exceed 100%.
   - At least one percentage must be > 0.
   - Available money must exceed the monthly savings target.
@@ -233,7 +264,7 @@ Newton-Raphson method to find the internal rate of return:
 
 ### 4.1 Layout
 
-A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` and `db/config.private.json`) and a main area with two cards:
+A purple-accented database toolbar (§0.4 — Load/Save buttons backed by `db/transactions/ra.csv` and `db/config.private.json`) above a full-width main area with two cards:
 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
@@ -258,11 +289,11 @@ A purple-accented sidebar (Load/Save buttons backed by `db/transactions/ra.csv` 
 
 ### 5.1 Tab Placement
 
-Between the **RA** and **History** tabs. The tab header is "Retirement"; a refresh icon mirrors the other tabs.
+Between the **RA** and **History** tabs. The tab header is "Retirement"; refreshing happens via the global header refresh control (§0.1).
 
-### 5.2 Sidebar (left col, sticky)
+### 5.2 Sidebar (left col)
 
-Three sections separated by dividers:
+The settings sidebar is a non-sticky card (it is taller than the viewport, so it scrolls with the page). Each section below is a collapsible `<details>` element with its title as the `<summary>`; **Core is open by default, all other sections start collapsed**. Sections are separated by dividers:
 
 **Core**
 - Date of birth (date input). The current age is shown beneath as a read-only label.
@@ -275,7 +306,7 @@ Three sections separated by dividers:
 **Per-fund nominal return %**
 - Discretionary, TFSA, Crypto (note: "expected nominal return, no default consensus"), RA.
 
-**Offshore allocation** (collapsible `<details>`)
+**Offshore allocation**
 - Discretionary offshore %, TFSA offshore %, ZAR depreciation %/yr.
 
 **Funds available at retirement**
@@ -453,7 +484,8 @@ Date,Description,Amount
 ### 7.2 Auto-Save
 
 - All data changes trigger a debounced save (800ms delay) via POST to the server.
-- Manual save buttons are also available for each module.
+- Manual save buttons are also available for each module (in the §0.4 database toolbars).
+- The header save-status chip (§0.1) reflects the aggregate state of all in-flight saves: `Saving…` → `All changes saved` on success, `⚠ Save failed` on error (sticky until the next successful save). Save failures are additionally logged to the console.
 - On page load, all CSV files are fetched automatically: transaction files per-domain plus both config files (public and private), which are merged client-side into a single param map.
 
 ### 7.3 Server API

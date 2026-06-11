@@ -81,6 +81,8 @@ const calculateDebtProjection = () => {
         debtTimeReducedEl.textContent = 'Never';
         debtNewEndDateEl.textContent = 'Never';
         debtOriginalEndDateEl.textContent = 'Original: Never';
+        const kpiDebtFreeGuard = document.getElementById('kpi-debt-free');
+        if (kpiDebtFreeGuard) kpiDebtFreeGuard.textContent = 'Never';
         return;
     }
 
@@ -138,6 +140,11 @@ const calculateDebtProjection = () => {
 
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
     debtNewEndDateEl.textContent = actual.endDate.toLocaleDateString('en-ZA', options);
+    // Mirror the projected payoff date into the header KPI strip.
+    const kpiDebtFree = document.getElementById('kpi-debt-free');
+    if (kpiDebtFree) {
+        kpiDebtFree.textContent = actual.endDate.toLocaleDateString('en-ZA', { year: 'numeric', month: 'short' });
+    }
     const loanStartStr = debtLoanStartInput.value;
     const originalTerm = parseInt(debtOriginalTermInput.value) || 0;
     if (loanStartStr && originalTerm > 0) {

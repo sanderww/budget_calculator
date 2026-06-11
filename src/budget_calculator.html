@@ -27,6 +27,11 @@
             <polyline points="17 21 17 13 7 13 7 21"/>
             <polyline points="7 3 7 8 15 8"/>
         </symbol>
+        <symbol id="icon-database" viewBox="0 0 24 24">
+            <path d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z"/>
+            <path d="M7 10l5 5 5-5"/>
+            <path d="M12 15V3"/>
+        </symbol>
     </svg>
 
     <div class="max-w-7xl mx-auto">
@@ -47,68 +52,71 @@
                     <p id="test-mode-label" class="hidden text-xs text-amber-600 mt-1 font-medium tracking-wide">SAMPLE DATA</p>
                 </div>
             </div>
-            <button id="test-mode-btn"
-                class="mt-1 flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors border-slate-200 text-slate-400 hover:text-slate-500 hover:border-slate-300"
-                title="Switch between real and sample data">
-                <span id="test-mode-dot" class="w-1.5 h-1.5 rounded-full bg-slate-300 transition-colors"></span>
-                Test Mode
-            </button>
+            <div class="mt-1 flex items-center gap-2">
+                <span id="save-status"
+                    class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium border-slate-200 text-slate-400"
+                    role="status" aria-live="polite">All changes saved</span>
+                <button id="refresh-current"
+                    class="refresh-icon p-1.5 rounded-full border border-slate-200 hover:border-slate-300"
+                    title="Refresh calculations on this tab" aria-label="Refresh calculations on this tab">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
+                </button>
+                <button id="test-mode-btn"
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors border-slate-200 text-slate-400 hover:text-slate-500 hover:border-slate-300"
+                    title="Switch between real and sample data">
+                    <span id="test-mode-dot" class="w-1.5 h-1.5 rounded-full bg-slate-300 transition-colors"></span>
+                    Test Mode
+                </button>
+            </div>
         </header>
+
+        <!-- KPI Strip: at-a-glance numbers mirrored from the tabs -->
+        <div class="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-slate-500">Net savings now</p>
+                <p id="kpi-net-now" class="text-lg font-bold text-slate-800 tabular-nums">—</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-slate-500">Net savings on <span id="kpi-net-date">—</span></p>
+                <p id="kpi-net-future" class="text-lg font-bold text-slate-800 tabular-nums">—</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-slate-500">Portfolio value</p>
+                <p id="kpi-portfolio" class="text-lg font-bold text-slate-800 tabular-nums">—</p>
+            </div>
+            <div class="bg-white border border-slate-200 rounded-xl px-4 py-3 shadow-sm">
+                <p class="text-xs font-medium text-slate-500">Debt-free by</p>
+                <p id="kpi-debt-free" class="text-lg font-bold text-slate-800">—</p>
+            </div>
+        </div>
 
         <!-- Tab Navigation -->
         <div class="mb-6 border-b border-slate-200 overflow-x-auto">
             <nav class="-mb-px flex space-x-8" aria-label="Tabs">
-                <div class="inline-flex items-center gap-1">
-                    <button id="tab-budget"
-                        class="border-indigo-500 text-indigo-600 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
-                        Budget Calculator
-                    </button>
-                    <button id="refresh-budget" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh budget calculations">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
-                    </button>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                    <button id="tab-investment"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
-                        Investment Tracker
-                    </button>
-                    <button id="refresh-investment" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh investment calculations">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
-                    </button>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                    <button id="tab-debt"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
-                        Debt Calculator
-                    </button>
-                    <button id="refresh-debt" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh debt calculations">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
-                    </button>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                    <button id="tab-ra"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
-                        RA
-                    </button>
-                    <button id="refresh-ra" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh RA calculations">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
-                    </button>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                    <button id="tab-retirement"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
-                        Retirement
-                    </button>
-                    <button id="refresh-retirement" class="refresh-icon p-0.5 rounded hover:bg-slate-100" title="Refresh retirement calculations">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
-                    </button>
-                </div>
-                <div class="inline-flex items-center gap-1">
-                    <button id="tab-history"
-                        class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
-                        History
-                    </button>
-                </div>
+                <button id="tab-budget"
+                    class="border-indigo-500 text-indigo-600 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Budget
+                </button>
+                <button id="tab-investment"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Investments
+                </button>
+                <button id="tab-debt"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Debt
+                </button>
+                <button id="tab-ra"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
+                    RA
+                </button>
+                <button id="tab-retirement"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
+                    Retirement
+                </button>
+                <button id="tab-history"
+                    class="border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 whitespace-nowrap py-3.5 px-1 border-b-2 font-medium text-sm transition-colors">
+                    History
+                </button>
             </nav>
         </div>
 
@@ -118,54 +126,20 @@
 
         <!-- BUDGET TAB CONTENT -->
         <div id="budget-content">
-            <!-- Main Layout with Sidebar -->
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- Left Sidebar -->
-                <div class="lg:col-span-1">
-                    <div
-                        class="card bg-gradient-to-b from-blue-50 to-indigo-50 border-l-4 border-blue-400 sticky top-8">
-                        <div class="flex flex-col gap-4">
-                            <div class="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="text-indigo-600">
-                                    <path d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
-                                    </path>
-                                    <path d="M7 10l5 5 5-5"></path>
-                                    <path d="M12 15V3"></path>
-                                </svg>
-                                <h3 class="font-semibold text-blue-800">Budget Database</h3>
-                            </div>
-
-                            <!-- Database Section -->
-                            <div class="pt-4 border-t border-blue-200">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="text-indigo-600">
-                                        <path
-                                            d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
-                                        </path>
-                                        <path d="M7 10l5 5 5-5"></path>
-                                        <path d="M12 15V3"></path>
-                                    </svg>
-                                    <span class="font-medium text-slate-700 text-sm">Database</span>
-                                </div>
-                                <div class="text-xs text-slate-600 mb-3">db/calulator_data.csv</div>
-                                <button id="save-csv" class="btn btn-primary text-xs w-full">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><use href="#icon-save"/></svg>
-                                    Save Budget
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Database toolbar -->
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><use href="#icon-database"/></svg>
+                    <span class="font-mono">db/transactions/budget.csv</span>
                 </div>
+                <button id="save-csv" class="btn btn-primary text-xs py-1.5 px-3">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
+                    Save Budget
+                </button>
+            </div>
 
-                <!-- Main Content Area -->
-                <div class="lg:col-span-3">
-
-                    <!-- Main Grid -->
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Main Grid -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <!-- Left Column: Inputs -->
                         <div class="lg:col-span-2">
                             <!-- Savings -->
@@ -263,6 +237,7 @@
                                         </div>
                                     </div>
                                     <button id="calculate-allocation" class="btn btn-primary w-full text-sm py-2">Calculate Allocation</button>
+                                    <p id="allocation-error" class="hidden text-xs text-red-600" role="alert"></p>
                                     <div id="allocation-results" class="hidden space-y-1 text-xs">
                                         <div class="flex justify-between p-1.5 bg-green-50 rounded">
                                             <span class="text-slate-600">Required Savings</span>
@@ -288,8 +263,6 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
-                </div>
             </div>
 
             <!-- Timeline Overview Chart -->
@@ -316,51 +289,22 @@
 
         <!-- INVESTMENT TAB CONTENT -->
         <div id="investment-content" class="hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- Left Sidebar -->
-                <div class="lg:col-span-1">
-                    <div
-                        class="card bg-gradient-to-b from-green-50 to-emerald-50 border-l-4 border-green-400 sticky top-8">
-                        <div class="flex flex-col gap-4">
-                            <div class="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="text-green-600">
-                                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-                                </svg>
-                                <h3 class="font-semibold text-green-800">Investment Database</h3>
-                            </div>
-
-                            <!-- Database Section -->
-                            <div class="pt-4 border-t border-green-200">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="text-green-600">
-                                        <path
-                                            d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
-                                        </path>
-                                        <path d="M7 10l5 5 5-5"></path>
-                                        <path d="M12 15V3"></path>
-                                    </svg>
-                                    <span class="font-medium text-slate-700 text-sm">Database</span>
-                                </div>
-                                <div class="text-xs text-slate-600 mb-3">db/investments.csv</div>
-                                <button id="load-inv-csv" class="btn btn-secondary text-xs w-full mb-2">
-                                    Load Investments
-                                </button>
-                                <button id="save-inv-csv" class="btn btn-primary text-xs w-full">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><use href="#icon-save"/></svg>
-                                    Save Investments
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Database toolbar -->
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><use href="#icon-database"/></svg>
+                    <span class="font-mono">db/transactions/investments.csv</span>
                 </div>
+                <div class="flex items-center gap-2">
+                    <button id="load-inv-csv" class="btn btn-secondary text-xs py-1.5 px-3">Load Investments</button>
+                    <button id="save-inv-csv" class="btn btn-primary text-xs py-1.5 px-3">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
+                        Save Investments
+                    </button>
+                </div>
+            </div>
 
-                <!-- Main Content Area -->
-                <div class="lg:col-span-3">
-                    <div class="grid grid-cols-1 gap-6">
+            <div class="grid grid-cols-1 gap-6">
 
                         <!-- Performance Summary -->
                         <div class="card">
@@ -535,62 +479,27 @@
                             <div id="transaction-list" class="space-y-2"></div>
                         </div>
 
-                    </div>
-                </div>
             </div>
         </div>
 
         <!-- DEBT TAB CONTENT -->
         <div id="debt-content" class="hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- Left Sidebar -->
-                <div class="lg:col-span-1">
-                    <div class="card bg-gradient-to-b from-red-50 to-rose-50 border-l-4 border-red-400 sticky top-8">
-                        <div class="flex flex-col gap-4">
-                            <div class="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="text-red-600">
-                                    <path
-                                        d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z">
-                                    </path>
-                                    <path
-                                        d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z">
-                                    </path>
-                                </svg>
-                                <h3 class="font-semibold text-red-800">Debt Database</h3>
-                            </div>
-
-                            <!-- Database Section -->
-                            <div class="pt-4 border-t border-red-200">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
-                                        fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                        stroke-linejoin="round" class="text-red-600">
-                                        <path
-                                            d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z">
-                                        </path>
-                                        <path d="M7 10l5 5 5-5"></path>
-                                        <path d="M12 15V3"></path>
-                                    </svg>
-                                    <span class="font-medium text-slate-700 text-sm">Database</span>
-                                </div>
-                                <div class="text-xs text-slate-600 mb-3">db/debt.csv</div>
-                                <button id="load-debt-csv" class="btn btn-secondary text-xs w-full mb-2">
-                                    Load Debt Data
-                                </button>
-                                <button id="save-debt-csv" class="btn btn-primary text-xs w-full">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-2"><use href="#icon-save"/></svg>
-                                    Save Debt Data
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Database toolbar -->
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600"><use href="#icon-database"/></svg>
+                    <span class="font-mono">db/transactions/debt.csv</span>
                 </div>
+                <div class="flex items-center gap-2">
+                    <button id="load-debt-csv" class="btn btn-secondary text-xs py-1.5 px-3">Load Debt Data</button>
+                    <button id="save-debt-csv" class="btn btn-primary text-xs py-1.5 px-3">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
+                        Save Debt Data
+                    </button>
+                </div>
+            </div>
 
-                <!-- Main Content Area -->
-                <div class="lg:col-span-3">
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
                         <!-- Loan Details -->
                         <div class="card">
@@ -719,42 +628,27 @@
                             <div id="repayment-list" class="space-y-2"></div>
                         </div>
 
-                    </div>
-                </div>
             </div>
         </div>
 
         <!-- RA TAB CONTENT -->
         <div id="ra-content" class="hidden">
-            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <!-- Left Sidebar -->
-                <div class="lg:col-span-1">
-                    <div class="card bg-gradient-to-b from-purple-50 to-violet-50 border-l-4 border-purple-400 sticky top-8">
-                        <div class="flex flex-col gap-4">
-                            <div class="flex items-center gap-3">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="text-purple-600">
-                                    <path d="M12 2v20M5 7h14M5 17h14"/>
-                                </svg>
-                                <h3 class="font-semibold text-purple-800">RA Database</h3>
-                            </div>
-
-                            <div class="pt-4 border-t border-purple-200">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <span class="font-medium text-slate-700 text-sm">Database</span>
-                                </div>
-                                <div class="text-xs text-slate-600 mb-3">db/ra.csv</div>
-                                <button id="load-ra-csv" class="btn btn-secondary text-xs w-full mb-2">Load RA</button>
-                                <button id="save-ra-csv" class="btn btn-primary text-xs w-full">Save RA</button>
-                            </div>
-                        </div>
-                    </div>
+            <!-- Database toolbar -->
+            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-600"><use href="#icon-database"/></svg>
+                    <span class="font-mono">db/transactions/ra.csv</span>
                 </div>
+                <div class="flex items-center gap-2">
+                    <button id="load-ra-csv" class="btn btn-secondary text-xs py-1.5 px-3">Load RA</button>
+                    <button id="save-ra-csv" class="btn btn-primary text-xs py-1.5 px-3">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
+                        Save RA
+                    </button>
+                </div>
+            </div>
 
-                <!-- Main Content Area -->
-                <div class="lg:col-span-3">
-                    <div class="grid grid-cols-1 gap-6">
+            <div class="grid grid-cols-1 gap-6">
 
                         <!-- Summary -->
                         <div class="card">
@@ -836,8 +730,6 @@
                             <div id="ra-list" class="space-y-2"></div>
                         </div>
 
-                    </div>
-                </div>
             </div>
         </div>
 
@@ -846,7 +738,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <!-- Left Sidebar -->
                 <div class="lg:col-span-1">
-                    <div id="retirement-sidebar" class="card bg-gradient-to-b from-amber-50 to-orange-50 border-l-4 border-amber-400 sticky top-8">
+                    <div id="retirement-sidebar" class="card bg-gradient-to-b from-amber-50 to-orange-50 border-l-4 border-amber-400">
                         <div class="flex flex-col gap-4">
                             <div class="flex items-center gap-3">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24"
@@ -864,8 +756,8 @@
                             </label>
 
                             <!-- Core settings -->
-                            <div class="pt-4 border-t border-amber-200">
-                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Core</div>
+                            <details class="pt-4 border-t border-amber-200" open>
+                                <summary class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider cursor-pointer">Core</summary>
                                 <label class="block text-xs text-slate-600">Date of birth</label>
                                 <input type="date" id="ret-dob" class="input-field text-sm" value="1985-08-08">
                                 <div class="text-[11px] text-slate-500 mt-1">Current age: <span id="ret-current-age">—</span></div>
@@ -890,11 +782,11 @@
 
                                 <label class="block text-xs text-slate-600 mt-3">CPI assumption (%)</label>
                                 <input type="number" id="ret-cpi" class="input-field text-sm" min="0" max="100" step="0.1" value="5">
-                            </div>
+                            </details>
 
                             <!-- Returns -->
-                            <div class="pt-4 border-t border-amber-200">
-                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Per-fund nominal return %</div>
+                            <details class="pt-4 border-t border-amber-200">
+                                <summary class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider cursor-pointer">Per-fund nominal return %</summary>
                                 <label class="block text-xs text-slate-600">Discretionary</label>
                                 <input type="number" id="ret-return-discretionary" class="input-field text-sm" min="0" max="100" step="0.1" value="10">
                                 <label class="block text-xs text-slate-600 mt-2">TFSA</label>
@@ -904,7 +796,7 @@
                                 <div class="text-[10px] text-slate-400 mt-1">expected nominal return, no default consensus</div>
                                 <label class="block text-xs text-slate-600 mt-2">RA</label>
                                 <input type="number" id="ret-return-ra" class="input-field text-sm" min="0" max="100" step="0.1" value="10">
-                            </div>
+                            </details>
 
                             <!-- Offshore -->
                             <details class="pt-4 border-t border-amber-200">
@@ -918,17 +810,17 @@
                             </details>
 
                             <!-- Funds available at retirement -->
-                            <div class="pt-4 border-t border-amber-200">
-                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Funds available at retirement</div>
+                            <details class="pt-4 border-t border-amber-200">
+                                <summary class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider cursor-pointer">Funds available at retirement</summary>
                                 <div class="text-[10px] text-slate-500 mb-2">Uncheck a fund if you expect it not to be available at retirement (e.g. spent or repurposed). The current value still appears on the Investments tab; only the retirement projection treats it as zero.</div>
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" id="ret-include-discretionary" class="rounded" checked> Discretionary</label>
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-1.5"><input type="checkbox" id="ret-include-tfsa" class="rounded" checked> TFSA</label>
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700 mt-1.5"><input type="checkbox" id="ret-include-crypto" class="rounded" checked> Crypto</label>
-                            </div>
+                            </details>
 
                             <!-- RA structure -->
-                            <div class="pt-4 border-t border-amber-200">
-                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">RA structure</div>
+                            <details class="pt-4 border-t border-amber-200">
+                                <summary class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider cursor-pointer">RA structure</summary>
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700">
                                     <input type="checkbox" id="ret-ra-commute" class="rounded" checked>
                                     Commute 1/3 as lump sum at retirement
@@ -937,11 +829,11 @@
                                 <input type="number" id="ret-ra-vested" class="input-field text-sm" min="0" step="100" value="0">
                                 <div id="ret-ra-vested-hint" class="text-[10px] text-slate-400 mt-1">Enter your pre-Sep-2024 RA balance for accurate two-pot modelling.</div>
                                 <div class="text-[10px] text-slate-500 mt-2">New contributions split 33% savings / 67% retirement (Sep 2024 rule).</div>
-                            </div>
+                            </details>
 
                             <!-- Optional scenarios -->
-                            <div class="pt-4 border-t border-amber-200">
-                                <div class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider">Optional scenarios</div>
+                            <details class="pt-4 border-t border-amber-200">
+                                <summary class="text-xs font-semibold text-slate-700 mb-2 uppercase tracking-wider cursor-pointer">Optional scenarios</summary>
 
                                 <label class="inline-flex items-center gap-2 text-xs text-slate-700"><input type="checkbox" id="ret-opt-dutch" class="rounded"> Dutch pension</label>
                                 <div class="ml-5 mt-1 grid grid-cols-2 gap-2">
@@ -993,7 +885,7 @@
                                     <input type="number" id="ret-opt-savings-pot-amount" class="input-field text-sm" min="0" step="100" value="0">
                                     <div id="ret-opt-savings-pot-warn" class="hidden text-[10px] text-amber-700 mt-1">Below SARS minimum (R2,000).</div>
                                 </div>
-                            </div>
+                            </details>
 
                             <div class="pt-4 border-t border-amber-200">
                                 <button id="ret-load-csv" class="btn btn-secondary text-xs w-full mb-2">Load Retirement</button>

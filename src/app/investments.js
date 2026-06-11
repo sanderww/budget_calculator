@@ -42,6 +42,14 @@ const updatePerformanceDisplay = () => {
     calculatePerformance('TFSA', investmentData.currentValues.TFSA, 'inv-tfsa', 'gain-tfsa', 'ann-tfsa', 'gain-money-tfsa');
     calculatePerformance('Crypto', investmentData.currentValues.Crypto, 'inv-crypto', 'gain-crypto', 'ann-crypto', 'gain-money-crypto');
     updateTfsaCapDisplay();
+
+    // Mirror the combined current value into the header KPI strip.
+    const kpiPortfolio = document.getElementById('kpi-portfolio');
+    if (kpiPortfolio) {
+        const total = ['Discretionary', 'TFSA', 'Crypto']
+            .reduce((s, k) => s + (parseFloat(investmentData.currentValues[k]) || 0), 0);
+        kpiPortfolio.textContent = formatCurrency(total);
+    }
 };
 
 const updateTfsaCapDisplay = () => {

@@ -38,6 +38,8 @@ const TABS = {
     history:    { tab: tabHistory,    content: contentHistory,    onShow: () => renderHistory() },
 };
 
+let currentTab = 'budget';
+
 const switchTab = (name) => {
     Object.values(TABS).forEach(({ tab, content }) => {
         tab.classList.remove('border-indigo-500', 'text-indigo-600');
@@ -48,43 +50,25 @@ const switchTab = (name) => {
     target.tab.classList.add('border-indigo-500', 'text-indigo-600');
     target.tab.classList.remove('border-transparent', 'text-slate-500');
     target.content.classList.remove('hidden');
+    currentTab = name;
     if (target.onShow) target.onShow();
 };
 
 Object.entries(TABS).forEach(([name, { tab }]) =>
     tab.addEventListener('click', () => switchTab(name)));
 
-document.getElementById('refresh-budget').addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchTab('budget');
-    calculateAndDisplaySummary();
-    renderBudget();
-});
+// One refresh control in the header re-renders whichever tab is active.
+const REFRESH_ACTIONS = {
+    budget:     () => { calculateAndDisplaySummary(); renderBudget(); },
+    investment: () => { renderFullInvestmentUI(); updatePerformanceDisplay(); },
+    debt:       () => { calculateDebtProjection(); renderRepayments(); },
+    ra:         () => renderRa(),
+    retirement: () => renderRetirement(),
+    history:    () => renderHistory(),
+};
 
-document.getElementById('refresh-investment').addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchTab('investment');
-    renderFullInvestmentUI();
-    updatePerformanceDisplay();
-});
-
-document.getElementById('refresh-debt').addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchTab('debt');
-    calculateDebtProjection();
-    renderRepayments();
-});
-
-document.getElementById('refresh-ra').addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchTab('ra');
-    renderRa();
-});
-
-document.getElementById('refresh-retirement').addEventListener('click', (e) => {
-    e.stopPropagation();
-    switchTab('retirement');
-    renderRetirement();
+document.getElementById('refresh-current').addEventListener('click', () => {
+    REFRESH_ACTIONS[currentTab]();
 });
 
 const updateTestModeUI = () => {

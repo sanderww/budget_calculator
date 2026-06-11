@@ -14,8 +14,30 @@ export const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
     _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn, btnId), delayMs);
 };
 
+// Header chip reflecting the auto-save state. Failures stay visible until the
+// next successful save so the user can't miss a write that never landed.
+let _pendingSaves = 0;
+let _saveFailed = false;
+const _setSaveStatus = (state) => {
+    const el = document.getElementById('save-status');
+    if (!el) return;
+    const base = 'hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium';
+    if (state === 'saving') {
+        el.textContent = 'Saving…';
+        el.className = `${base} border-slate-200 text-slate-500`;
+    } else if (state === 'saved') {
+        el.textContent = 'All changes saved';
+        el.className = `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
+    } else if (state === 'error') {
+        el.textContent = '⚠ Save failed';
+        el.className = `${base} border-red-200 bg-red-50 text-red-600`;
+    }
+};
+
 export const saveToServer = async (name, csvFn, btnId) => {
     const csv = csvFn();
+    _pendingSaves++;
+    _setSaveStatus('saving');
     try {
         const headers = { 'Content-Type': 'text/csv' };
         if (testMode) headers['X-Test-Mode'] = 'true';
@@ -25,6 +47,7 @@ export const saveToServer = async (name, csvFn, btnId) => {
             body: csv
         });
         if (!res.ok) throw new Error(`Save failed: ${res.status}`);
+        _saveFailed = false;
         if (btnId) {
             const btn = document.getElementById(btnId);
             if (btn) {
@@ -34,7 +57,11 @@ export const saveToServer = async (name, csvFn, btnId) => {
             }
         }
     } catch (err) {
+        _saveFailed = true;
         console.error(`Failed to save ${name}:`, err);
+    } finally {
+        _pendingSaves--;
+        if (_pendingSaves <= 0) _setSaveStatus(_saveFailed ? 'error' : 'saved');
     }
 };
 

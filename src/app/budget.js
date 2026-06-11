@@ -83,6 +83,20 @@ const calculateAndDisplaySummary = () => {
     document.getElementById('future-net-amount').textContent = formatCurrency(r.futureNetAmount);
     document.getElementById('future-net-amount').style.color = r.futureNetAmount >= 0 ? '#4f46e5' : '#ef4444';
 
+    // Mirror into the header KPI strip.
+    const kpiNetNow = document.getElementById('kpi-net-now');
+    if (kpiNetNow) {
+        kpiNetNow.textContent = formatCurrency(r.currentNetAmount);
+        kpiNetNow.style.color = r.currentNetAmount >= 0 ? '#16a34a' : '#ef4444';
+    }
+    const kpiNetFuture = document.getElementById('kpi-net-future');
+    if (kpiNetFuture) {
+        kpiNetFuture.textContent = formatCurrency(r.futureNetAmount);
+        kpiNetFuture.style.color = r.futureNetAmount >= 0 ? '#0f172a' : '#ef4444';
+    }
+    const kpiNetDate = document.getElementById('kpi-net-date');
+    if (kpiNetDate) kpiNetDate.textContent = futureDateInput.value || '—';
+
     currentMonthlySavingsTarget = r.monthlySavingsTarget;
 
     try {
@@ -109,6 +123,13 @@ const calculateAndDisplaySummary = () => {
     }
 };
 
+const allocationError = document.getElementById('allocation-error');
+const showAllocationError = (msg) => {
+    allocationError.textContent = msg;
+    allocationError.classList.remove('hidden');
+    allocationResults.classList.add('hidden');
+};
+
 const calculateMonthlyAllocation = () => {
     const availableMoney = parseFloat(availableMoneyInput.value) || 0;
     const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
@@ -119,21 +140,22 @@ const calculateMonthlyAllocation = () => {
     const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
 
     if (totalPercentage > 100) {
-        alert('Total percentage cannot exceed 100%. Please adjust your percentages.');
+        showAllocationError('Total percentage cannot exceed 100%. Please adjust your percentages.');
         return;
     }
     if (totalPercentage === 0) {
-        alert('Please enter at least one percentage allocation.');
+        showAllocationError('Please enter at least one percentage allocation.');
         return;
     }
 
     const r = _calcMonthlyAllocation(availableMoney, monthlySavingsTarget, mortgagePercentage, eftPercentage, cryptoPercentage);
 
     if (r.remainingMoney < 0) {
-        alert('Available money is less than required monthly savings. You need to increase your available money or reduce your financial commitments.');
+        showAllocationError('Available money is less than required monthly savings. Increase your available money or reduce your financial commitments.');
         return;
     }
 
+    allocationError.classList.add('hidden');
     document.getElementById('allocation-savings').textContent = formatCurrency(monthlySavingsTarget);
     document.getElementById('allocation-mortgage').textContent = formatCurrency(r.mortgageAmount);
     document.getElementById('allocation-eft').textContent = formatCurrency(r.eftAmount);
