@@ -28,8 +28,7 @@ const contentHistory = document.getElementById('history-content');
 const contentRa = document.getElementById('ra-content');
 const contentRetirement = document.getElementById('retirement-content');
 
-// onShow thunks are evaluated at click time, so they may reference render
-// functions defined later in this file.
+// onShow thunks re-render tabs whose content depends on other tabs' state.
 const TABS = {
     budget:     { tab: tabBudget,     content: contentBudget },
     investment: { tab: tabInvestment, content: contentInvestment },

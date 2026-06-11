@@ -28,7 +28,6 @@ let raParams = {
 
 const raMakeId = () => 'ra_' + Math.random().toString(36).slice(2, 9);
 const raFmtZARShort = fmtZARWhole;
-const raFmtZAR = fmtZAR;
 
 function updateRaPerformanceDisplay() {
     const cv = (raCurrentValue !== undefined && raCurrentValue !== null && raCurrentValue !== '')

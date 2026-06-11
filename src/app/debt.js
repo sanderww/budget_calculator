@@ -1,6 +1,6 @@
 // Debt tab: mortgage projection and extra repayments.
 import {
-    getUpcoming25th as _getUpcoming25th,
+    getUpcoming25th,
     monthlyInterestFactor as _monthlyInterestFactor,
     calculateDebtResults as _calculateDebtResults,
     xirr as _xirr,
@@ -10,8 +10,6 @@ import {
 import { fmtZAR as formatCurrency } from '../format.js';
 import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './rows.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
-
-const getUpcoming25th = () => _getUpcoming25th(new Date());
 
 // --- DEBT CALCULATOR LOGIC ---
 let debtData = {
