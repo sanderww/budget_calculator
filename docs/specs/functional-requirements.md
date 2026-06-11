@@ -4,6 +4,8 @@
 
 A single-page web application for personal financial management with six modules: Budget Calculator, Investment Tracker, Debt Calculator, RA, Retirement, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
 
+Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, generated via `npm run build:css` / `make css`) plus custom styles in `src/styles/app.css`; no CSS CDN dependency at runtime.
+
 ---
 
 ## 1. Budget Calculator

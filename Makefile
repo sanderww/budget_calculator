@@ -2,7 +2,10 @@ PID_FILE = .server.pid
 LOG_FILE = server.log
 PORT = 8000
 
-.PHONY: start stop restart status commit-remote
+.PHONY: start stop restart status commit-remote css
+
+css:
+	npm run build:css
 
 start:
 	@if [ -f $(PID_FILE) ] && kill -0 $$(cat $(PID_FILE)) 2>/dev/null; then \

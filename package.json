@@ -4,10 +4,12 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "build:css": "tailwindcss -c tailwind.config.cjs -i src/styles/tailwind.in.css -o src/styles/tailwind.css --minify"
   },
   "devDependencies": {
     "happy-dom": "^20.10.2",
+    "tailwindcss": "^3.4.19",
     "vitest": "^2.0.0"
   }
 }
