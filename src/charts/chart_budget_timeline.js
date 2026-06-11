@@ -1,3 +1,5 @@
+import { fmtZARAxis as formatRand } from '../lib/format.js';
+
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const AVG_DAYS_PER_MONTH = 30.4375;
 const MONTH_MS = MS_PER_DAY * AVG_DAYS_PER_MONTH;
@@ -12,11 +14,6 @@ function parseISODate(iso) {
 
 function monthsBetween(aMs, bMs) {
     return (bMs - aMs) / MONTH_MS;
-}
-
-function formatRand(value) {
-    const n = Math.round(parseFloat(value) || 0);
-    return 'R ' + n.toLocaleString('en-ZA').replace(/,/g, ' ');
 }
 
 function formatDayMonthYear(ms) {

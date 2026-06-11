@@ -1,10 +1,7 @@
 const INSTANCE_KEY_INCOME = '__retirementIncomeChart';
 const INSTANCE_KEY_CAPITAL = '__retirementCapitalChart';
 
-function formatRand(value) {
-    const n = Math.round(parseFloat(value) || 0);
-    return 'R ' + n.toLocaleString('en-ZA').replace(/,/g, ' ');
-}
+import { fmtZARAxis as formatRand } from '../lib/format.js';
 
 // PMT amortising L over (lifeExp - age) years at returnPct annual (monthly compounded).
 // Matches §5.4 "Lump-sum monthly drawdown" in core-requirements.md.

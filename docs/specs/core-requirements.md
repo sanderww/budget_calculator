@@ -240,6 +240,15 @@ Net vs Savings (after tax) = Net vs Savings − Estimated Tax
 - `Marginal Rate ≤ 0` (or missing)
 - `Absolute Return ≤ Annual Exclusion` (gain fully covered by the exclusion)
 
+**CGT exclusion progress bar (Discretionary only):** a progress bar shown directly beneath the Estimated tax (CGT) line indicates how close the unrealized gain is to triggering CGT, mirroring the TFSA lifetime-cap bar.
+```
+Percent Used = (max(0, Absolute Return) / Annual Exclusion) × 100   // bar width clamped to 100%
+Remaining    = max(0, Annual Exclusion − Absolute Return)            // labelled "R <remaining> before CGT"
+```
+Colour: emerald below 80%, amber at ≥ 80%, red at ≥ 100% (gain has crossed the exclusion and CGT now applies). The bar reflects the gain vs the R 40,000 threshold only; it is independent of the marginal rate.
+
+**Tooltip:** an info icon beside the "Estimated tax (CGT)" label explains, on hover, that the figure is the worst-case estimate (everything sold at once, single R 40,000 exclusion); that the exclusion resets each SA tax year and applies to the gain rather than the amount sold; and how **tax-gain harvesting** (keeping each year's realised gain under R 40,000, selling and rebuying to reset base cost) can reduce or avoid CGT. Includes a "general info, not tax advice" disclaimer.
+
 ### 2.3 Crypto: Total BTC
 For the Crypto account only, track the total Bitcoin quantity:
 ```
@@ -580,6 +589,9 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar; `life_expectancy` and `lump_sum_drawdown_return_pct` are public params persisted in `db/config.public.json`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |
 | R33 | The Budget Timeline chart draws two savings trajectories: a solid **Planned** line (the user's planned monthly rate) and a dashed **Recommended** line (always the `requiredMonthlySavings`). `buildBudgetTimelineSeries` returns both `savingsLine` (planned) and `recommendedLine`; they coincide when no planned override is set. The planned amount persists in `db/config.private.json` under `budget_planned_monthly_savings` (non-public; absent → follow the recommendation) and is restored to the input on load. |
 | R34 | The Retirement tab renders two stacked-bar charts ("Retirement at a glance") between the Snapshot card and the Monthly Income card: Chart 1 (monthly income net by age) and Chart 2 (capital by age) — both keyed on Age 55 / Age D / Retirement age with bar collapse when ages coincide. Pure render from the retirement snapshot (no new persisted state). Chart 1's lump-sum layers use per-age PMT amortisation over `life_expectancy − bar_age` at `lump_sum_drawdown_return_pct`; the retirement-age bar matches `monthly.atRetirement.net + monthly.lumpSumDrawdown`. Both charts respect the real-terms toggle and re-render on the same triggers as Card 0. |
+| R35 | A header KPI strip shows four read-only figures above the tab bar — Net savings now, Net savings on the selected date, Portfolio value (sum of the three Investments current values), and Debt-free by (projected payoff month, or `Never`). These are mirrors of values the tabs already compute; the strip introduces no calculations of its own and updates on the same triggers as its source tab. |
+| R36 | A header save-status chip aggregates the state of all auto-save POSTs: `Saving…` while any save is in flight, `All changes saved` after the last in-flight save succeeds, `⚠ Save failed` on any error. A failure indication persists until the next successful save, so a silent failed write cannot go unnoticed. |
+| R37 | Allocation validation failures (R5/R6) are presented inline in the budget summary card, not as blocking browser alerts. |
 
 ---
 
