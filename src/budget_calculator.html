@@ -351,8 +351,21 @@
                                             <span id="net-savings-discretionary" class="font-medium">R 0.00</span>
                                         </div>
                                         <div class="flex justify-between text-xs text-slate-500">
-                                            <span>Estimated tax (CGT)</span>
+                                            <span class="inline-flex items-center gap-1">Estimated tax (CGT)<span class="cursor-help text-slate-400" title="Worst-case estimate: assumes you sell everything at once, using a single R 40,000 annual exclusion.
+
+The R 40,000 exclusion resets every SA tax year (1 March–end Feb) and covers the GAIN, not the amount sold. By realising gains gradually and keeping each year's gain under R 40,000, you can often pay little or no CGT.
+
+Tax-gain harvesting: sell and immediately rebuy to crystallise the gain (using up that year's exclusion) and reset your base cost higher — shrinking future taxable gains. The exclusion is shared across all your capital gains for the year, and brokerage/spread costs apply each time.
+
+General info, not tax advice — confirm with a tax practitioner."><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></span>
                                             <span id="tax-discretionary" class="font-medium text-red-500">R 0.00</span>
+                                        </div>
+                                        <div class="w-full bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden">
+                                            <div id="cgt-excl-bar" class="bg-emerald-500 h-1.5 rounded-full transition-all" style="width: 0%"></div>
+                                        </div>
+                                        <div class="flex justify-between text-[11px] text-slate-400">
+                                            <span><span id="cgt-excl-pct">0.0%</span> of CGT exclusion</span>
+                                            <span>R <span id="cgt-excl-remaining">40,000</span> before CGT</span>
                                         </div>
                                         <div class="flex justify-between text-xs font-bold text-slate-700">
                                             <span>Net vs savings (after tax)</span>

@@ -163,10 +163,11 @@ Each account displays:
 For the **Discretionary** account specifically (only):
 
 - **Marginal tax rate (%)** — editable numeric input below Current Value. Default `41`. Range `0..100`, step `1`. Persisted in `db/config.private.json` as the key `marginal_rate`.
-- **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown.
+- **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown. An info icon beside the label carries a hover tooltip explaining that the figure is the worst-case (sell-everything-at-once) estimate, that the R 40,000 exclusion resets each tax year and applies to the gain (not the amount sold), and how **tax-gain harvesting** (staggering disposals under R 40,000/year, selling and rebuying to reset base cost) can reduce or avoid CGT — closing with a "not tax advice" disclaimer.
+- **CGT exclusion progress bar** — directly below the Estimated tax (CGT) line, a bar fills with `min(100, gain / R 40,000 × 100)%`. Below the bar: `<pct>% of CGT exclusion` on the left and `R <remaining> before CGT` on the right, where `remaining = max(0, R 40,000 − gain)`. Bar is emerald below 80%, amber from 80% up to 100%, red at or above 100% (gain has crossed the exclusion). Driven by the gain vs the R 40,000 threshold only — independent of the marginal rate. Resets to 0% when `totalInvested === 0`.
 - **Net vs savings (after tax)** — `Net vs Savings − Estimated Tax`. Green when ≥ 0, red when < 0.
 
-These three rows are **not** shown on the TFSA or Crypto cards.
+These rows (and the CGT exclusion bar) are **not** shown on the TFSA or Crypto cards.
 
 For the **TFSA** account specifically:
 

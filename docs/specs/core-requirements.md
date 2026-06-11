@@ -240,6 +240,15 @@ Net vs Savings (after tax) = Net vs Savings − Estimated Tax
 - `Marginal Rate ≤ 0` (or missing)
 - `Absolute Return ≤ Annual Exclusion` (gain fully covered by the exclusion)
 
+**CGT exclusion progress bar (Discretionary only):** a progress bar shown directly beneath the Estimated tax (CGT) line indicates how close the unrealized gain is to triggering CGT, mirroring the TFSA lifetime-cap bar.
+```
+Percent Used = (max(0, Absolute Return) / Annual Exclusion) × 100   // bar width clamped to 100%
+Remaining    = max(0, Annual Exclusion − Absolute Return)            // labelled "R <remaining> before CGT"
+```
+Colour: emerald below 80%, amber at ≥ 80%, red at ≥ 100% (gain has crossed the exclusion and CGT now applies). The bar reflects the gain vs the R 40,000 threshold only; it is independent of the marginal rate.
+
+**Tooltip:** an info icon beside the "Estimated tax (CGT)" label explains, on hover, that the figure is the worst-case estimate (everything sold at once, single R 40,000 exclusion); that the exclusion resets each SA tax year and applies to the gain rather than the amount sold; and how **tax-gain harvesting** (keeping each year's realised gain under R 40,000, selling and rebuying to reset base cost) can reduce or avoid CGT. Includes a "general info, not tax advice" disclaimer.
+
 ### 2.3 Crypto: Total BTC
 For the Crypto account only, track the total Bitcoin quantity:
 ```

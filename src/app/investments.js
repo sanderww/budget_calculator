@@ -68,6 +68,23 @@ const updateTfsaCapDisplay = () => {
     if (remEl) remEl.textContent = Math.round(cap.remaining).toLocaleString('en-ZA');
 };
 
+// Progress toward the annual CGT exclusion (gain vs R40,000) for Discretionary.
+const updateCgtExclusionDisplay = (gain) => {
+    const exclusion = 40000;
+    const g = Math.max(0, gain || 0);
+    const pct = (g / exclusion) * 100;
+    const remaining = Math.max(0, exclusion - g);
+    const barEl = document.getElementById('cgt-excl-bar');
+    const pctEl = document.getElementById('cgt-excl-pct');
+    const remEl = document.getElementById('cgt-excl-remaining');
+    if (barEl) {
+        barEl.style.width = `${Math.min(100, pct)}%`;
+        barEl.className = `h-1.5 rounded-full transition-all ${pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`;
+    }
+    if (pctEl) pctEl.textContent = `${pct.toFixed(1)}%`;
+    if (remEl) remEl.textContent = Math.round(remaining).toLocaleString('en-ZA');
+};
+
 const renderTransactions = () => {
     transactionList.innerHTML = '';
     if (investmentData.transactions.length === 0) {
@@ -114,6 +131,9 @@ const calculatePerformance = (type, currentValueStr, invId, gainId, annId, money
     if (invEl) invEl.textContent = fmtZAR(r.totalInvested);
 
     const typeKey = type.toLowerCase();
+    // CGT exclusion bar tracks the gain vs the R40,000 threshold (Discretionary only).
+    // Reset to 0 when nothing is invested, matching the performance panel's empty state.
+    if (type === 'Discretionary') updateCgtExclusionDisplay(r.totalInvested === 0 ? 0 : r.absoluteReturn);
     const gainEl = document.getElementById(gainId);
     if (!gainEl) return;
 
