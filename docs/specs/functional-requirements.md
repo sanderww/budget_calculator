@@ -6,6 +6,8 @@ A single-page web application for personal financial management with six modules
 
 Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, generated via `npm run build:css` / `make css`) plus custom styles in `src/styles/app.css`; no CSS CDN dependency at runtime.
 
+**Implementation layout.** `src/budget_calculator.html` is markup-only and loads `src/app/main.js` as an ES-module bootstrap. Per-tab controllers live in `src/app/` (budget, investments, debt, ra, history, retirement) with shared helpers for persistence, row rendering, and the performance panel; shared number/currency formatters live in `src/format.js`. All calculation and CSV-parsing logic is split into domain modules under `src/calc/` (budget, investments, debt, ra, retirement) and re-exported through the `src/calculations.js` barrel — that barrel is the only import path consumers use. Chart helpers (`src/chart_budget_timeline.js`, `src/chart_retirement.js`) sit at the `src/` root alongside the barrel.
+
 ---
 
 ## 1. Budget Calculator
