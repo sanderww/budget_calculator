@@ -10,7 +10,7 @@ import { createRowElement } from './rows.js';
 import { renderPerformancePanel } from './perf-panel.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
-// main.js (currently app.js) points this at the retirement re-render — the
+// main.js points this at the retirement re-render — the
 // retirement tab reads live RA state; importing that renderer here directly
 // would create a module cycle.
 let onStateChanged = () => {};
