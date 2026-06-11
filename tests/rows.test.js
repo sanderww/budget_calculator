@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from 'vitest';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../src/app/rows.js';
+import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../src/lib/rows.js';
 
 describe('sortByDateThenIdDesc', () => {
     it('sorts newest date first', () => {

@@ -7,8 +7,8 @@ import {
     parseDebtCSV as _parseDebtCSV,
     generateDebtCSV as _generateDebtCSV,
 } from '../calculations.js';
-import { fmtZAR as formatCurrency } from '../format.js';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './rows.js';
+import { fmtZAR as formatCurrency } from '../lib/format.js';
+import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // --- DEBT CALCULATOR LOGIC ---

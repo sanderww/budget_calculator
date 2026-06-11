@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBudgetTimelineSeries } from '../src/chart_budget_timeline.js';
+import { buildBudgetTimelineSeries } from '../src/charts/chart_budget_timeline.js';
 
 const day = (iso) => new Date(iso + 'T00:00:00Z').getTime();
 const TODAY = new Date('2026-06-06T00:00:00Z');

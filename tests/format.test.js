@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fmtZAR, fmtZARWhole, fmtZARSigned, fmtZARAxis } from '../src/format.js';
+import { fmtZAR, fmtZARWhole, fmtZARSigned, fmtZARAxis } from '../src/lib/format.js';
 
 // Expectations are built from toLocaleString so the tests are robust to the
 // ICU grouping character; what they lock down is the wrapper logic

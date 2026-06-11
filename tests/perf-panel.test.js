@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderPerformancePanel } from '../src/app/perf-panel.js';
-import { fmtZAR } from '../src/format.js';
+import { renderPerformancePanel } from '../src/lib/perf-panel.js';
+import { fmtZAR } from '../src/lib/format.js';
 
 const makeEls = () => {
     const el = () => document.createElement('div');

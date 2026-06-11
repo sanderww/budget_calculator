@@ -6,7 +6,7 @@ A single-page web application for personal financial management with six modules
 
 Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, generated via `npm run build:css` / `make css`) plus custom styles in `src/styles/app.css`; no CSS CDN dependency at runtime.
 
-**Implementation layout.** `src/budget_calculator.html` is markup-only and loads `src/app/main.js` as an ES-module bootstrap. Per-tab controllers live in `src/app/` (budget, investments, debt, ra, history, retirement) with shared helpers for persistence, row rendering, and the performance panel; shared number/currency formatters live in `src/format.js`. All calculation and CSV-parsing logic is split into domain modules under `src/calc/` (budget, investments, debt, ra, retirement) and re-exported through the `src/calculations.js` barrel — that barrel is the only import path consumers use. Chart helpers (`src/chart_budget_timeline.js`, `src/chart_retirement.js`) sit at the `src/` root alongside the barrel.
+**Implementation layout.** `src/budget_calculator.html` is markup-only and loads `src/app/main.js` as an ES-module bootstrap. Per-tab controllers live in `src/app/` (budget, investments, debt, ra, history, retirement, plus the persistence/config layer). Shared front-end helpers live in `src/lib/` (`format.js` currency formatters, `rows.js` row builder, `perf-panel.js` performance renderer) and chart modules in `src/charts/`. All calculation and CSV-parsing logic is split into domain modules under `src/calc/` (budget, investments, debt, ra, retirement) and re-exported through the `src/calculations.js` barrel — that barrel is the only import path consumers use and deliberately stays at the `src/` root.
 
 ---
 
@@ -101,7 +101,7 @@ X-axis is datetime. Legend at bottom centre. Headline above the chart in plain l
 - Custom tooltip on bars shows the future-cost description, date, and amount.
 - The user-adjusted time window is not persisted (resets on reload).
 
-**Data source**: pure series-builder `buildBudgetTimelineSeries` in `src/chart_budget_timeline.js`. It does not consume `calculateBudgetSummary` outputs — it derives `requiredMonthlySavings` independently from `savings`, `totalDebts`, `totalProvisions`, `futureCosts`, and `futureDate`.
+**Data source**: pure series-builder `buildBudgetTimelineSeries` in `src/charts/chart_budget_timeline.js`. It does not consume `calculateBudgetSummary` outputs — it derives `requiredMonthlySavings` independently from `savings`, `totalDebts`, `totalProvisions`, `futureCosts`, and `futureDate`.
 
 ---
 

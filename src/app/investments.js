@@ -5,9 +5,9 @@ import {
     generateInvestmentCSV as _generateInvestmentCSV,
     tfsaLifetimeContributions as _tfsaLifetimeContributions,
 } from '../calculations.js';
-import { fmtZAR as formatCurrency, fmtZAR } from '../format.js';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from './rows.js';
-import { renderPerformancePanel } from './perf-panel.js';
+import { fmtZAR as formatCurrency, fmtZAR } from '../lib/format.js';
+import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
+import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // main.js points this at the retirement re-render — the

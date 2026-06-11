@@ -1,4 +1,4 @@
-import { fmtZARAxis as formatRand } from './format.js';
+import { fmtZARAxis as formatRand } from '../lib/format.js';
 
 const MS_PER_DAY = 1000 * 60 * 60 * 24;
 const AVG_DAYS_PER_MONTH = 30.4375;

@@ -9,8 +9,8 @@ import {
     calculateRetirementSnapshot as _calculateRetirementSnapshot,
     generateConfigJSON as _generateConfigJSON,
 } from '../calculations.js';
-import { renderRetirementCharts as _renderRetirementCharts } from '../chart_retirement.js';
-import { fmtZARWhole, fmtZARSigned } from '../format.js';
+import { renderRetirementCharts as _renderRetirementCharts } from '../charts/chart_retirement.js';
+import { fmtZARWhole, fmtZARSigned } from '../lib/format.js';
 import { getConfigMap, persistConfig, saveToServer } from './persistence.js';
 import { getInvestmentData } from './investments.js';
 import { getRaState } from './ra.js';

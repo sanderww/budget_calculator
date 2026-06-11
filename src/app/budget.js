@@ -5,9 +5,9 @@ import {
     parseBudgetCSV as _parseBudgetCSV,
     generateBudgetCSV as _generateBudgetCSV,
 } from '../calculations.js';
-import { renderBudgetTimeline as _renderBudgetTimeline } from '../chart_budget_timeline.js';
-import { fmtZAR as formatCurrency } from '../format.js';
-import { createRowElement, emptyStateHTML, generateId } from './rows.js';
+import { renderBudgetTimeline as _renderBudgetTimeline } from '../charts/chart_budget_timeline.js';
+import { fmtZAR as formatCurrency } from '../lib/format.js';
+import { createRowElement, emptyStateHTML, generateId } from '../lib/rows.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
 let budgetData = {
