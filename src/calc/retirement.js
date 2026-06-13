@@ -252,6 +252,111 @@ export function projectLivingAnnuityDepletion(
     return null;
 }
 
+// Walk retirement month-by-month from retirement_age to life_expectancy and
+// sample one point per integer age. Two pots evolve:
+//  - lump-sum pot: grows at lumpSumReturnPct, pays the fixed PMT until empty;
+//  - RA annuitised pot: grows at raReturnPct minus a pot-proportional drawdown
+//    (income varies over time), with full commutation below the living-annuity
+//    threshold (residual moves into the lump-sum pot, net of lump-sum tax).
+// Before age 55 the RA pot is locked: passive growth, no income. The commuted
+// 1/3 is already inside lumpSumAtRetirement — it is never re-added here.
+// `deflate(n, yearsFromToday)` applies the real-terms toggle.
+export function simulateRetirementTimeline({
+    retirementAge = 0,
+    lifeExpectancy = 0,
+    dutchAge = RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE,
+    lumpSumAtRetirement = 0,
+    lumpSumMonthly = 0,
+    lumpSumReturnPct = 0,
+    raPotAtRetirement = 0,
+    raPotAt55 = 0,
+    commuteThird = false,
+    raReturnPct = 0,
+    withdrawalRatePct = 0,
+    taxRatePct = 0,
+    dutchMonthlyNet = 0,
+    dutchEnabled = false,
+    yearsToRetirement = 0,
+    deflate = (n) => n,
+}) {
+    const startAge = Math.floor(Number(retirementAge) || 0);
+    const endAge = Math.max(startAge, Math.floor(Number(lifeExpectancy) || 0));
+    const rLump = Math.pow(1 + (Number(lumpSumReturnPct) || 0) / 100, 1 / 12) - 1;
+    const rRa = Math.pow(1 + (Number(raReturnPct) || 0) / 100, 1 / 12) - 1;
+    const wdMonthly = ((Number(withdrawalRatePct) || 0) / 100) / 12;
+    const tax = Math.max(0, Math.min(100, Number(taxRatePct) || 0)) / 100;
+    const pmt = Math.max(0, Number(lumpSumMonthly) || 0);
+    const drawdownStartAge = Math.max(startAge, RETIREMENT_CONSTANTS.RA_ACCESS_AGE);
+
+    let lumpPot = Math.max(0, Number(lumpSumAtRetirement) || 0);
+    let raPot = Math.max(0, Number(raPotAtRetirement) || 0);
+    let raDrawdownActive = false;
+    let raDepleted = raPot <= 0;
+
+    // Begin RA drawdown: annuitise the full pot (× 2/3 if commuting). Mirrors
+    // raMonthlyIncome — a full pot below the de minimis produces zero annuity
+    // income; its commutation is ALREADY inside lumpSumAtRetirement (the caller's
+    // projectedFundsAtRet includes commutationRet.net), so it is NOT re-added here.
+    const activateDrawdown = (potBasisFull) => {
+        const fullPot = Math.max(0, Number(potBasisFull) || 0);
+        raDrawdownActive = true;
+        if (fullPot < RETIREMENT_CONSTANTS.DE_MINIMIS) {
+            raPot = 0;
+            raDepleted = true;
+            return;
+        }
+        raPot = commuteThird ? fullPot * 2 / 3 : fullPot;
+        raDepleted = raPot <= 0;
+    };
+    if (startAge >= drawdownStartAge) activateDrawdown(raPotAtRetirement);
+
+    const points = [];
+    for (let age = startAge; age <= endAge; age++) {
+        if (!raDrawdownActive && age >= drawdownStartAge) activateDrawdown(raPotAt55);
+
+        // Income = first month of this age; capital = before that month's flows.
+        const yearsFromToday = Math.max(0, (Number(yearsToRetirement) || 0) + (age - startAge));
+        const raGross = (raDrawdownActive && !raDepleted) ? raPot * wdMonthly : 0;
+        const incomeRa = raGross * (1 - tax);
+        const incomeLump = lumpPot > 0 ? pmt : 0;
+        const incomeDutch = (dutchEnabled && age >= (Number(dutchAge) || 0)) ? (Number(dutchMonthlyNet) || 0) : 0;
+        points.push({
+            age,
+            income: {
+                ra: deflate(incomeRa, yearsFromToday),
+                lumpSum: deflate(incomeLump, yearsFromToday),
+                dutch: deflate(incomeDutch, yearsFromToday),
+                total: deflate(incomeRa + incomeLump + incomeDutch, yearsFromToday),
+            },
+            capital: {
+                raPot: deflate(Math.max(0, raPot), yearsFromToday),
+                lumpSum: deflate(Math.max(0, lumpPot), yearsFromToday),
+                total: deflate(Math.max(0, raPot) + Math.max(0, lumpPot), yearsFromToday),
+            },
+        });
+        if (age === endAge) break;
+
+        for (let m = 0; m < 12; m++) {
+            if (lumpPot > 0) {
+                lumpPot = Math.max(0, lumpPot * (1 + rLump) - pmt);
+            }
+            if (raDrawdownActive && !raDepleted) {
+                const draw = raPot * wdMonthly;
+                raPot = raPot * (1 + rRa) - draw;
+                if (raPot < RETIREMENT_CONSTANTS.LIVING_ANNUITY_THRESHOLD) {
+                    const residual = Math.max(0, raPot);
+                    lumpPot += Math.max(0, residual - lumpSumTax(residual));
+                    raPot = 0;
+                    raDepleted = true;
+                }
+            } else if (!raDrawdownActive && raPot > 0) {
+                raPot = raPot * (1 + rRa);
+            }
+        }
+    }
+    return points;
+}
+
 const RETIREMENT_DEFAULT_PARAMS = {
     dob: '1985-08-08',
     retirement_age: 65,
@@ -530,7 +635,28 @@ export function calculateRetirementSnapshot({
     const maxMonthly55Nominal = monthly55Projected.net + lumpSumMonthlyNominal;
     const maxMonthly68Nominal = monthly68Projected.net + lumpSumMonthlyNominal;
 
+    // Year-by-year retirement timeline (retirement_age → life_expectancy).
+    const timeline = simulateRetirementTimeline({
+        retirementAge: Number(p.retirement_age) || 0,
+        lifeExpectancy,
+        dutchAge,
+        lumpSumAtRetirement: projectedFundsAtRet,
+        lumpSumMonthly: lumpSumMonthlyNominal,
+        lumpSumReturnPct: lumpSumDrawdownReturnPct,
+        raPotAtRetirement: raAtRetirement.total,
+        raPotAt55: raAt55.total,
+        commuteThird: commute,
+        raReturnPct: p.return_ra_pct,
+        withdrawalRatePct: p.withdrawal_rate_pct,
+        taxRatePct: p.effective_tax_rate_pct,
+        dutchMonthlyNet,
+        dutchEnabled: !!p.opt_dutch_enabled,
+        yearsToRetirement: yearsToRet,
+        deflate,
+    });
+
     return {
+        timeline,
         ageNow,
         monthsToRetirement, monthsTo55, monthsTo68,
         yearsToRet, yearsTo55, yearsTo68,

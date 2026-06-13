@@ -518,9 +518,21 @@ Two stacked-bar charts visualise the Snapshot across three ages: Age 55, Age D (
 
 Both charts respect the **Show in today's money** toggle (R26) by deflating each bar value by `(1 + cpi/100)^years_from_today_to_bar_age`, and re-render on the same triggers as Card 0 (R28).
 
+### 5.5b Retirement timeline (year-by-year)
+
+A continuous projection over the whole of retirement — `retirement_age → life_expectancy`, one sample per integer age — produced by `simulateRetirementTimeline` and returned as `snapshot.timeline`. Unlike the three-age snapshot charts (§5.5a), this walks the two drawdown pots month-by-month so income and capital evolve realistically:
+
+- **Lump-sum pot** starts at the at-retirement lump-sum total (`projectedFundsAtRet`, the same figure as the §5.5 "instantly available" total). Each month it grows at `lump_sum_drawdown_return_pct` and pays out the fixed PMT (§5.4); lump-sum *income* is that PMT while the pot lasts, and the pot depletes to ~0 at `life_expectancy`.
+- **RA annuitised pot** begins drawdown at `max(retirement_age, 55)`. Before 55 (early retirement) the pot grows passively with no income. Once drawdown starts the pot is annuitised (× 2/3 if commuting), and each month income gross = `pot × withdrawal_rate/12`, net of `effective_tax_rate`, with `pot = pot × (1 + monthly return) − gross`. RA income therefore rises or falls over time depending on whether the return outpaces the withdrawal rate.
+- **De minimis at drawdown start**: if the full RA pot is below R360,000 when drawdown begins it produces no annuity income (mirrors `raMonthlyIncome`). Its commutation is already counted in the lump-sum total (`projectedFundsAtRet` includes `commutationRet.net`), so the timeline does **not** re-add it — re-adding would double-count and leave the lump-sum pot growing instead of depleting against its PMT.
+- **Living-annuity commutation mid-retirement**: if an actively-drawing pot falls below the R150,000 living-annuity threshold it fully commutes — the residual (net of lump-sum tax) moves into the lump-sum capital pot and RA income stops from that age. (The commuted residual is not subsequently drawn by the fixed PMT — an accepted simplification; it persists as available capital.)
+- **Dutch pension** adds its constant net monthly amount from `opt_dutch_age`, producing the visible income step.
+
+Each sampled year is deflated per the **Show in today's money** toggle (R26) by years from today to that age. Income figures are net of tax, consistent with Card 0's "Max estimated monthly income".
+
 ### 5.6 Out of scope (v1)
 
-Year-by-year growth chart, aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario side-by-side, sequence-of-returns risk, full DTA detail for Dutch pension, spouse/household joint projection, estate duty, marginal-rate brackets for savings-pot tax, multiple RAs at different providers. Months-to-age math is month-precision (ignores day-of-month) — known small boundary noise within ~30 days of a target age, acceptable for multi-decade projections.
+Aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario side-by-side, sequence-of-returns risk, full DTA detail for Dutch pension, spouse/household joint projection, estate duty, marginal-rate brackets for savings-pot tax, multiple RAs at different providers. Months-to-age math is month-precision (ignores day-of-month) — known small boundary noise within ~30 days of a target age, acceptable for multi-decade projections.
 
 ---
 
@@ -592,6 +604,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R35 | A header KPI strip shows four read-only figures above the tab bar — Net savings now, Net savings on the selected date, Portfolio value (sum of the three Investments current values), and Debt-free by (projected payoff month, or `Never`). These are mirrors of values the tabs already compute; the strip introduces no calculations of its own and updates on the same triggers as its source tab. |
 | R36 | A header save-status chip aggregates the state of all auto-save POSTs: `Saving…` while any save is in flight, `All changes saved` after the last in-flight save succeeds, `⚠ Save failed` on any error. A failure indication persists until the next successful save, so a silent failed write cannot go unnoticed. |
 | R37 | Allocation validation failures (R5/R6) are presented inline in the budget summary card, not as blocking browser alerts. |
+| R38 | The Retirement tab renders a year-by-year timeline (`snapshot.timeline`, from `simulateRetirementTimeline`) from `retirement_age` to `life_expectancy`, sampled per integer age, in a card above the "Retirement at a glance" charts (§5.5b). Two stacked-area charts: monthly net income by source (RA drawdown / lump-sum PMT / Dutch pension) and available capital (RA annuitised pot / lump-sum capital). The pots are walked month-by-month: the lump-sum pot grows at `lump_sum_drawdown_return_pct` and pays the fixed PMT; the RA pot draws down at `withdrawal_rate_pct` and, if an actively-drawing pot falls below the R150,000 living-annuity threshold mid-retirement, commutes its residual (net of lump-sum tax) into lump-sum capital with income ending there. A full pot below the R360,000 de minimis at drawdown start yields no RA annuity income and is not re-added to lump-sum capital (commutation is already counted in the at-retirement lump sum). RA drawdown begins at `max(retirement_age, 55)`. Both charts respect the real-terms toggle (R26) and re-render on the same triggers as Card 0 (R28). |
 
 ---
 

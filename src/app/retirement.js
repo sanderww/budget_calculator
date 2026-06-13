@@ -9,7 +9,8 @@ import {
     calculateRetirementSnapshot as _calculateRetirementSnapshot,
     generateConfigJSON as _generateConfigJSON,
 } from '../calculations.js';
-import { renderRetirementCharts as _renderRetirementCharts } from '../charts/chart_retirement.js';
+import { renderRetirementCharts as _renderRetirementCharts,
+         renderRetirementTimelineCharts as _renderRetirementTimelineCharts } from '../charts/chart_retirement.js';
 import { fmtZARWhole, fmtZARSigned } from '../lib/format.js';
 import { getConfigMap, persistConfig, saveToServer } from './persistence.js';
 import { getInvestmentData } from './investments.js';
@@ -463,6 +464,13 @@ function renderRetirement() {
     `;
 
     window.__retirementSnapshot = snap; // Exposed for manual debugging only.
+
+    _renderRetirementTimelineCharts({
+        containerIncome: document.getElementById('retirement-chart-income-timeline'),
+        containerCapital: document.getElementById('retirement-chart-capital-timeline'),
+        badge: document.getElementById('retirement-timeline-badge'),
+        snapshot: snap,
+    });
 
     _renderRetirementCharts({
         containerIncome: document.getElementById('retirement-chart-income'),

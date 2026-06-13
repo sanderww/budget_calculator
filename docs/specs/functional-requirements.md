@@ -348,6 +348,17 @@ Three-column × four-row grid (label | Age 55 | Age `opt_dutch_age`):
 
 A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
 
+**Card 0-timeline — Retirement timeline**
+
+Positioned directly below Card 0 and above Card 0a. Two side-by-side stacked **area** ApexCharts (stacked vertically on narrow viewports), x-axis = age, running from `retirement_age` to `life_expectancy` (one point per integer age). The card header carries its own `nominal` / `today's money` badge mirroring Card 0.
+
+Driven by `snapshot.timeline` (see core-requirements §5.6), which walks retirement month-by-month and samples yearly:
+
+- **Chart 1: Monthly income through retirement** — stacked net income by source: RA drawdown, lump-sum drawdown (the PMT), and Dutch pension. RA drawdown varies year to year as the annuitised pot grows or shrinks; the Dutch pension layer steps in at `opt_dutch_age`.
+- **Chart 2: Available capital through retirement** — stacked: RA annuitised pot and lump-sum capital, each depleting (or growing) over time.
+
+All-zero layers are dropped from the legend. Both charts re-render on the same triggers as Card 0. When the timeline has fewer than two points (e.g. retirement age ≥ life expectancy), a placeholder is shown instead.
+
 **Card 0a — Retirement at a glance**
 
 Two side-by-side stacked-bar ApexCharts (stacked vertically on narrow viewports). The card header carries a `nominal` / `today's money` badge that mirrors Card 0.
