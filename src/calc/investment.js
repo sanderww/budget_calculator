@@ -1,6 +1,6 @@
 // Investments tab: performance metrics and investment CSV parse/generate.
 
-import { generateRecordId as _generateId } from './util.js';
+import { generateRecordId as _generateId, xirr } from './util.js';
 
 export function calculateInvestmentPerformance(transactions, currentValue, today = new Date(), marginalRate = 0) {
     const totalInvested = transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
@@ -46,16 +46,46 @@ export function calculateInvestmentPerformance(transactions, currentValue, today
     const averageAgeDays = weightedAgeSum / totalInvested;
     const yearsHeld = averageAgeDays / 365.25;
 
+    // Don't annualize very short holding periods — annualizing a few weeks'
+    // gain produces meaningless extremes (e.g. a 5% gain over 5 days → ~3600%).
     if (yearsHeld <= 0.1) {
         return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays, yearsHeld, annualizedReturn: null };
     }
 
-    const ratio = currentValue / totalInvested;
-    if (ratio <= 0) {
-        return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays, yearsHeld, annualizedReturn: null };
+    // Build cash flows for XIRR
+    const cashFlows = [];
+    transactions.forEach(t => {
+        const amount = parseFloat(t.amount) || 0;
+        if (amount > 0 && t.date) {
+            cashFlows.push({ amount: -amount, date: new Date(t.date) });
+        }
+    });
+
+    if (cashFlows.length > 0 && currentValue > 0) {
+        cashFlows.push({ amount: currentValue, date: today });
+        cashFlows.sort((a, b) => a.date - b.date);
     }
 
-    const annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
+    let annualizedReturn = null;
+    if (cashFlows.length >= 2 && currentValue > 0) {
+        try {
+            const rate = xirr(cashFlows);
+            if (!isNaN(rate) && Number.isFinite(rate)) {
+                annualizedReturn = rate * 100;
+            }
+        } catch (e) {
+            // Ignore and let fallback handle it
+        }
+    }
+
+    // Fallback to simple annualized return if XIRR calculation is not available/failed
+    if (annualizedReturn === null) {
+        const ratio = currentValue / totalInvested;
+        if (ratio > 0) {
+            annualizedReturn = (Math.pow(ratio, 1 / yearsHeld) - 1) * 100;
+        }
+    }
+
     return { totalInvested, totalCryptoValue, absoluteReturn, percentageReturn, savingsGain, netVsSavings, taxableGain, estimatedTax, netVsSavingsAfterTax, averageAgeDays, yearsHeld, annualizedReturn };
 }
 

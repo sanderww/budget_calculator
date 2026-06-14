@@ -207,6 +207,26 @@ describe('calculateInvestmentPerformance', () => {
         expect(result.annualizedReturn).toBeCloseTo(expectedAnn, 1);
     });
 
+    it('uses cash-flow-weighted XIRR for uneven periodic contributions', () => {
+        // Two contributions a year apart, then current value today. The simple
+        // lump-sum-at-average-age formula would understate the true IRR because
+        // it ignores that the later contribution was exposed for less time.
+        const txs = [
+            { amount: 10000, date: '2024-01-01', type: 'TFSA' },
+            { amount: 10000, date: '2025-01-01', type: 'TFSA' },
+        ];
+        const today = new Date(2026, 0, 1);
+        const result = calculateInvestmentPerformance(txs, 23000, today);
+
+        // Simple formula using weighted-average age (≈1.5 years held).
+        const simpleAnn = (Math.pow(23000 / 20000, 1 / result.yearsHeld) - 1) * 100;
+
+        // True XIRR: discounting -10000@2024, -10000@2025, +23000@2026 to zero.
+        // Solving gives ≈9.68% — materially higher than the simple estimate.
+        expect(result.annualizedReturn).toBeCloseTo(9.68, 1);
+        expect(result.annualizedReturn).not.toBeCloseTo(simpleAnn, 1);
+    });
+
     it('sums totalCryptoValue from cryptoValue fields', () => {
         const txs = [
             { amount: 5000, date: '2024-01-01', type: 'Crypto', cryptoValue: '0.5' },

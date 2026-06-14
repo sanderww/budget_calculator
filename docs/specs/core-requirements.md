@@ -173,17 +173,30 @@ Absolute Return = Current Value − Total Invested
 Percentage Return = (Absolute Return / Total Invested) × 100
 ```
 
-#### Annualized Return (CAGR)
+#### Annualized Return (XIRR)
 
-Uses a weighted-average holding period across all transactions, weighted by amount invested:
+Computed as the true cash-flow-weighted internal rate of return (XIRR) over the
+account's actual contribution dates, so periodic and uneven contributions are
+each weighted by how long they were invested:
+
+```
+Cash flows = [ −amount @ transaction.date for each contribution ]  +  [ +Current Value @ today ]
+
+Annualized Return = xirr(cash flows) × 100   (Newton-Raphson, see §3.6)
+```
+
+A weighted-average holding period is still derived for display and for the
+short-history guard:
 
 ```
 Weighted Average Age (days) = sum(transaction.amount × transaction.age_in_days) / Total Invested
-
 Years Held = Weighted Average Age / 365.25
-
-Annualized Return = ((Current Value / Total Invested) ^ (1 / Years Held) − 1) × 100
 ```
+
+- When `Years Held ≤ 0.1`, annualized return returns `N/A` (annualizing a few
+  weeks of gain produces meaningless extremes).
+- If XIRR fails to converge, fall back to the simple CAGR
+  `((Current Value / Total Invested) ^ (1 / Years Held) − 1) × 100`.
 
 Show "N/A" if:
 - Years Held ≤ 0.1 (too short to be meaningful)
@@ -395,7 +408,7 @@ The RA Summary card mirrors the Investments tab's per-fund performance layout, t
 | **Invested** | `Σ contribution_amount` (sum of all contribution rows). |
 | **Gain/Loss (R)** | `current_value − invested`. |
 | **Gain/Loss %** | `(current_value − invested) / invested × 100`. |
-| **Annualized %** | CAGR over the contribution-weighted average holding period: `(current_value / invested)^(1 / years_held) − 1`. Returns `N/A` when fewer than ~0.1 years of holding history exists. |
+| **Annualized %** | True cash-flow-weighted XIRR over the actual contribution dates (falls back to simple CAGR if XIRR fails to converge). Returns `N/A` when fewer than ~0.1 years of holding history exists. |
 | **6% savings would be** | Hypothetical gain if each contribution had instead earned 6% p.a. with daily compounding from its date to today. |
 | **Net vs savings** | `Gain/Loss − (6% savings)`. |
 
@@ -568,7 +581,7 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 | R4 | Monthly savings target uses `ceil(days / 30)` months, minimum 1 month. |
 | R5 | Monthly allocation percentages must sum to ≤ 100%; at least one must be > 0%. |
 | R6 | Available money for allocation must exceed the monthly savings target. |
-| R7 | Investment annualized return uses weighted-average holding period (weighted by amount). |
+| R7 | Investment annualized return uses true cash-flow-weighted XIRR over actual contribution dates (falls back to weighted-average-period CAGR if XIRR fails to converge). |
 | R8 | Investment benchmark is 6% p.a. compounded daily from each transaction date to today. |
 | R9 | Annualized return displays "N/A" when years held ≤ 0.1 or data is insufficient. |
 | R9a | Discretionary card shows estimated SARS CGT and net-after-tax using `taxable = max(0, gain − R 40k)`, `tax = taxable × 0.40 × marginal_rate%`. Marginal rate is user-configurable (default 41) and persisted. Tax is zero on loss, when marginal rate is 0, or when the gain is fully under the R 40k annual exclusion. TFSA and Crypto cards are unaffected. |

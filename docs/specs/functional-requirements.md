@@ -152,11 +152,12 @@ Each account displays:
 - **Total Invested** — sum of all transaction amounts for this account
 - **Gain/Loss (R)** — absolute return = Current Value - Total Invested
 - **Gain/Loss (%)** — percentage return = (absolute return / total invested) * 100
-- **Annualized Return** — compound annualized growth rate based on a weighted-average holding period per transaction:
-  - Weighted average age (days) = sum(amount * age_in_days) / total_invested
-  - Years held = average age / 365.25
-  - Annualized = ((current_value / total_invested) ^ (1 / years_held) - 1) * 100
+- **Annualized Return** — true cash-flow-weighted internal rate of return (XIRR) over the account's actual contribution dates, so each contribution is weighted by how long it was invested:
+  - Cash flows = one `-amount` outflow per contribution (on its transaction date) plus a single `+current_value` inflow today.
+  - Annualized = `xirr(cash flows) * 100` (Newton-Raphson, see §3.4).
+  - A contribution-weighted average holding period is still derived for display: weighted average age (days) = sum(amount * age_in_days) / total_invested; years held = average age / 365.25.
   - Shows "N/A" if years held <= 0.1 or data is insufficient.
+  - Falls back to the simple CAGR `((current_value / total_invested) ^ (1 / years_held) - 1) * 100` if XIRR fails to converge.
 - **6% Savings Comparison** — hypothetical gain if each transaction amount had been in a 6% p.a. savings account from its transaction date to today, compounded daily: `amount * (1.06 ^ (age_days / 365.25) - 1)`.
 - **Net vs Savings** — absolute return minus the 6% savings gain.
 
