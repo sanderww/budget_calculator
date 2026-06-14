@@ -94,6 +94,21 @@ describe('retirement phase — RA annuity & Dutch pension', () => {
         const off = buildRetirementScenarioTimeline(baseInput(), TODAY);
         expect(off.points.every(p => p.income.dutch === 0)).toBe(true);
     });
+
+    it('Dutch pension escalates with CPI: rises nominally, flat in real terms', () => {
+        const dutch = { opt_dutch_enabled: 1, opt_dutch_age: 68, opt_dutch_eur_monthly: 1000, opt_dutch_eur_zar: 20, cpi_pct: 6 };
+        const nominal = buildRetirementScenarioTimeline(baseInput({
+            params: { ...baseParams(), ...dutch, show_real_terms: 0 },
+        }), TODAY);
+        // Nominal: each later year is strictly larger (compounding with CPI).
+        expect(at(nominal, 90).income.dutch).toBeGreaterThan(at(nominal, 70).income.dutch);
+
+        const real = buildRetirementScenarioTimeline(baseInput({
+            params: { ...baseParams(), ...dutch, show_real_terms: 1 },
+        }), TODAY);
+        // Real terms: holds its purchasing power, so it is flat across ages.
+        expect(at(real, 90).income.dutch).toBeCloseTo(at(real, 70).income.dutch, 4);
+    });
 });
 
 describe('manual capital drawdown', () => {

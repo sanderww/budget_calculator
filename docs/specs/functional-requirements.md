@@ -352,9 +352,9 @@ A small `nominal` / `today's money` badge in the card header reflects the deflat
 
 Positioned directly below Card 0. A single card with two side-by-side stacked **area** ApexCharts (stacked vertically on narrow viewports), x-axis = age, running from age **55** (RA access age; or the retirement age when it is below 55) to `life_expectancy`, one point per integer age. The card header carries its own `nominal` / `today's money` badge mirroring Card 0. This card replaces the earlier "Retirement timeline" (auto-PMT) and "Retirement at a glance" (3-bar) cards.
 
-It exposes one control — **Monthly capital drawdown (from retirement)**, id `ret-scenario-drawdown`, persisted to `db/config.private.json` as `ret_scenario_monthly_drawdown` — and is driven by `snapshot.scenario` (see core-requirements §5.5b), which walks the projection month-by-month from today and samples per integer age, reflecting every ticked optional-scenario box.
+It exposes one control — **Monthly capital drawdown (from retirement)**, id `ret-scenario-drawdown`, persisted to `db/config.private.json` as `ret_scenario_monthly_drawdown` — and is driven by `snapshot.scenario` (see core-requirements §5.5b), which walks the projection month-by-month from today and samples per integer age, reflecting every ticked optional-scenario box. The help text notes the figure is a **nominal (future-rand)** amount, so with "Show in today's money" on the chart displays it deflated (appearing smaller and shrinking with age).
 
-- **Chart 1: Monthly income through retirement** — stacked net income by source: RA annuity, RA savings-pot withdrawals (during accumulation when enabled), Dutch pension (from `opt_dutch_age` when enabled), and the user's capital drawdown (from the retirement age).
+- **Chart 1: Monthly income through retirement** — stacked net income by source: RA annuity, RA savings-pot withdrawals (during accumulation when enabled), Dutch pension (from `opt_dutch_age` when enabled, assumed to escalate with CPI so it is flat in real terms), and the user's capital drawdown (from the retirement age).
 - **Chart 2: Available capital through retirement** — stacked by pool: Discretionary, TFSA, Crypto, "RA lump + one-offs", and the annuitised RA pot.
 
 A dashed vertical annotation marks the retirement age (where the manual drawdown begins). All-zero layers are dropped from the legend; non-finite values coerce to 0; fewer than two points shows a placeholder. Both charts re-render on every retirement-input change and every Investments/RA-tab edit that changes a current value, on the same triggers as Card 0.
@@ -378,7 +378,7 @@ Two side-by-side panels: a "today" panel and "At retirement age X", each with a 
 
 **Card 4 — Assumptions** (collapsible `<details>`, default closed)
 
-Read-only key/value table summarising all in-effect assumptions: returns per fund, CPI, tax rate, FX rates, two-pot split, commutation, TFSA cap remaining, RA deduction-cap headroom (R 430,000 − last-12-months contributions), and the hardcoded constants.
+Read-only key/value table summarising all in-effect assumptions: returns per fund, CPI, tax rate, FX rates, two-pot split, commutation, TFSA cap remaining, RA deduction-cap headroom (R 430,000 − last-12-months contributions), and the hardcoded constants. When the Dutch pension is enabled, a row notes it is assumed to rise with CPI (flat in real terms).
 
 ### 5.4 Edge cases
 

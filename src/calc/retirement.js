@@ -402,7 +402,9 @@ export function buildRetirementScenarioTimeline({
             const raAnnuityNet = (raAnnuitisedActive && !raDepleted) ? annuitised * wdMonthly * (1 - tax) : 0;
             const raSavingsPotNet = (accumulating && savingsPotWdMonthly > 0 && savingsPot > 0)
                 ? Math.min(savingsPotWdMonthly, savingsPot) * (1 - tax) : 0;
-            const dutchNet = (dutchEnabled && age + 1e-6 >= dutchAge) ? dutchMonthlyNet : 0;
+            // Dutch pension is assumed to escalate with CPI, so it holds its
+            // purchasing power: a flat line in real terms, rising in nominal terms.
+            const dutchNet = (dutchEnabled && age + 1e-6 >= dutchAge) ? dutchMonthlyNet * Math.pow(1 + cpi, yrs) : 0;
             const liquidTotal = disc + tfsa + crypto + raLumpOneOff;
             const manualNet = (retired && Dm > 0) ? Math.min(Dm, liquidTotal) : 0;
 

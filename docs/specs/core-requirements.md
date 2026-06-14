@@ -426,7 +426,7 @@ Project retirement wealth and monthly income from existing Investments + RA tab 
 | **Withdrawal rate** | Annual percentage drawn from the annuitised pot (default 4%). |
 | **CPI** | Annual price-inflation rate; used for "today's money" deflation when toggled (default 5%). |
 | **Effective retirement-income tax rate** | Single-rate proxy for marginal tax in retirement (default 18%). |
-| **Dutch pension** | Optional monthly income paid in EUR. Default €900/month from age 68; both the start age and the EUR/month amount are user-configurable. ZAR conversion uses the user-supplied EUR/ZAR rate. |
+| **Dutch pension** | Optional monthly income paid in EUR. Default €900/month from age 68; both the start age and the EUR/month amount are user-configurable. ZAR conversion uses the user-supplied EUR/ZAR rate. Assumed to escalate with CPI, so it holds its real value over time (flat in today's money). |
 | **Savings-pot withdrawal** | Optional pre-retirement annual withdrawal from the savings component, taxed at the effective rate, flowing into discretionary funds. Min R 2,000 per SARS. |
 
 ### 5.3 Hardcoded constants (SARS / SA Budget 2026/27)
@@ -518,7 +518,7 @@ It exposes one user control, `ret_scenario_monthly_drawdown` (R/month, persisted
 - **Accumulation (`age < retirement_age`)** — liquid pools (discretionary/TFSA/crypto, each gated by its `opt_include_*` flag) grow at their own returns; the RA two-pot grows with optional extra contributions (`opt_ra_monthly_*`, split 33/67); max-TFSA top-ups (`opt_tfsa_enabled`) add the annual cap each 1 March until the lifetime cap; savings-pot withdrawals (`opt_savings_pot_withdrawal_*`) appear as RA savings-pot income. No annuity income and no manual drawdown yet.
 - **At retirement age** — one-off lumps land in liquid capital: `+ house_sale + inheritance_zar − bond_payoff`. The manual monthly drawdown begins.
 - **At RA-access age (`max(retirement_age, 55)`)** — the RA pot is annuitised (× 2/3 if commuting, full otherwise; a full pot below the R360,000 de minimis is fully commuted to liquid capital net of lump-sum tax, with no annuity). The commuted lump joins liquid capital. The living-annuity drawdown income begins: `gross = pot × withdrawal_rate/12`, net of tax, `pot = pot × (1 + monthly return) − gross`; a sub-R150,000 residual commutes into liquid capital and income stops.
-- **Dutch pension** adds its constant net monthly amount from `opt_dutch_age` when enabled.
+- **Dutch pension** adds its net monthly amount from `opt_dutch_age` when enabled. It is assumed to escalate with CPI, so it holds its purchasing power: the nominal amount grows by `(1 + cpi/100)^years_from_today`, making it a flat line in real terms (and a rising one in nominal terms).
 
 **Manual drawdown** is taken **proportionally** across the liquid pools (discretionary, TFSA, crypto, "RA lump + one-offs"), capped each month at the remaining liquid total so capital never goes negative; the first age the cap binds is reported as `drawdownExhaustedAge`. With nothing checked and no drawdown, it is simply current capital growing to retirement age and beyond.
 

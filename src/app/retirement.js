@@ -439,6 +439,7 @@ function renderRetirement() {
         ['Returns (Discretionary / TFSA / Crypto / RA)', `${retirementParams.return_discretionary_pct}% / ${retirementParams.return_tfsa_pct}% / ${retirementParams.return_crypto_pct}% / ${retirementParams.return_ra_pct}%`],
         ['Offshore (Discretionary / TFSA)', `${retirementParams.offshore_discretionary_pct}% / ${retirementParams.offshore_tfsa_pct}%`],
         ['ZAR depreciation', `${retirementParams.zar_depreciation_pct}%/yr`],
+        ...(retirementParams.opt_dutch_enabled ? [['Dutch pension', 'assumed to rise with CPI (flat in real terms)']] : []),
         ['Two-pot split', '33% savings / 67% retirement (post-Sep-2024 contributions)'],
         ['Commutation', retirementParams.ra_commute_third ? '1/3 lump sum on' : 'off'],
         ['TFSA cap remaining', retFmtZAR(Math.max(0, _RET_CONSTS.TFSA_LIFETIME_CAP - (getInvestmentData().transactions || []).filter(t => t.type === 'TFSA').reduce((s, t) => s + (Number(t.amount) || 0), 0)))],
