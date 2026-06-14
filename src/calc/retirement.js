@@ -252,109 +252,238 @@ export function projectLivingAnnuityDepletion(
     return null;
 }
 
-// Walk retirement month-by-month from retirement_age to life_expectancy and
-// sample one point per integer age. Two pots evolve:
-//  - lump-sum pot: grows at lumpSumReturnPct, pays the fixed PMT until empty;
-//  - RA annuitised pot: grows at raReturnPct minus a pot-proportional drawdown
-//    (income varies over time), with full commutation below the living-annuity
-//    threshold (residual moves into the lump-sum pot, net of lump-sum tax).
-// Before age 55 the RA pot is locked: passive growth, no income. The commuted
-// 1/3 is already inside lumpSumAtRetirement — it is never re-added here.
-// `deflate(n, yearsFromToday)` applies the real-terms toggle.
-export function simulateRetirementTimeline({
-    retirementAge = 0,
-    lifeExpectancy = 0,
-    dutchAge = RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE,
-    lumpSumAtRetirement = 0,
-    lumpSumMonthly = 0,
-    lumpSumReturnPct = 0,
-    raPotAtRetirement = 0,
-    raPotAt55 = 0,
-    commuteThird = false,
-    raReturnPct = 0,
-    withdrawalRatePct = 0,
-    taxRatePct = 0,
-    dutchMonthlyNet = 0,
-    dutchEnabled = false,
-    yearsToRetirement = 0,
-    deflate = (n) => n,
-}) {
-    const startAge = Math.floor(Number(retirementAge) || 0);
-    const endAge = Math.max(startAge, Math.floor(Number(lifeExpectancy) || 0));
-    const rLump = Math.pow(1 + (Number(lumpSumReturnPct) || 0) / 100, 1 / 12) - 1;
-    const rRa = Math.pow(1 + (Number(raReturnPct) || 0) / 100, 1 / 12) - 1;
-    const wdMonthly = ((Number(withdrawalRatePct) || 0) / 100) / 12;
-    const tax = Math.max(0, Math.min(100, Number(taxRatePct) || 0)) / 100;
-    const pmt = Math.max(0, Number(lumpSumMonthly) || 0);
-    const drawdownStartAge = Math.max(startAge, RETIREMENT_CONSTANTS.RA_ACCESS_AGE);
+// Interactive retirement scenario simulation. Walks month-by-month from today,
+// samples one point per integer age over [startAge, lifeExpectancy] (startAge =
+// min(55, retirement_age) — RA becomes accessible at 55), and produces a
+// component breakdown of monthly income and available capital at each age so the
+// user can play with scenarios.
+//
+// Phases:
+//  - Accumulation (age < retirement_age): liquid pools (discretionary/TFSA/crypto)
+//    and the RA two-pot grow; optional extra RA contributions and max-TFSA top-ups
+//    accrue; optional savings-pot withdrawals appear as RA savings-pot income.
+//  - Retirement (age ≥ retirement_age): one-off lumps (house/inheritance − bond)
+//    land in liquid capital and the user's manual monthly drawdown begins, taken
+//    PROPORTIONALLY across the liquid pools and capped so capital never goes
+//    negative (replaces the old automatic lump-sum PMT).
+//  - RA access (age ≥ max(retirement_age, 55)): the RA pot is annuitised (× 2/3 if
+//    commuting; full commutation below the de minimis), the commuted lump joins
+//    liquid capital, and the living-annuity drawdown income begins — varying over
+//    time as the pot grows/shrinks, with a sub-R150k residual commuting to capital.
+//  - Dutch pension (age ≥ opt_dutch_age, when enabled) adds a flat net income.
+//
+// Every checked optional-scenario box is honoured; with nothing checked it is just
+// the current capital growing to retirement age and then (optionally) drawn down.
+// All figures are net of tax and deflated to today's money when show_real_terms is on.
+export function buildRetirementScenarioTimeline({
+    params,
+    discretionaryToday = 0,
+    tfsaToday = 0,
+    cryptoToday = 0,
+    tfsaTransactions = [],
+    raPotToday = 0,
+    monthlyDrawdown = 0,
+}, today = new Date()) {
+    const p = { ...RETIREMENT_DEFAULT_PARAMS, ...(params || {}) };
 
-    let lumpPot = Math.max(0, Number(lumpSumAtRetirement) || 0);
-    let raPot = Math.max(0, Number(raPotAtRetirement) || 0);
-    let raDrawdownActive = false;
-    let raDepleted = raPot <= 0;
+    const ageNow = (() => {
+        const dob = new Date(p.dob);
+        if (Number.isNaN(dob.getTime())) return null;
+        const ms = today - dob;
+        return ms <= 0 ? 0 : ms / (365.25 * 24 * 60 * 60 * 1000);
+    })();
+    if (ageNow === null) return { points: [], startAge: 0, retAge: 0, dutchAge: 0, lifeExp: 0, realTerms: false, drawdownExhaustedAge: null };
 
-    // Begin RA drawdown: annuitise the full pot (× 2/3 if commuting). Mirrors
-    // raMonthlyIncome — a full pot below the de minimis produces zero annuity
-    // income; its commutation is ALREADY inside lumpSumAtRetirement (the caller's
-    // projectedFundsAtRet includes commutationRet.net), so it is NOT re-added here.
-    const activateDrawdown = (potBasisFull) => {
-        const fullPot = Math.max(0, Number(potBasisFull) || 0);
-        raDrawdownActive = true;
+    const retAge = Number(p.retirement_age) || 0;
+    const lifeExp = Math.max(retAge, Number(p.life_expectancy) || 0);
+    const dutchAge = Number(p.opt_dutch_age) || RETIREMENT_CONSTANTS.DUTCH_PENSION_AGE;
+    const raAccessAge = Math.max(retAge, RETIREMENT_CONSTANTS.RA_ACCESS_AGE);
+    const startAge = Math.min(RETIREMENT_CONSTANTS.RA_ACCESS_AGE, retAge);
+
+    // Monthly compounding rates.
+    const rDisc = Math.pow(1 + (Number(p.return_discretionary_pct) || 0) / 100, 1 / 12) - 1;
+    const rTfsa = Math.pow(1 + (Number(p.return_tfsa_pct) || 0) / 100, 1 / 12) - 1;
+    const rCrypto = Math.pow(1 + (Number(p.return_crypto_pct) || 0) / 100, 1 / 12) - 1;
+    const rRa = Math.pow(1 + (Number(p.return_ra_pct) || 0) / 100, 1 / 12) - 1;
+    const rLump = Math.pow(1 + (Number(p.lump_sum_drawdown_return_pct) || 0) / 100, 1 / 12) - 1;
+    const wdMonthly = ((Number(p.withdrawal_rate_pct) || 0) / 100) / 12;
+    const tax = Math.max(0, Math.min(100, Number(p.effective_tax_rate_pct) || 0)) / 100;
+
+    // Fund-inclusion gates.
+    const incDisc = (p.opt_include_discretionary === 0 || p.opt_include_discretionary === false) ? 0 : 1;
+    const incTfsa = (p.opt_include_tfsa === 0 || p.opt_include_tfsa === false) ? 0 : 1;
+    const incCrypto = (p.opt_include_crypto === 0 || p.opt_include_crypto === false) ? 0 : 1;
+
+    // Liquid pools (drawable). raLumpOneOff = commuted RA + one-off events.
+    let disc = incDisc * (Number(discretionaryToday) || 0);
+    let tfsa = incTfsa * (Number(tfsaToday) || 0);
+    let crypto = incCrypto * (Number(cryptoToday) || 0);
+    let raLumpOneOff = 0;
+
+    // RA two-pot (today).
+    const raPot = Math.max(0, Number(raPotToday) || 0);
+    let vested = Math.max(0, Math.min(Number(p.ra_vested_balance) || 0, raPot));
+    const postSep = Math.max(0, raPot - vested);
+    let savingsPot = postSep * RETIREMENT_CONSTANTS.SAVINGS_POT_SPLIT;
+    let retirementPot = postSep * RETIREMENT_CONSTANTS.RETIREMENT_POT_SPLIT;
+    let annuitised = 0;       // set when RA is annuitised at raAccessAge
+    let raAnnuitisedActive = false;
+    let raDepleted = false;
+
+    // Scenario inputs.
+    const commute = !!p.ra_commute_third;
+    const extraMonthly = (p.opt_ra_monthly_enabled ? Math.max(0, Number(p.opt_ra_monthly_amount) || 0) : 0);
+    const savingsContribMonthly = extraMonthly * RETIREMENT_CONSTANTS.SAVINGS_POT_SPLIT;
+    const retirementContribMonthly = extraMonthly * RETIREMENT_CONSTANTS.RETIREMENT_POT_SPLIT;
+    const savingsPotWdMonthly = (p.opt_savings_pot_withdrawal_enabled ? Math.max(0, Number(p.opt_savings_pot_withdrawal_annual) || 0) : 0) / 12;
+    const maxTfsa = !!p.opt_tfsa_enabled && incTfsa === 1;
+    const dutchEnabled = !!p.opt_dutch_enabled;
+    const dutchEurZar = Number(p.opt_dutch_eur_zar) || 0;
+    const dutchMonthlyNet = dutchEnabled ? (Number(p.opt_dutch_eur_monthly) || 0) * dutchEurZar * (1 - tax) : 0;
+    const houseSale = (p.opt_house_enabled ? Number(p.opt_house_value) || 0 : 0);
+    const inheritanceZar = (p.opt_inheritance_enabled ? (Number(p.opt_inheritance_eur) || 0) * dutchEurZar : 0);
+    const bondPayoff = (p.opt_bond_enabled ? Number(p.opt_bond_balance) || 0 : 0);
+    const Dm = Math.max(0, Number(monthlyDrawdown) || 0);
+
+    // TFSA max-contribution tracking (lifetime cap).
+    let tfsaLifetimeRemaining = maxTfsa
+        ? Math.max(0, RETIREMENT_CONSTANTS.TFSA_LIFETIME_CAP - (tfsaTransactions || []).reduce((s, t) => s + (Number(t.amount) || 0), 0))
+        : 0;
+
+    const deflateOn = !!p.show_real_terms;
+    const cpi = (Number(p.cpi_pct) || 0) / 100;
+    const deflate = (n, years) => deflateOn ? n / Math.pow(1 + cpi, Math.max(0, years)) : n;
+
+    let retired = false;       // age ≥ retirement_age (manual draw + one-offs)
+    let drawdownExhaustedAge = null;
+
+    const annuitiseRa = () => {
+        const fullPot = vested + savingsPot + retirementPot;
+        raAnnuitisedActive = true;
         if (fullPot < RETIREMENT_CONSTANTS.DE_MINIMIS) {
-            raPot = 0;
+            // Full commutation — whole pot to liquid capital, net of lump-sum tax.
+            raLumpOneOff += Math.max(0, fullPot - lumpSumTax(fullPot));
+            annuitised = 0;
             raDepleted = true;
-            return;
+        } else if (commute) {
+            const commGross = fullPot / 3;
+            raLumpOneOff += Math.max(0, commGross - lumpSumTax(commGross));
+            annuitised = fullPot * 2 / 3;
+        } else {
+            annuitised = fullPot;
         }
-        raPot = commuteThird ? fullPot * 2 / 3 : fullPot;
-        raDepleted = raPot <= 0;
+        vested = 0; savingsPot = 0; retirementPot = 0;
     };
-    if (startAge >= drawdownStartAge) activateDrawdown(raPotAtRetirement);
 
     const points = [];
-    for (let age = startAge; age <= endAge; age++) {
-        if (!raDrawdownActive && age >= drawdownStartAge) activateDrawdown(raPotAt55);
+    // +1 month of headroom guarantees the integer life-expectancy age is reached
+    // despite the fractional current age; the loop breaks once it is recorded.
+    const totalMonths = Math.max(0, Math.ceil((lifeExp - ageNow) * 12) + 1);
+    let lastRecorded = null;
+    let done = false;
 
-        // Income = first month of this age; capital = before that month's flows.
-        const yearsFromToday = Math.max(0, (Number(yearsToRetirement) || 0) + (age - startAge));
-        const raGross = (raDrawdownActive && !raDepleted) ? raPot * wdMonthly : 0;
-        const incomeRa = raGross * (1 - tax);
-        const incomeLump = lumpPot > 0 ? pmt : 0;
-        const incomeDutch = (dutchEnabled && age >= (Number(dutchAge) || 0)) ? (Number(dutchMonthlyNet) || 0) : 0;
-        points.push({
-            age,
-            income: {
-                ra: deflate(incomeRa, yearsFromToday),
-                lumpSum: deflate(incomeLump, yearsFromToday),
-                dutch: deflate(incomeDutch, yearsFromToday),
-                total: deflate(incomeRa + incomeLump + incomeDutch, yearsFromToday),
-            },
-            capital: {
-                raPot: deflate(Math.max(0, raPot), yearsFromToday),
-                lumpSum: deflate(Math.max(0, lumpPot), yearsFromToday),
-                total: deflate(Math.max(0, raPot) + Math.max(0, lumpPot), yearsFromToday),
-            },
-        });
-        if (age === endAge) break;
+    for (let m = 0; m <= totalMonths && !done; m++) {
+        const age = ageNow + m / 12;
+        const intAge = Math.floor(age + 1e-6);
 
-        for (let m = 0; m < 12; m++) {
-            if (lumpPot > 0) {
-                lumpPot = Math.max(0, lumpPot * (1 + rLump) - pmt);
+        // Transitions happen before recording so the boundary point reflects them.
+        if (!retired && age + 1e-6 >= retAge) {
+            raLumpOneOff += houseSale + inheritanceZar - bondPayoff;
+            retired = true;
+        }
+        if (!raAnnuitisedActive && age + 1e-6 >= raAccessAge) annuitiseRa();
+
+        // Record one point per integer age in range.
+        if (intAge >= startAge && intAge <= lifeExp && intAge !== lastRecorded) {
+            lastRecorded = intAge;
+            const yrs = Math.max(0, age - ageNow);
+            const accumulating = age + 1e-6 < retAge;
+
+            const raAnnuityNet = (raAnnuitisedActive && !raDepleted) ? annuitised * wdMonthly * (1 - tax) : 0;
+            const raSavingsPotNet = (accumulating && savingsPotWdMonthly > 0 && savingsPot > 0)
+                ? Math.min(savingsPotWdMonthly, savingsPot) * (1 - tax) : 0;
+            const dutchNet = (dutchEnabled && age + 1e-6 >= dutchAge) ? dutchMonthlyNet : 0;
+            const liquidTotal = disc + tfsa + crypto + raLumpOneOff;
+            const manualNet = (retired && Dm > 0) ? Math.min(Dm, liquidTotal) : 0;
+
+            const raPotLayer = accumulating ? (vested + savingsPot + retirementPot) : annuitised;
+
+            points.push({
+                age: intAge,
+                income: {
+                    raAnnuity: deflate(raAnnuityNet, yrs),
+                    raSavingsPot: deflate(raSavingsPotNet, yrs),
+                    dutch: deflate(dutchNet, yrs),
+                    manualDraw: deflate(manualNet, yrs),
+                    total: deflate(raAnnuityNet + raSavingsPotNet + dutchNet + manualNet, yrs),
+                },
+                capital: {
+                    discretionary: deflate(Math.max(0, disc), yrs),
+                    tfsa: deflate(Math.max(0, tfsa), yrs),
+                    crypto: deflate(Math.max(0, crypto), yrs),
+                    raLumpOneOff: deflate(Math.max(0, raLumpOneOff), yrs),
+                    raPot: deflate(Math.max(0, raPotLayer), yrs),
+                    total: deflate(Math.max(0, disc + tfsa + crypto + raLumpOneOff + raPotLayer), yrs),
+                },
+            });
+            if (intAge >= lifeExp) { done = true; continue; }
+        }
+
+        if (m === totalMonths) break;
+
+        // ---- Apply one month of flows ----
+        const accumulating = age + 1e-6 < retAge;
+
+        // Liquid pools always grow at their own return.
+        disc *= (1 + rDisc);
+        crypto *= (1 + rCrypto);
+        tfsa *= (1 + rTfsa);
+        if (raLumpOneOff > 0) raLumpOneOff *= (1 + rLump);
+
+        // TFSA max top-up at each tax-year start (1 March) while accumulating.
+        if (accumulating && maxTfsa && tfsaLifetimeRemaining > 0) {
+            const d = new Date(today.getFullYear(), today.getMonth(), 1);
+            d.setMonth(d.getMonth() + m);
+            if (d.getMonth() === 2) { // March
+                const topUp = Math.min(RETIREMENT_CONSTANTS.TFSA_ANNUAL_CAP, tfsaLifetimeRemaining);
+                tfsa += topUp;
+                tfsaLifetimeRemaining -= topUp;
             }
-            if (raDrawdownActive && !raDepleted) {
-                const draw = raPot * wdMonthly;
-                raPot = raPot * (1 + rRa) - draw;
-                if (raPot < RETIREMENT_CONSTANTS.LIVING_ANNUITY_THRESHOLD) {
-                    const residual = Math.max(0, raPot);
-                    lumpPot += Math.max(0, residual - lumpSumTax(residual));
-                    raPot = 0;
+        }
+
+        if (accumulating) {
+            // RA two-pot grows with optional extra contributions; savings-pot withdrawals draw it down.
+            vested *= (1 + rRa);
+            retirementPot = retirementPot * (1 + rRa) + retirementContribMonthly;
+            savingsPot = savingsPot * (1 + rRa) + savingsContribMonthly;
+            if (savingsPotWdMonthly > 0 && savingsPot > 0) {
+                savingsPot = Math.max(0, savingsPot - savingsPotWdMonthly);
+            }
+        } else {
+            // Retirement: manual drawdown (proportional across liquid pools, capped).
+            if (Dm > 0) {
+                const liquidTotal = disc + tfsa + crypto + raLumpOneOff;
+                const draw = Math.min(Dm, liquidTotal);
+                if (draw < Dm && drawdownExhaustedAge === null) drawdownExhaustedAge = intAge;
+                if (liquidTotal > 0) {
+                    const f = draw / liquidTotal;
+                    disc -= disc * f; tfsa -= tfsa * f; crypto -= crypto * f; raLumpOneOff -= raLumpOneOff * f;
+                }
+            }
+            // RA living-annuity drawdown.
+            if (raAnnuitisedActive && !raDepleted) {
+                const draw = annuitised * wdMonthly;
+                annuitised = annuitised * (1 + rRa) - draw;
+                if (annuitised < RETIREMENT_CONSTANTS.LIVING_ANNUITY_THRESHOLD) {
+                    raLumpOneOff += Math.max(0, annuitised - lumpSumTax(Math.max(0, annuitised)));
+                    annuitised = 0;
                     raDepleted = true;
                 }
-            } else if (!raDrawdownActive && raPot > 0) {
-                raPot = raPot * (1 + rRa);
             }
         }
     }
-    return points;
+
+    return { points, startAge, retAge, dutchAge, lifeExp, realTerms: deflateOn, drawdownExhaustedAge };
 }
 
 const RETIREMENT_DEFAULT_PARAMS = {
@@ -399,6 +528,9 @@ const RETIREMENT_DEFAULT_PARAMS = {
     opt_inheritance_eur: 0,
     opt_bond_enabled: 0,
     opt_bond_balance: 0,
+
+    // Interactive scenario: user-entered monthly capital drawdown (R/month, nominal).
+    ret_scenario_monthly_drawdown: 0,
 };
 
 export function getDefaultRetirementParams() {
@@ -635,28 +767,20 @@ export function calculateRetirementSnapshot({
     const maxMonthly55Nominal = monthly55Projected.net + lumpSumMonthlyNominal;
     const maxMonthly68Nominal = monthly68Projected.net + lumpSumMonthlyNominal;
 
-    // Year-by-year retirement timeline (retirement_age → life_expectancy).
-    const timeline = simulateRetirementTimeline({
-        retirementAge: Number(p.retirement_age) || 0,
-        lifeExpectancy,
-        dutchAge,
-        lumpSumAtRetirement: projectedFundsAtRet,
-        lumpSumMonthly: lumpSumMonthlyNominal,
-        lumpSumReturnPct: lumpSumDrawdownReturnPct,
-        raPotAtRetirement: raAtRetirement.total,
-        raPotAt55: raAt55.total,
-        commuteThird: commute,
-        raReturnPct: p.return_ra_pct,
-        withdrawalRatePct: p.withdrawal_rate_pct,
-        taxRatePct: p.effective_tax_rate_pct,
-        dutchMonthlyNet,
-        dutchEnabled: !!p.opt_dutch_enabled,
-        yearsToRetirement: yearsToRet,
-        deflate,
-    });
+    // Interactive scenario timeline (age 55 → life_expectancy), with the user's
+    // manual monthly drawdown and a per-component income/capital breakdown.
+    const scenario = buildRetirementScenarioTimeline({
+        params: p,
+        discretionaryToday,
+        tfsaToday,
+        cryptoToday,
+        tfsaTransactions,
+        raPotToday,
+        monthlyDrawdown: Number(p.ret_scenario_monthly_drawdown) || 0,
+    }, today);
 
     return {
-        timeline,
+        scenario,
         ageNow,
         monthsToRetirement, monthsTo55, monthsTo68,
         yearsToRet, yearsTo55, yearsTo68,

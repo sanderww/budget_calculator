@@ -911,20 +911,21 @@ General info, not tax advice — confirm with a tax practitioner."><svg xmlns="h
                 <div class="lg:col-span-3">
                     <div class="grid grid-cols-1 gap-6">
                         <div id="retirement-card-snapshot" class="card"></div>
-                        <div id="retirement-card-timeline" class="card">
-                            <div class="flex items-center justify-between mb-4">
+                        <div id="retirement-card-scenario" class="card">
+                            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
                                 <h2 class="text-xl font-semibold text-slate-800">Retirement timeline</h2>
-                                <span id="retirement-timeline-badge" class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">nominal</span>
+                                <span id="retirement-scenario-badge" class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">nominal</span>
                             </div>
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div id="retirement-chart-income-timeline" class="min-h-[360px]"></div>
-                                <div id="retirement-chart-capital-timeline" class="min-h-[360px]"></div>
-                            </div>
-                        </div>
-                        <div id="retirement-card-charts" class="card">
-                            <div class="flex items-center justify-between mb-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Retirement at a glance</h2>
-                                <span id="retirement-charts-badge" class="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700">nominal</span>
+                            <p class="text-sm text-slate-500 mb-4">Income and capital per age from 55 to life expectancy, reflecting every option ticked in the sidebar. The dashed line marks your retirement age, where the capital drawdown below begins.</p>
+                            <div class="flex flex-wrap items-end gap-3 mb-5">
+                                <div>
+                                    <label for="ret-scenario-drawdown" class="block text-xs font-medium text-slate-500 mb-1">Monthly capital drawdown (from retirement)</label>
+                                    <div class="relative">
+                                        <span class="currency-prefix">R</span>
+                                        <input type="number" id="ret-scenario-drawdown" class="input-field amount-input text-sm" min="0" step="500" placeholder="0">
+                                    </div>
+                                </div>
+                                <p class="text-xs text-slate-500 max-w-md">Drawn proportionally across your liquid pools (discretionary, TFSA, crypto, RA lump &amp; one-offs) and capped so capital never goes negative. Leave at 0 to let capital keep growing untouched.</p>
                             </div>
                             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                                 <div id="retirement-chart-income" class="min-h-[360px]"></div>

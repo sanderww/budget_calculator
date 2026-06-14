@@ -348,25 +348,16 @@ Three-column × four-row grid (label | Age 55 | Age `opt_dutch_age`):
 
 A small `nominal` / `today's money` badge in the card header reflects the deflation toggle.
 
-**Card 0-timeline — Retirement timeline**
+**Card 0-scenario — Retirement timeline (interactive)**
 
-Positioned directly below Card 0 and above Card 0a. Two side-by-side stacked **area** ApexCharts (stacked vertically on narrow viewports), x-axis = age, running from `retirement_age` to `life_expectancy` (one point per integer age). The card header carries its own `nominal` / `today's money` badge mirroring Card 0.
+Positioned directly below Card 0. A single card with two side-by-side stacked **area** ApexCharts (stacked vertically on narrow viewports), x-axis = age, running from age **55** (RA access age; or the retirement age when it is below 55) to `life_expectancy`, one point per integer age. The card header carries its own `nominal` / `today's money` badge mirroring Card 0. This card replaces the earlier "Retirement timeline" (auto-PMT) and "Retirement at a glance" (3-bar) cards.
 
-Driven by `snapshot.timeline` (see core-requirements §5.6), which walks retirement month-by-month and samples yearly:
+It exposes one control — **Monthly capital drawdown (from retirement)**, id `ret-scenario-drawdown`, persisted to `db/config.private.json` as `ret_scenario_monthly_drawdown` — and is driven by `snapshot.scenario` (see core-requirements §5.5b), which walks the projection month-by-month from today and samples per integer age, reflecting every ticked optional-scenario box.
 
-- **Chart 1: Monthly income through retirement** — stacked net income by source: RA drawdown, lump-sum drawdown (the PMT), and Dutch pension. RA drawdown varies year to year as the annuitised pot grows or shrinks; the Dutch pension layer steps in at `opt_dutch_age`.
-- **Chart 2: Available capital through retirement** — stacked: RA annuitised pot and lump-sum capital, each depleting (or growing) over time.
+- **Chart 1: Monthly income through retirement** — stacked net income by source: RA annuity, RA savings-pot withdrawals (during accumulation when enabled), Dutch pension (from `opt_dutch_age` when enabled), and the user's capital drawdown (from the retirement age).
+- **Chart 2: Available capital through retirement** — stacked by pool: Discretionary, TFSA, Crypto, "RA lump + one-offs", and the annuitised RA pot.
 
-All-zero layers are dropped from the legend. Both charts re-render on the same triggers as Card 0. When the timeline has fewer than two points (e.g. retirement age ≥ life expectancy), a placeholder is shown instead.
-
-**Card 0a — Retirement at a glance**
-
-Two side-by-side stacked-bar ApexCharts (stacked vertically on narrow viewports). The card header carries a `nominal` / `today's money` badge that mirrors Card 0.
-
-- **Chart 1: Monthly income (net)** — one bar per canonical age (Age 55, Age `opt_dutch_age`, Retirement age). When two ages coincide the bars collapse and the label combines (e.g. `Age 55 · Retirement (age 55)`). Each bar stacks: RA drawdown (net), Dutch pension (net), and a per-vehicle PMT amortisation of every lump-sum component (Discretionary, TFSA, Crypto, RA commuted, one-off events). PMT formula is §5.4's "Lump-sum monthly drawdown" applied per age — each bar amortises its own pool from that age to `life_expectancy`. Title row shows `PMT to age <life_expectancy> @ <rate>%`.
-- **Chart 2: Capital available by age** — same bars, stacked by Discretionary, TFSA, Crypto, RA commuted lump sum, and one-off events net (`house_sale + inheritance_zar + savings_pot_withdrawals_net − bond_payoff`). Negative one-off net renders as 0 with a tooltip note rather than a negative segment.
-
-Empty layers (gated-out funds, Dutch disabled, etc.) are filtered out of the legend entirely. Both charts re-render on every retirement-input change and every Investments/RA-tab edit that changes a current value, on the same triggers as Card 0.
+A dashed vertical annotation marks the retirement age (where the manual drawdown begins). All-zero layers are dropped from the legend; non-finite values coerce to 0; fewer than two points shows a placeholder. Both charts re-render on every retirement-input change and every Investments/RA-tab edit that changes a current value, on the same triggers as Card 0.
 
 **Card 1 — Monthly income (net of tax)**
 

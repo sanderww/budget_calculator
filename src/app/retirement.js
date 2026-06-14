@@ -9,8 +9,7 @@ import {
     calculateRetirementSnapshot as _calculateRetirementSnapshot,
     generateConfigJSON as _generateConfigJSON,
 } from '../calculations.js';
-import { renderRetirementCharts as _renderRetirementCharts,
-         renderRetirementTimelineCharts as _renderRetirementTimelineCharts } from '../charts/chart_retirement.js';
+import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
 import { fmtZARWhole, fmtZARSigned } from '../lib/format.js';
 import { getConfigMap, persistConfig, saveToServer } from './persistence.js';
 import { getInvestmentData } from './investments.js';
@@ -92,6 +91,8 @@ const retInputBindings = [
     ['ret-opt-bond-balance',          'opt_bond_balance',                      'number'],
     ['ret-opt-savings-pot',           'opt_savings_pot_withdrawal_enabled',    'checkbox'],
     ['ret-opt-savings-pot-amount',    'opt_savings_pot_withdrawal_annual',     'number'],
+
+    ['ret-scenario-drawdown',         'ret_scenario_monthly_drawdown',         'number'],
 ];
 
 function retApplyParamsToInputs() {
@@ -465,17 +466,10 @@ function renderRetirement() {
 
     window.__retirementSnapshot = snap; // Exposed for manual debugging only.
 
-    _renderRetirementTimelineCharts({
-        containerIncome: document.getElementById('retirement-chart-income-timeline'),
-        containerCapital: document.getElementById('retirement-chart-capital-timeline'),
-        badge: document.getElementById('retirement-timeline-badge'),
-        snapshot: snap,
-    });
-
-    _renderRetirementCharts({
+    _renderRetirementScenarioCharts({
         containerIncome: document.getElementById('retirement-chart-income'),
         containerCapital: document.getElementById('retirement-chart-capital'),
-        badge: document.getElementById('retirement-charts-badge'),
+        badge: document.getElementById('retirement-scenario-badge'),
         snapshot: snap,
     });
 }
