@@ -140,3 +140,17 @@ input[type="number"].input-field {
     /* indigo-600 */
     transform: rotate(180deg);
 }
+
+/* Hide the scrollbar on horizontally-scrollable bars (e.g. the tab nav)
+   while keeping the content scrollable on narrow screens. */
+.no-scrollbar {
+    -ms-overflow-style: none;
+    /* IE / old Edge */
+    scrollbar-width: none;
+    /* Firefox */
+}
+
+.no-scrollbar::-webkit-scrollbar {
+    display: none;
+    /* Chrome / Safari */
+}
