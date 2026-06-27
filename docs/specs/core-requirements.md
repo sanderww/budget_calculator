@@ -549,7 +549,7 @@ Aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario side-by-
 
 ### 6.1 Goal
 
-Give the user a year-by-year view of capital deployed — how much went toward debt reduction and how much went into investments, broken down by investment type.
+Give the user a year-by-year view of capital deployed — how much went toward debt reduction, how much went into investments (broken down by investment type), and how much went into the RA — shown as a table plus a category breakdown and a timeline.
 
 ### 6.2 Data Sources
 
@@ -557,10 +557,11 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 |---|---|
 | **Year** | Derived from transaction/repayment dates |
 | **Debt Repaid** | Sum of extra mortgage repayments for that year |
-| **Investments Total** | Sum of all investment transaction amounts for that year |
+| **Investments Total** | Sum of all investment transaction amounts for that year (TFSA + Discretionary + Crypto) |
 | **TFSA** | Sum of TFSA-type investment transactions for that year |
 | **Discretionary** | Sum of Discretionary-type investment transactions for that year |
 | **Crypto** | Sum of Crypto-type investment transactions for that year |
+| **RA** | Sum of RA contributions for that year, kept separate from the Investments Total |
 
 ### 6.3 Rules
 
@@ -568,6 +569,13 @@ Give the user a year-by-year view of capital deployed — how much went toward d
 - A totals row at the bottom sums all columns.
 - Years with no activity are omitted.
 - Empty values (no activity for that column/year) display as a dash.
+
+### 6.4 Charts
+
+Two ApexCharts visualisations accompany the table. Both use one shared category list — **Debt Repaid, Discretionary, TFSA, RA, Crypto** — so colours and labels are consistent across the table, the pie, and the timeline.
+
+- **Total Allocated by Category** — a donut of all-years grand totals per category; zero-total categories are omitted and the centre shows the overall total.
+- **Allocation Timeline** — a per-year stacked bar chart, stacked by the same five categories; categories with no positive year are omitted.
 
 ---
 

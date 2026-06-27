@@ -410,20 +410,30 @@ All reads happen at render time; the Retirement tab never mutates other tabs' st
 
 ## 6. History Tab
 
-Aggregates all financial activity by year in a summary table:
+Aggregates all financial activity by year in a summary table, plus two charts.
+
+**Table** — one row per calendar year:
 
 | Column | Source |
 |---|---|
 | Year | Extracted from transaction/repayment dates |
 | Debt Repaid | Sum of extra debt repayments for that year |
-| Investments Total | Sum of all investment transaction amounts for that year |
+| Investments Total | Sum of all investment transaction amounts for that year (TFSA + Discretionary + Crypto) |
 | TFSA | Investment transactions of type TFSA for that year |
 | Discretionary | Investment transactions of type Discretionary for that year |
 | Crypto | Investment transactions of type Crypto for that year |
+| RA | Sum of RA contributions for that year — kept separate from the Investments Total |
 
 - A totals row sums all columns.
 - Years are sorted ascending.
 - Empty values display as an em-dash.
+
+**Charts** — both rendered with ApexCharts (the app's existing chart library) and driven by a single shared category list so colours and labels stay in sync between the two and the table:
+
+- **Total Allocated by Category** — a donut showing the grand total across all years per category: Debt Repaid, Discretionary, TFSA, RA, Crypto. Categories with a zero total are omitted; the centre shows the combined total.
+- **Allocation Timeline** — a stacked bar chart, one bar per year, stacked by the same five categories. Categories with no positive value in any year are omitted from the series.
+
+When there is no activity at all, both charts show an explanatory placeholder instead.
 
 ---
 
