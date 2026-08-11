@@ -66,6 +66,15 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         else:
             self.send_response(404); self.end_headers()
 
+    def end_headers(self):
+        # Without this, responses carry only Last-Modified, so browsers apply
+        # heuristic freshness and can serve edited JS/CSS modules from disk cache
+        # for days without asking the server. `no-cache` forces revalidation on
+        # every request (unchanged files still get a cheap 304). Do not remove:
+        # it is what makes a plain reload pick up local edits.
+        self.send_header('Cache-Control', 'no-cache')
+        super().end_headers()
+
     def log_message(self, *args): pass  # silence request logs
 
     def translate_path(self, path):
