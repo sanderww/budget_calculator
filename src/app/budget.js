@@ -4,10 +4,12 @@ import {
     calculateMonthlyAllocation as _calcMonthlyAllocation,
     parseBudgetCSV as _parseBudgetCSV,
     generateBudgetCSV as _generateBudgetCSV,
+    isPastDue,
+    convertFutureCostToProvision,
 } from '../calculations.js';
 import { renderBudgetTimeline as _renderBudgetTimeline } from '../charts/chart_budget_timeline.js';
 import { fmtZAR as formatCurrency } from '../lib/format.js';
-import { createRowElement, emptyStateHTML, generateId } from '../lib/rows.js';
+import { createRowElement, sortByDateThenIdAsc, emptyStateHTML, generateId } from '../lib/rows.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
 let budgetData = {
@@ -40,7 +42,10 @@ const renderBudget = () => {
     savingsInput.value = budgetData.savings || '';
     renderList(debtList, budgetData.debts, createDebtItem);
     renderList(provisionList, budgetData.provisions, createProvisionItem);
-    renderList(futureCostList, budgetData.futureCosts, createFutureCostItem);
+    // Future costs always display soonest-first, re-sorted on every render
+    // (load, refresh, add, delete). Sorting a copy leaves the stored order
+    // alone; rows are addressed by id, so this never disturbs an edit.
+    renderList(futureCostList, [...budgetData.futureCosts].sort(sortByDateThenIdAsc), createFutureCostItem);
     calculateAndDisplaySummary();
 };
 
@@ -57,8 +62,11 @@ const createDebtItem = (item) => createRowElement(item, {
     gridTemplateColumns: '1fr 1fr auto', fields: ['description', 'amount'] });
 const createProvisionItem = (item) => createRowElement(item, {
     gridTemplateColumns: '1fr 1fr 1fr auto', fields: ['description', 'amount', 'date'] });
+// The extra `auto` column holds the "move to provisions" button, shown only
+// once a cost's date has passed.
 const createFutureCostItem = (item) => createRowElement(item, {
-    gridTemplateColumns: '1fr 1fr 1fr auto', fields: ['description', 'amount', 'date'] });
+    gridTemplateColumns: '1fr 1fr 1fr auto auto', fields: ['description', 'amount', 'date'],
+    convertible: (row) => isPastDue(row.date) });
 
 let currentMonthlySavingsTarget = 0;
 
@@ -260,7 +268,23 @@ futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData
 
 debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
 provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
-futureCostList.addEventListener('click', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+// Convert is intercepted before the shared handler: it is the only action
+// that moves a row between two lists, so it owns the whole click.
+futureCostList.addEventListener('click', (e) => {
+    const convertBtn = e.target.closest('.convert-btn');
+    if (convertBtn) {
+        const id = convertBtn.closest('[data-id]')?.dataset.id;
+        const updated = convertFutureCostToProvision(budgetData, id);
+        if (updated !== budgetData) {
+            budgetData = updated;
+            renderBudget();
+            debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+        }
+        return;
+    }
+    handleListChange(e, budgetData.futureCosts);
+    debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+});
 
 calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 

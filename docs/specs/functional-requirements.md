@@ -4,6 +4,8 @@
 
 A single-page web application for personal financial management with six modules: Budget Calculator, Investment Tracker, Debt Calculator, RA, Retirement, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
 
+**Currency notation.** Every amount rendered anywhere in the UI uses comma thousands separators and a dot decimal separator — `R 3,000.50` is three thousand rand and fifty cents. `src/lib/format.js` is the single source of truth: it exports `fmtZAR` (two decimals), `fmtZARWhole` / `fmtZARSigned` (whole rand), `fmtZARAxis` (chart axes and tooltips) and `fmtNum` (grouped number without the `R` prefix), all pinned to `ZAR_LOCALE = 'en-US'`. Modules must not call `toLocaleString` directly, and the `en-ZA` locale (which renders `3 000,50`) must not be used for display. Static placeholders in `budget_calculator.html` follow the same notation.
+
 Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, generated via `npm run build:css` / `make css`) plus custom styles in `src/styles/app.css`; no CSS CDN dependency at runtime.
 
 **Implementation layout.** `src/budget_calculator.html` is markup-only and loads `src/app/main.js` as an ES-module bootstrap. Per-tab controllers live in `src/app/` (budget, investments, debt, ra, history, retirement, plus the persistence/config layer). Shared front-end helpers live in `src/lib/` (`format.js` currency formatters, `rows.js` row builder, `perf-panel.js` performance renderer) and chart modules in `src/charts/`. All calculation and CSV-parsing logic is split into domain modules under `src/calc/` (budget, investments, debt, ra, retirement) and re-exported through the `src/calculations.js` barrel — that barrel is the only import path consumers use and deliberately stays at the `src/` root.
@@ -62,6 +64,7 @@ The Budget, Investments, Debt, and RA tabs each open with a slim full-width tool
   - **Amount** (R, numeric)
   - **Date** (date)
 - Users can add and remove items.
+- Provisions can also arrive by conversion from a past-due future cost (§1.4). Converted rows are appended at the end; the Provisions list is not sorted.
 
 ### 1.4 Future Costs
 
@@ -70,6 +73,12 @@ The Budget, Investments, Debt, and RA tabs each open with a slim full-width tool
   - **Amount** (R, numeric)
   - **Date** (date)
 - Users can add and remove items.
+- **Move to provisions:** each row carries a second button (an arrow, `→`, titled "Move to provisions") beside the trash icon. It is active **only on rows whose date is strictly before today** — `isPastDue` in `src/calc/budget.js`, which normalises both dates to local midnight, so a cost due *today* is still pending. On non-past-due rows the button keeps its grid cell but renders `invisible` and `disabled`, so every row's trash icon stays aligned (the same technique `createRowElement` uses for the crypto BTC field).
+  - Clicking it moves the row out of Future Costs and appends it to Provisions with its `id`, description, amount and **original date** intact — the date is preserved so the provision stays identifiable as the cost that was due on that day. The list re-renders and auto-saves on the same path as add/remove.
+  - The state transition is `convertFutureCostToProvision(data, id, today)` in `src/calc/budget.js`: pure, never mutating its input, returning a new data object on success and the **input object by reference** when the move is refused (unknown id, blank or unparseable date, or a date not strictly before today). The click handler detects a no-op with `!==` and skips the re-render and save.
+  - The conversion is **deliberately manual, never automatic.** Once a future cost's date passes, the money was either saved (it becomes a provision) or spent (the row is simply deleted). The app cannot infer which from the date, so it never converts on its own; the button's appearance is the cue that a row needs that decision.
+  - **Effect on the summary:** converting reduces **Net savings now** by the amount and leaves **Net savings on [date]** unchanged. This falls out of the existing formulas rather than any new arithmetic — a past-dated cost already satisfies `date <= target` for every future target, so it was already inside `relevantFutureCosts`; after conversion it sits in `totalProvisions` instead, and `futureNetAmount` derives from `currentNetAmount`.
+- **Default ordering:** the list is always displayed sorted by date ascending — soonest cost at the top — via `sortByDateThenIdAsc` (`src/lib/rows.js`). Rows with a blank or unparseable date sort to the top, keeping a freshly added row in sight so its date can be filled in; date ties break by id ascending (ids embed creation time). The sort is applied to a copy on every render — initial load, the header refresh button, and every add/remove — so the stored order and the CSV are left untouched, and because rows are addressed by `data-id`, re-ordering never disturbs an in-progress edit. Typing into a date field does not re-sort mid-edit; the new position takes effect on the next render.
 
 ### 1.5 Financial Summary
 

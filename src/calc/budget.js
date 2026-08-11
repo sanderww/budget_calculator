@@ -63,6 +63,44 @@ export function calculateMonthlyAllocation(availableMoney, monthlySavingsTarget,
     const leftover = availableMoney - totalAllocated;
     return { remainingMoney, mortgageAmount, eftAmount, cryptoAmount, totalAllocated, leftover };
 }
+// True only for a parseable date strictly before today. Both sides are
+// normalised to local midnight, so a row dated today reads as still pending
+// rather than flipping to "due" partway through the day.
+export function isPastDue(date, today = new Date()) {
+    const t = Date.parse(date);
+    if (Number.isNaN(t)) return false;
+    const due = new Date(t);
+    due.setHours(0, 0, 0, 0);
+    const ref = new Date(today);
+    ref.setHours(0, 0, 0, 0);
+    return due < ref;
+}
+
+// Moves one past-due future cost into provisions, carrying its description,
+// amount and date across untouched. The date is deliberately preserved so the
+// provision stays identifiable as "the cost that was due on that date".
+//
+// Deliberately manual, never automatic: once a future cost's date passes, the
+// money was either saved (it becomes a provision) or spent (the row is simply
+// deleted). Only the user knows which, so the app never infers it.
+//
+// Returns a new data object on success, leaving the input and its arrays
+// unmutated. Returns the input object by reference when the move is refused,
+// so callers can detect a no-op with `!==`.
+export function convertFutureCostToProvision(data, id, today = new Date()) {
+    const index = data.futureCosts.findIndex(c => c.id === id);
+    if (index === -1) return data;
+
+    const cost = data.futureCosts[index];
+    if (!isPastDue(cost.date, today)) return data;
+
+    return {
+        ...data,
+        futureCosts: data.futureCosts.filter((_, i) => i !== index),
+        provisions: [...data.provisions, { ...cost }],
+    };
+}
+
 export function parseBudgetCSV(text) {
     const newData = { savings: 0, debts: [], provisions: [], futureCosts: [] };
     const rows = text.split('\n').filter(row => row.trim() !== '');

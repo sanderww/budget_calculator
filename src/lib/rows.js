@@ -13,15 +13,42 @@ export const sortByDateThenIdDesc = (a, b) => {
     return 0;
 };
 
+// Soonest date first; ties broken by id ascending (ids embed creation time).
+// Rows with a missing or unparseable date sort to the top, keeping a freshly
+// added blank row in sight so its date can be filled in.
+export const sortByDateThenIdAsc = (a, b) => {
+    const timeA = Date.parse(a.date);
+    const timeB = Date.parse(b.date);
+    const badA = Number.isNaN(timeA);
+    const badB = Number.isNaN(timeB);
+    if (badA !== badB) return badA ? -1 : 1;
+    if (!badA) {
+        if (timeA < timeB) return -1;
+        if (timeA > timeB) return 1;
+    }
+    if (a.id < b.id) return -1;
+    if (a.id > b.id) return 1;
+    return 0;
+};
+
 export const emptyStateHTML = (message) =>
     `<p class="text-sm text-slate-400 text-center py-4 border border-dashed border-slate-200 rounded-xl">${message}</p>`;
 
 const trashIconSVG = (size) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 
+const convertIconSVG = (size) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>`;
+
 // fields: ordered array of 'date' | 'description' | 'amount' | 'cryptoValue'
 // | { select: [...options] }. A remove button is always appended.
-export function createRowElement(item, { gridTemplateColumns, fields, compact = false }) {
+//
+// convertible: optional predicate (item) => boolean. When supplied, a
+// convert button is added before the remove button. Rows where the predicate
+// is false keep the cell but render the button `invisible`, so the remove
+// buttons stay aligned down the list (same technique as cryptoValue above).
+// Omitting the option emits no cell at all, leaving other lists untouched.
+export function createRowElement(item, { gridTemplateColumns, fields, compact = false, convertible = null }) {
     const div = document.createElement('div');
     div.className = 'grid gap-2 items-center';
     div.style.gridTemplateColumns = gridTemplateColumns;
@@ -77,6 +104,19 @@ export function createRowElement(item, { gridTemplateColumns, fields, compact = 
             });
             div.appendChild(el);
         }
+    }
+
+    if (convertible) {
+        const convertBtn = document.createElement('button');
+        convertBtn.type = 'button';
+        convertBtn.innerHTML = convertIconSVG(compact ? 14 : 16);
+        convertBtn.title = 'Move to provisions';
+        convertBtn.setAttribute('aria-label', 'Move to provisions');
+        const usable = convertible(item);
+        convertBtn.className = `btn btn-secondary convert-btn ${compact ? 'p-1.5' : 'p-2'}`
+            + (usable ? '' : ' invisible');
+        if (!usable) convertBtn.disabled = true;
+        div.appendChild(convertBtn);
     }
 
     const removeBtn = document.createElement('button');

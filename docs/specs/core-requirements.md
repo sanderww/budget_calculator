@@ -14,6 +14,14 @@ A personal finance tool for an individual to:
 
 Currency is South African Rand (R) throughout.
 
+### Currency notation (hard requirement)
+
+Every displayed amount — summary cards, tables, tooltips, chart axes and chart tooltips, static HTML placeholders — uses **comma thousands separators and a dot decimal separator**: `R 3,000.50` means three thousand rand and fifty cents.
+
+- The `en-ZA` locale must **not** be used for display; it renders `3 000,50` (space groups, comma decimal) and is explicitly forbidden.
+- All formatting goes through `src/lib/format.js`, which pins `ZAR_LOCALE = 'en-US'`. No module may call `toLocaleString` directly.
+- Cent-precise amounts show exactly two decimals (`fmtZAR`); whole-rand amounts show none (`fmtZARWhole`, `fmtZARSigned`, `fmtZARAxis`); bare grouped numbers without the `R` prefix use `fmtNum`.
+
 ---
 
 ## 1. Budget Module
@@ -25,7 +33,13 @@ Currency is South African Rand (R) throughout.
 | **Savings** | Total liquid cash available right now. |
 | **Debt** | A fixed obligation that reduces available savings immediately (e.g. a bill owed). Each debt has a description and an amount. |
 | **Provision** | Money set aside for a known future obligation, treated as already spent for planning purposes. Each provision has a description, amount, and a target date. |
-| **Future Cost** | An anticipated expense at a specific future date. Unlike provisions, future costs are not yet deducted — they are projected against a chosen future date. Each future cost has a description, amount, and date. |
+| **Future Cost** | An anticipated expense at a specific future date. Unlike provisions, future costs are not yet deducted — they are projected against a chosen future date. Each future cost has a description, amount, and date. Always listed in date order, soonest first, with undated rows at the top. |
+
+### 1.1a Future Cost → Provision
+
+Once a future cost's date has passed, the money behind it was either **saved** (it is now genuinely set aside, and the cost becomes a provision) or **spent** (the savings balance already reflects it, and the row is simply deleted). Nothing in the data distinguishes the two, so the app never converts automatically — the user moves a past-due cost across with a per-row button, or deletes it.
+
+Converting carries the description, amount and original date over unchanged. It reduces Current Net Amount by the row's amount and leaves Future Net unchanged, since a past-dated cost was already counted against every future target date.
 
 ### 1.2 Current Net Amount
 

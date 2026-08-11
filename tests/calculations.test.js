@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
     getUpcoming25th,
     calculateBudgetSummary,
+    isPastDue,
+    convertFutureCostToProvision,
     calculateMonthlyAllocation,
     calculateInvestmentPerformance,
     monthlyInterestFactor,
@@ -1534,5 +1536,107 @@ describe('generateConfigJSON', () => {
     it('pretty-prints with 2-space indent', () => {
         const json = generateConfigJSON({ cpi_pct: 5 }, { public: true });
         expect(json).toBe('{\n  "cpi_pct": 5\n}');
+    });
+});
+
+
+describe('isPastDue', () => {
+    const today = new Date('2026-08-11T12:00:00');
+
+    it('is true for yesterday', () => expect(isPastDue('2026-08-10', today)).toBe(true));
+    it('is false for today', () => expect(isPastDue('2026-08-11', today)).toBe(false));
+    it('is false for tomorrow', () => expect(isPastDue('2026-08-12', today)).toBe(false));
+    it('is false for a blank date', () => expect(isPastDue('', today)).toBe(false));
+    it('is false for an unparseable date', () => expect(isPastDue('not-a-date', today)).toBe(false));
+    it('is false for a missing date', () => expect(isPastDue(undefined, today)).toBe(false));
+
+    it('ignores the time of day on the reference date', () => {
+        // Late in the day must not make today's row suddenly past due.
+        expect(isPastDue('2026-08-11', new Date('2026-08-11T23:59:59'))).toBe(false);
+    });
+});
+
+describe('convertFutureCostToProvision', () => {
+    const today = new Date('2026-08-11T12:00:00');
+    const baseData = () => ({
+        savings: 100000,
+        debts: [],
+        provisions: [{ id: 'p1', description: 'washing machine', amount: 8500, date: '2025-09-15' }],
+        futureCosts: [
+            { id: 'f1', description: 'rent tax 2025', amount: 5000, date: '2026-08-08' },
+            { id: 'f2', description: 'Geyser', amount: 20000, date: '2034-01-06' },
+            { id: 'f3', description: 'undated', amount: 1000, date: '' },
+        ],
+    });
+
+    it('moves a past-due cost into provisions with every field intact', () => {
+        const out = convertFutureCostToProvision(baseData(), 'f1', today);
+        expect(out.futureCosts.map(c => c.id)).toEqual(['f2', 'f3']);
+        expect(out.provisions).toHaveLength(2);
+        expect(out.provisions[1]).toEqual({
+            id: 'f1', description: 'rent tax 2025', amount: 5000, date: '2026-08-08',
+        });
+    });
+
+    it('preserves the original date rather than stamping today', () => {
+        const out = convertFutureCostToProvision(baseData(), 'f1', today);
+        expect(out.provisions[1].date).toBe('2026-08-08');
+    });
+
+    it('moves exactly one row: one out, one in', () => {
+        const before = baseData();
+        const out = convertFutureCostToProvision(before, 'f1', today);
+        expect(out.futureCosts).toHaveLength(before.futureCosts.length - 1);
+        expect(out.provisions).toHaveLength(before.provisions.length + 1);
+    });
+
+    it('does not mutate the input data or its arrays', () => {
+        const before = baseData();
+        convertFutureCostToProvision(before, 'f1', today);
+        expect(before.futureCosts).toHaveLength(3);
+        expect(before.provisions).toHaveLength(1);
+    });
+
+    it('leaves unrelated fields alone', () => {
+        const out = convertFutureCostToProvision(baseData(), 'f1', today);
+        expect(out.savings).toBe(100000);
+        expect(out.debts).toEqual([]);
+    });
+
+    it('refuses a future-dated cost, returning the input by reference', () => {
+        const before = baseData();
+        expect(convertFutureCostToProvision(before, 'f2', today)).toBe(before);
+    });
+
+    it('refuses an undated cost', () => {
+        const before = baseData();
+        expect(convertFutureCostToProvision(before, 'f3', today)).toBe(before);
+    });
+
+    it('refuses an unknown id', () => {
+        const before = baseData();
+        expect(convertFutureCostToProvision(before, 'nope', today)).toBe(before);
+    });
+
+    it('refuses a cost dated exactly today', () => {
+        const before = baseData();
+        before.futureCosts.push({ id: 'f4', description: 'due today', amount: 100, date: '2026-08-11' });
+        expect(convertFutureCostToProvision(before, 'f4', today)).toBe(before);
+    });
+
+    it('drops current net by the amount and leaves future net unchanged', () => {
+        // The moved cost was already inside relevantFutureCosts (its date is
+        // <= any future target), so only the "now" figure should move.
+        const before = baseData();
+        const target = new Date('2027-01-01');
+        const summaryBefore = calculateBudgetSummary(
+            before.savings, before.debts, before.provisions, before.futureCosts, target, today);
+
+        const after = convertFutureCostToProvision(before, 'f1', today);
+        const summaryAfter = calculateBudgetSummary(
+            after.savings, after.debts, after.provisions, after.futureCosts, target, today);
+
+        expect(summaryAfter.currentNetAmount).toBe(summaryBefore.currentNetAmount - 5000);
+        expect(summaryAfter.futureNetAmount).toBe(summaryBefore.futureNetAmount);
     });
 });
