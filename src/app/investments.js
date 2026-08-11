@@ -5,7 +5,7 @@ import {
     generateInvestmentCSV as _generateInvestmentCSV,
     tfsaLifetimeContributions as _tfsaLifetimeContributions,
 } from '../calculations.js';
-import { fmtZAR as formatCurrency, fmtZAR } from '../lib/format.js';
+import { fmtZAR as formatCurrency, fmtZAR, fmtNum } from '../lib/format.js';
 import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
@@ -65,7 +65,7 @@ const updateTfsaCapDisplay = () => {
         barEl.className = `h-1.5 rounded-full transition-all ${cap.percentUsed >= 100 ? 'bg-red-500' : cap.percentUsed >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`;
     }
     if (pctEl) pctEl.textContent = `${cap.percentUsed.toFixed(1)}%`;
-    if (remEl) remEl.textContent = Math.round(cap.remaining).toLocaleString('en-ZA');
+    if (remEl) remEl.textContent = fmtNum(Math.round(cap.remaining));
 };
 
 // Progress toward the annual CGT exclusion (gain vs R40,000) for Discretionary.
@@ -82,7 +82,7 @@ const updateCgtExclusionDisplay = (gain) => {
         barEl.className = `h-1.5 rounded-full transition-all ${pct >= 100 ? 'bg-red-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`;
     }
     if (pctEl) pctEl.textContent = `${pct.toFixed(1)}%`;
-    if (remEl) remEl.textContent = Math.round(remaining).toLocaleString('en-ZA');
+    if (remEl) remEl.textContent = fmtNum(Math.round(remaining));
 };
 
 const renderTransactions = () => {

@@ -4,6 +4,7 @@ import { getInvestmentData } from './investments.js';
 import { getDebtData } from './debt.js';
 import { getRaState } from './ra.js';
 import { renderHistoryCharts } from '../charts/chart_history.js';
+import { fmtNum } from '../lib/format.js';
 
 // Calendar year from an ISO date, or null when it can't be parsed. Every source
 // (debt, investments, RA) is grouped by calendar year so the table has one row
@@ -47,7 +48,7 @@ const renderHistory = () => {
 
     // Currency formatter: positive amounts only, an em dash otherwise.
     const fmt = (val) => val > 0
-        ? 'R ' + val.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+        ? 'R ' + fmtNum(Math.round(val))
         : '—';
 
     // Grand totals per category (drives the pie and the table's total row).

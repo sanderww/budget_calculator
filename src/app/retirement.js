@@ -10,7 +10,7 @@ import {
     generateConfigJSON as _generateConfigJSON,
 } from '../calculations.js';
 import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
-import { fmtZARWhole, fmtZARSigned } from '../lib/format.js';
+import { fmtZARWhole, fmtZARSigned, fmtNum } from '../lib/format.js';
 import { getConfigMap, persistConfig, saveToServer } from './persistence.js';
 import { getInvestmentData } from './investments.js';
 import { getRaState } from './ra.js';
@@ -317,7 +317,7 @@ function renderRetirement() {
         ['Discretionary', snap.liquid.atRetirement.discretionary, ''],
         ['TFSA', snap.liquid.atRetirement.tfsa,
             retirementParams.opt_tfsa_enabled
-                ? `R${_RET_CONSTS.TFSA_ANNUAL_CAP.toLocaleString()}/yr; ~${yearsTilTfsaCap ?? 0} more years until lifetime cap.`
+                ? `R${fmtNum(_RET_CONSTS.TFSA_ANNUAL_CAP)}/yr; ~${yearsTilTfsaCap ?? 0} more years until lifetime cap.`
                 : ''],
         ['Crypto', snap.liquid.atRetirement.crypto, ''],
     ];
@@ -444,7 +444,7 @@ function renderRetirement() {
         ['Commutation', retirementParams.ra_commute_third ? '1/3 lump sum on' : 'off'],
         ['TFSA cap remaining', retFmtZAR(Math.max(0, _RET_CONSTS.TFSA_LIFETIME_CAP - (getInvestmentData().transactions || []).filter(t => t.type === 'TFSA').reduce((s, t) => s + (Number(t.amount) || 0), 0)))],
         ['RA deduction-cap headroom', retFmtZAR(snap.ra.deductionCapHeadroom) + ' / yr'],
-        ['Hard constants', `de minimis R${_RET_CONSTS.DE_MINIMIS.toLocaleString()}, living-annuity threshold R${_RET_CONSTS.LIVING_ANNUITY_THRESHOLD.toLocaleString()}, lump-sum tax-free R${_RET_CONSTS.LUMP_SUM_TAX_FREE.toLocaleString()}`],
+        ['Hard constants', `de minimis R${fmtNum(_RET_CONSTS.DE_MINIMIS)}, living-annuity threshold R${fmtNum(_RET_CONSTS.LIVING_ANNUITY_THRESHOLD)}, lump-sum tax-free R${fmtNum(_RET_CONSTS.LUMP_SUM_TAX_FREE)}`],
     ];
     document.getElementById('retirement-card-assumptions').innerHTML = `
         <details>
