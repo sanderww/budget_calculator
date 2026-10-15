@@ -539,6 +539,40 @@ export function getDefaultRetirementParams() {
     return { ...RETIREMENT_DEFAULT_PARAMS };
 }
 
+// --- Pinned scenarios (UX-3.2) ----------------------------------------------
+// A scenario stores only the retirement params that differ from the defaults,
+// so stored scenarios stay small and pick up later default changes. The
+// "today's money" toggle is display-only and always follows the live setting.
+const SCENARIO_EXCLUDED_KEYS = new Set(['show_real_terms']);
+
+export function retirementParamsDiff(params) {
+    const p = params || {};
+    const diff = {};
+    Object.keys(RETIREMENT_DEFAULT_PARAMS).forEach(k => {
+        if (SCENARIO_EXCLUDED_KEYS.has(k)) return;
+        if (!(k in p)) return;
+        if (p[k] !== RETIREMENT_DEFAULT_PARAMS[k]) diff[k] = p[k];
+    });
+    return diff;
+}
+
+// Full param set for a scenario: the current params (non-retirement keys and
+// the display toggle) with the defaults and then the scenario's diff on top.
+export function resolveScenarioParams(currentParams, scenarioParams) {
+    const current = currentParams || {};
+    const resolved = { ...current, ...RETIREMENT_DEFAULT_PARAMS, ...(scenarioParams || {}) };
+    SCENARIO_EXCLUDED_KEYS.forEach(k => {
+        if (k in current) resolved[k] = current[k];
+        else resolved[k] = RETIREMENT_DEFAULT_PARAMS[k];
+    });
+    return resolved;
+}
+
+export function defaultScenarioLabel(params) {
+    const p = params || {};
+    return `Retire at ${p.retirement_age} · ${p.withdrawal_rate_pct}% draw`;
+}
+
 export function parseRetirementCSV(text) {
     const params = { ...RETIREMENT_DEFAULT_PARAMS };
     const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');

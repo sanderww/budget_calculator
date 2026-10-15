@@ -367,6 +367,17 @@ Each scenario has a checkbox + inline inputs (only enabled when checkbox is chec
 
 ### 5.3 Cards
 
+**Scenarios card (pinned scenarios)**
+
+The first card above the retirement results, id `retirement-card-scenarios`. Its header holds a **Pin scenario** button (`ret-pin-scenario`), which saves the current parameter set as a scenario under the default label `Retire at <retirement_age> · <withdrawal_rate_pct>% draw` (for the defaults: "Retire at 65 · 4% draw") and focuses the new card's label field so it can be renamed straight away.
+
+- A **Current** card (current sidebar parameters) is always shown, followed by up to **3** pinned scenario cards. With 3 pinned, the Pin button is disabled and the hint reads "3 scenarios pinned. Remove one to pin another."
+- Each card shows three headline numbers, recalculated live on every render from the same pure projection the main view uses (`calculateRetirementSnapshot`): **Net monthly at 55** (`monthly.projected55.net`), **Net monthly at D** (`monthly.projected68.net`, `D = opt_dutch_age`) and **Capital at retirement (age)** (`lumpSum.atRetirement`, the Total of "Instantly available at retirement"). The numbers are real or nominal according to the "Show in today's money" toggle; the toggle is never part of a scenario.
+- A scenario card's label is an editable text field (`aria-label="Scenario name"`); the new label is saved on change, and an empty label falls back to the default label.
+- **Apply** loads the scenario's parameters into the sidebar (every sidebar input updates, the params are saved and the tab re-renders) and shows the undo toast (§0.5) `Applied "<label>"`; Undo restores the parameters that were in effect before Apply.
+- **Remove** deletes the scenario and shows the undo toast `Removed "<label>"`; Undo puts it back in its original position.
+- Persistence: the private config key `ret_scenarios` (in `db/config.private.json`; never public) holds an array of `{ id, label, params }`. `params` holds only the retirement keys whose values differ from the defaults (`retirementParamsDiff`), so stored scenarios stay small and follow later default changes. A scenario resolves to `{ ...current params, ...defaults, ...scenario.params }` with the current `show_real_terms` (`resolveScenarioParams`); both Apply and the card numbers use this.
+
 **Card 0 — Snapshot**
 
 Three-column × four-row grid (label | Age 55 | Age `opt_dutch_age`):
@@ -523,6 +534,7 @@ Date,Description,Amount
 }
 ```
 - Contains personal data (DOB, balances), personal assumptions (marginal rate, tax rates), loan parameters, and all scenario toggles. Gitignored.
+- Values are usually scalars; `ret_scenarios` is a JSON array of pinned retirement scenarios `{ id, label, params }` (§5.3), written as-is by `generateConfigJSON`.
 
 ### 7.2 Auto-Save
 
@@ -580,3 +592,6 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `parseRaCSV(text)` / `generateRaCSV(data)` | RA CSV serialization (transactions + param rows) |
 | `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject}, today?)` | Per-tax-year refund buckets. The RA tab calls it with `assumedFutureMonthly: 0, futureYearsToProject: 0` and renders only the rows whose status is `actual`. Internal projection mechanics are retained for unit tests but no longer surfaced in the UI. |
 | `calculatePotValueToday(transactions, nominalReturnPct, today?)` | Monthly-compounded estimate of pot value as of today |
+| `retirementParamsDiff(params)` | The retirement params (keys of the defaults, minus `show_real_terms`) whose values differ from the defaults; stored as a pinned scenario's `params` |
+| `resolveScenarioParams(currentParams, scenarioParams)` | `{ ...currentParams, ...defaults, ...scenarioParams }`, keeping the current `show_real_terms`; the full param set for Apply and scenario cards |
+| `defaultScenarioLabel(params)` | Default pinned-scenario label `Retire at <retirement_age> · <withdrawal_rate_pct>% draw` |

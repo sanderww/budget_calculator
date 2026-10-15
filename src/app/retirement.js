@@ -7,10 +7,14 @@ import {
     getDefaultRetirementParams as _getDefaultRetirementParams,
     parseRetirementCSV as _parseRetirementCSV,
     calculateRetirementSnapshot as _calculateRetirementSnapshot,
+    retirementParamsDiff as _retirementParamsDiff,
+    resolveScenarioParams as _resolveScenarioParams,
+    defaultScenarioLabel as _defaultScenarioLabel,
 } from '../calculations.js';
 import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
 import { fmtZARWhole, fmtZARSigned, fmtNum, parseAmount } from '../lib/format.js';
-import { bindAmountInput } from '../lib/rows.js';
+import { bindAmountInput, generateId } from '../lib/rows.js';
+import { showUndoToast } from '../lib/undo-toast.js';
 import { getConfigMap, persistConfig } from './persistence.js';
 import { getInvestmentData } from './investments.js';
 import { getRaState } from './ra.js';
@@ -129,8 +133,16 @@ function retReadInput(el, type) {
     return Number.isNaN(v) ? 0 : v;
 }
 
+// Pinned scenarios live in the config map only (private key), never in
+// retirementParams, so retPersist can't write a stale copy back.
+const RET_SCENARIOS_KEY = 'ret_scenarios';
+const RET_MAX_SCENARIOS = 3;
+
 function retPersist() {
-    Object.keys(retirementParams).forEach(k => { getConfigMap()[k] = retirementParams[k]; });
+    Object.keys(retirementParams).forEach(k => {
+        if (k === RET_SCENARIOS_KEY) return;
+        getConfigMap()[k] = retirementParams[k];
+    });
     persistConfig();
 }
 
@@ -159,6 +171,8 @@ function retWireInputs() {
         });
     });
 
+    document.getElementById('ret-pin-scenario').addEventListener('click', retPinScenario);
+
     document.getElementById('ret-load-csv').addEventListener('click', () => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -179,10 +193,10 @@ function retWireInputs() {
     });
 }
 
-function renderRetirement() {
-    const today = new Date();
-    const snap = _calculateRetirementSnapshot({
-        params: retirementParams,
+// The same pure projection for the main view and for every scenario card.
+function retSnapshotFor(params, today = new Date()) {
+    return _calculateRetirementSnapshot({
+        params,
         discretionaryToday: Number(getInvestmentData().currentValues.Discretionary) || 0,
         tfsaToday: Number(getInvestmentData().currentValues.TFSA) || 0,
         cryptoToday: Number(getInvestmentData().currentValues.Crypto) || 0,
@@ -190,6 +204,171 @@ function renderRetirement() {
         raPotToday: retRaPotToday(),
         raAnnualContributionLast12: retRaAnnualLast12(),
     }, today);
+}
+
+// --- PINNED SCENARIOS (UX-3.2) ---
+// Read-only view of the stored scenarios (rendering never creates the key).
+const retScenarios = () => {
+    const list = getConfigMap()[RET_SCENARIOS_KEY];
+    return Array.isArray(list) ? list : [];
+};
+
+// Returns the live array held in the config map, creating it when missing.
+function retScenarioList() {
+    const map = getConfigMap();
+    if (!Array.isArray(map[RET_SCENARIOS_KEY])) map[RET_SCENARIOS_KEY] = [];
+    return map[RET_SCENARIOS_KEY];
+}
+
+function retSetParams(params) {
+    retirementParams = params;
+    retApplyParamsToInputs();
+    retPersist();
+    renderRetirement();
+}
+
+function retPinScenario() {
+    const list = retScenarioList();
+    if (list.length >= RET_MAX_SCENARIOS) return;
+    const scenario = {
+        id: generateId(),
+        label: _defaultScenarioLabel(retirementParams),
+        params: _retirementParamsDiff(retirementParams),
+    };
+    list.push(scenario);
+    persistConfig();
+    renderRetirementScenarios();
+    const labelEl = document.querySelector(`[data-scenario-id="${scenario.id}"] .ret-scenario-label`);
+    if (labelEl) { labelEl.focus(); labelEl.select(); }
+}
+
+function retApplyScenario(id) {
+    const scenario = retScenarios().find(s => s.id === id);
+    if (!scenario) return;
+    const previous = { ...retirementParams };
+    retSetParams(_resolveScenarioParams(retirementParams, scenario.params));
+    showUndoToast({
+        message: `Applied "${scenario.label}"`,
+        onUndo: () => retSetParams(previous),
+    });
+}
+
+function retRemoveScenario(id) {
+    const list = retScenarios();
+    const index = list.findIndex(s => s.id === id);
+    if (index < 0) return;
+    const [scenario] = list.splice(index, 1);
+    persistConfig();
+    renderRetirementScenarios();
+    showUndoToast({
+        message: `Removed "${scenario.label}"`,
+        onUndo: () => {
+            const current = retScenarioList();
+            if (current.some(s => s.id === scenario.id) || current.length >= RET_MAX_SCENARIOS) return;
+            current.splice(Math.min(index, current.length), 0, scenario);
+            persistConfig();
+            renderRetirementScenarios();
+        },
+    });
+}
+
+function retScenarioCard({ snap, params, scenario }) {
+    const card = document.createElement('div');
+    card.className = scenario
+        ? 'ret-scenario-card p-3 rounded-xl border border-slate-200 bg-white flex flex-col gap-2'
+        : 'ret-scenario-card p-3 rounded-xl border border-indigo-200 bg-indigo-50 flex flex-col gap-2';
+    if (scenario) card.dataset.scenarioId = scenario.id;
+
+    if (scenario) {
+        const label = document.createElement('input');
+        label.type = 'text';
+        label.className = 'ret-scenario-label input-field text-sm font-semibold py-1';
+        label.value = scenario.label;
+        label.setAttribute('aria-label', 'Scenario name');
+        label.addEventListener('change', () => {
+            scenario.label = label.value.trim() || _defaultScenarioLabel(_resolveScenarioParams(retirementParams, scenario.params));
+            label.value = scenario.label;
+            persistConfig();
+        });
+        card.appendChild(label);
+    } else {
+        const title = document.createElement('div');
+        title.className = 'text-sm font-semibold text-indigo-800 py-1';
+        title.textContent = 'Current';
+        card.appendChild(title);
+    }
+
+    const dutchAge = Number(params.opt_dutch_age) || _RET_CONSTS.DUTCH_PENSION_AGE;
+    const stats = [
+        ['Net monthly at 55', snap.monthly.projected55.net, 'net55'],
+        [`Net monthly at ${dutchAge}`, snap.monthly.projected68.net, 'net68'],
+        [`Capital at retirement (${Number(params.retirement_age) || 65})`, snap.lumpSum.atRetirement, 'capital'],
+    ];
+    const dl = document.createElement('dl');
+    dl.className = 'space-y-1';
+    stats.forEach(([name, value, key]) => {
+        const row = document.createElement('div');
+        row.className = 'flex items-baseline justify-between gap-2';
+        const dt = document.createElement('dt');
+        dt.className = 'text-xs text-slate-500';
+        dt.textContent = name;
+        const dd = document.createElement('dd');
+        dd.className = 'text-sm font-semibold text-slate-800 tabular-nums';
+        dd.dataset.stat = key;
+        dd.textContent = retFmtZARSign(value);
+        row.append(dt, dd);
+        dl.appendChild(row);
+    });
+    card.appendChild(dl);
+
+    if (scenario) {
+        const actions = document.createElement('div');
+        actions.className = 'flex gap-2 mt-auto pt-1';
+        const apply = document.createElement('button');
+        apply.type = 'button';
+        apply.className = 'ret-scenario-apply btn btn-secondary text-xs py-1 px-2';
+        apply.textContent = 'Apply';
+        apply.setAttribute('aria-label', `Apply scenario ${scenario.label}`);
+        apply.addEventListener('click', () => retApplyScenario(scenario.id));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'ret-scenario-remove btn btn-danger text-xs py-1 px-2';
+        remove.textContent = 'Remove';
+        remove.setAttribute('aria-label', `Remove scenario ${scenario.label}`);
+        remove.addEventListener('click', () => retRemoveScenario(scenario.id));
+        actions.append(apply, remove);
+        card.appendChild(actions);
+    }
+    return card;
+}
+
+function renderRetirementScenarios(currentSnap) {
+    const container = document.getElementById('ret-scenario-cards');
+    if (!container) return;
+    const today = new Date();
+    const list = retScenarios();
+    const cards = [retScenarioCard({ snap: currentSnap || retSnapshotFor(retirementParams, today), params: retirementParams })];
+    list.forEach(scenario => {
+        const params = _resolveScenarioParams(retirementParams, scenario.params);
+        cards.push(retScenarioCard({ snap: retSnapshotFor(params, today), params, scenario }));
+    });
+    container.replaceChildren(...cards);
+
+    const full = list.length >= RET_MAX_SCENARIOS;
+    const pinBtn = document.getElementById('ret-pin-scenario');
+    if (pinBtn) pinBtn.disabled = full;
+    const hint = document.getElementById('ret-scenarios-hint');
+    if (hint) {
+        hint.textContent = full
+            ? `${RET_MAX_SCENARIOS} scenarios pinned. Remove one to pin another.`
+            : `Pin up to ${RET_MAX_SCENARIOS} parameter sets to compare them side by side with your current settings.`;
+    }
+}
+
+function renderRetirement() {
+    const today = new Date();
+    const snap = retSnapshotFor(retirementParams, today);
+    renderRetirementScenarios(snap);
 
     // Sidebar derived labels
     if (snap.ageNow !== null) {
@@ -490,6 +669,7 @@ retWireInputs();
 
 const loadRetirementFromConfig = () => {
     retirementParams = { ..._getDefaultRetirementParams(), ...getConfigMap() };
+    delete retirementParams[RET_SCENARIOS_KEY];
     retApplyParamsToInputs();
     renderRetirement();
 };

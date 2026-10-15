@@ -582,9 +582,18 @@ It exposes one user control, `ret_scenario_monthly_drawdown` (R/month, persisted
 
 Both charts re-render on the same triggers as Card 0 (R28).
 
+### 5.5b Pinned scenarios
+
+The user can pin up to **3** retirement parameter sets ("scenarios") and compare them with the current settings side by side.
+
+- **Storage:** private config key `ret_scenarios` = array of `{ id, label, params }`. `params = retirementParamsDiff(current)`: only the retirement keys whose values differ from the defaults, excluding the display-only `show_real_terms`. Default label: `Retire at <retirement_age> · <withdrawal_rate_pct>% draw`.
+- **Resolution:** `resolveScenarioParams(current, scenario.params) = { ...current, ...defaults, ...scenario.params }` with `show_real_terms` taken from the current params. Keys the scenario doesn't store therefore resolve to the defaults, not to the current values.
+- **Headline numbers per card** come from `calculateRetirementSnapshot` with the resolved params: net monthly income at 55 (`monthly.projected55.net`), net monthly income at the Dutch-pension age (`monthly.projected68.net`), and capital at retirement (`lumpSum.atRetirement`). All follow the real-terms toggle (R26).
+- **Apply** replaces the current params with the resolved set and is undoable (undo toast) back to the previous params; **Remove** is undoable too.
+
 ### 5.6 Out of scope (v1)
 
-Aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario side-by-side, sequence-of-returns risk, full DTA detail for Dutch pension, spouse/household joint projection, estate duty, marginal-rate brackets for savings-pot tax, multiple RAs at different providers. Months-to-age math is month-precision (ignores day-of-month) — known small boundary noise within ~30 days of a target age, acceptable for multi-decade projections.
+Aggregate lifetime lump-sum tax, inflation-indexed caps, multi-scenario projections beyond the pinned headline cards (§5.5b), sequence-of-returns risk, full DTA detail for Dutch pension, spouse/household joint projection, estate duty, marginal-rate brackets for savings-pot tax, multiple RAs at different providers. Months-to-age math is month-precision (ignores day-of-month) — known small boundary noise within ~30 days of a target age, acceptable for multi-decade projections.
 
 ---
 
@@ -668,6 +677,7 @@ Two ApexCharts visualisations accompany the table. Both use one shared category 
 | R40 | The Budget tab lists debts, provisions and future costs in one **Commitments** ledger (Type chip · Description · Amount · Due · delete). Every row carries `data-id` (the item id). Debt rows have no editable due date. Filter chips (All / Debts / Provisions / Future costs, with counts, `aria-pressed`) narrow the table; the chosen filter is remembered per browser in `localStorage` only, not in config. The footer shows the total for the current filter, plus per-kind subtotals on All. A quick-add field parses one line with `parseQuickAdd` (kind keyword `debt`/`provision`, else future cost; `YYYY-MM-DD` or `<month> YYYY` date; first amount `parseAmount` accepts, a bare year only as a last resort; the rest is the description) and adds the row on Enter only when both a description and an amount were found. Enter on an empty quick-add field adds a blank Future cost row. There are no "+ Add" buttons. |
 | R39 | Sample data mode is announced by a header pill ("Sample data") and a full-width amber banner under the header with a **Switch to my data** button. File paths are not shown in tab toolbars; they appear only as a muted footnote inside the per-tab `⋯` overflow menu, next to **Import CSV…** (Investments, Debt, RA, Retirement; Budget has no import and no menu). Explanatory help text (e.g. the CGT note) lives in toggle popovers built on one shared helper (`src/lib/popover.js`): a real `<button>` with `aria-expanded`, closing on Escape and outside click. |
 | R41 | The Budget tab opens with the runway timeline (§1.6), full width above the Commitments ledger. The chart runs from today to a horizon = max(target date, latest dated future cost) + 3 months, at least 12 months, and is drawn even when no cost falls in range. `buildBudgetTimelineSeries` takes `horizonDate` separately from `futureDate`; with `horizonDate === futureDate` its output is unchanged (regression-tested). The target date is set by a range slider under the chart (an x-axis annotation marks it) or by the date input; both write `future-date`. Each dated future cost is a point on the planned line that links to its ledger row. "Lowest point ahead" = min(planned trajectory − floor) with its date, amber below the minimum buffer; "Save per month to stay above buffer" = the required-savings loop with floor + buffer over every cost up to the horizon and at the horizon. The buffer is the private config key `budget_min_buffer` (default 0; blank removes it). |
+| R42 | The Retirement tab has a **Pin scenario** button above the results that saves the current params as a scenario (max 3) in the private config key `ret_scenarios` (array of `{ id, label, params }`, `params` = only the keys that differ from the defaults; not in `PUBLIC_PARAMS`). A Current card and one card per scenario show net monthly income at 55 and at the Dutch-pension age and capital at retirement, recalculated live from `calculateRetirementSnapshot` and following the real-terms toggle. Each scenario card has an editable label, **Apply** (loads the params into the sidebar, undoable via the undo toast) and **Remove** (undoable). |
 
 ---
 
@@ -679,7 +689,7 @@ Live data lives under `db/`:
 
 - `db/transactions/{budget,ra,investments,debt}.csv` — date-stamped rows and `current_value` snapshots. All gitignored.
 - `db/config.public.json` — generic modelling assumptions (return rates, CPI, withdrawal rate, etc.). Tracked in git.
-- `db/config.private.json` — personal data (DOB, balances) and personal assumptions (tax rates, scenario toggles). Gitignored.
+- `db/config.private.json` — personal data (DOB, balances) and personal assumptions (tax rates, scenario toggles). Gitignored. Values are scalars except `ret_scenarios`, an array of pinned retirement scenarios (§5.5b). Private keys added in the 2026-10 UX redesign: `budget_min_buffer` (§1.6), `budget_alloc_available`, `budget_alloc_mortgage_pct`, `budget_alloc_etf_pct` (§1.5) and `ret_scenarios` (§5.5b); none of them is in `PUBLIC_PARAMS`.
 
 Test mode mirrors the same layout under `db/test/`. Sample seed data lives under `db/examples/`.
 
