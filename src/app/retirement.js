@@ -138,11 +138,15 @@ function retReadInput(el, type) {
 const RET_SCENARIOS_KEY = 'ret_scenarios';
 const RET_MAX_SCENARIOS = 3;
 
+// The config map is shared with every tab, so the Retirement tab reads and
+// writes only its own keys (those of the defaults). Copying the whole map
+// would write stale copies of other tabs' keys back, or resurrect unset ones.
+const RET_PARAM_KEYS = Object.keys(_getDefaultRetirementParams());
+const retOwnKeys = (source) => Object.fromEntries(
+    RET_PARAM_KEYS.filter(k => k in source).map(k => [k, source[k]]));
+
 function retPersist() {
-    Object.keys(retirementParams).forEach(k => {
-        if (k === RET_SCENARIOS_KEY) return;
-        getConfigMap()[k] = retirementParams[k];
-    });
+    Object.assign(getConfigMap(), retOwnKeys(retirementParams));
     persistConfig();
 }
 
@@ -669,8 +673,7 @@ retApplyParamsToInputs();
 retWireInputs();
 
 const loadRetirementFromConfig = () => {
-    retirementParams = { ..._getDefaultRetirementParams(), ...getConfigMap() };
-    delete retirementParams[RET_SCENARIOS_KEY];
+    retirementParams = { ..._getDefaultRetirementParams(), ...retOwnKeys(getConfigMap()) };
     retApplyParamsToInputs();
     renderRetirement();
 };

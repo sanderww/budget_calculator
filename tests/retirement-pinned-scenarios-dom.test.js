@@ -162,3 +162,38 @@ describe('Pinned retirement scenarios', () => {
         expect(scenarioCards()[0].querySelector('input').value).toBe('Stored');
     });
 });
+
+describe('Retirement edits touch only retirement config keys', () => {
+    const seedAndLoad = (entries) => {
+        Object.assign(persistence.getConfigMap(), entries);
+        retirement.loadRetirementFromConfig();
+    };
+
+    it('does not revert a non-retirement key set after the retirement tab loaded', () => {
+        seedAndLoad({ budget_alloc_mortgage_pct: 50, marginal_rate: 41 });
+        persistence.setConfig('budget_alloc_mortgage_pct', 70);
+        persistence.setConfig('marginal_rate', 45);
+        setInput('ret-retirement-age', 61);
+        const map = persistence.getConfigMap();
+        expect(map.budget_alloc_mortgage_pct).toBe(70);
+        expect(map.marginal_rate).toBe(45);
+        expect(map.retirement_age).toBe(61);
+    });
+
+    it('does not bring back a non-retirement key that was unset', () => {
+        seedAndLoad({ budget_min_buffer: 5000 });
+        persistence.unsetConfig('budget_min_buffer');
+        setInput('ret-retirement-age', 62);
+        expect('budget_min_buffer' in persistence.getConfigMap()).toBe(false);
+    });
+
+    it('applying a pinned scenario leaves non-retirement keys alone', () => {
+        seedAndLoad({ budget_alloc_etf_pct: 50 });
+        setInput('ret-retirement-age', 58);
+        $('ret-pin-scenario').click();
+        persistence.setConfig('budget_alloc_etf_pct', 30);
+        scenarioCards()[0].querySelector('button[aria-label^="Apply scenario"]').click();
+        expect(persistence.getConfigMap().budget_alloc_etf_pct).toBe(30);
+        expect(persistence.getConfigMap().retirement_age).toBe(58);
+    });
+});
