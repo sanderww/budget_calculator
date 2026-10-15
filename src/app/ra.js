@@ -235,6 +235,7 @@ document.getElementById('load-ra-csv').addEventListener('click', () => {
 renderRa();
 
 const loadRaCSVFromServer = async () => {
+    let failure = null;
     try {
         const response = await fetch(dbPath('transactions/ra.csv'), { cache: 'no-store' });
         if (response.ok) {
@@ -247,16 +248,18 @@ const loadRaCSVFromServer = async () => {
             raCurrentValue = undefined;
         }
     } catch (err) {
-        // Cleared, then rethrown so a data-mode switch can revert (functional §8).
+        // Cleared and rendered, then rethrown so a data-mode switch can
+        // revert (functional §8).
         raTransactions = [];
         raCurrentValue = undefined;
-        throw err;
+        failure = err;
     }
     raParams = {
         tax_refund_rate_pct: getConfigMap().tax_refund_rate_pct ?? 41,
         nominal_return_pct:  getConfigMap().nominal_return_pct  ?? 10,
     };
     renderRa();
+    if (failure) throw failure;
 };
 // Note: do NOT call loadRaCSVFromServer() here. It depends on
 // the config being loaded first; the init IIFE invokes it.
