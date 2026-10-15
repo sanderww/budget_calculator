@@ -212,17 +212,25 @@ For the Crypto account specifically:
 
 - **Total BTC** — sum of all `cryptoValue` fields across Crypto transactions.
 
-### 2.2 Transactions
+### 2.2 Transactions ledger (UX-4.2)
 
-- Dynamic list of investment transactions, each with:
-  - **Date** (date input)
-  - **Description** (text)
-  - **Amount** (R, numeric)
-  - **BTC value** (numeric, only visible when account type = Crypto)
-  - **Account Type** (dropdown: Discretionary, TFSA, Crypto)
-- Users can add and remove transactions.
-- Displayed sorted by date descending (most recent first), then by creation order descending.
-- Changing a transaction's type to/from Crypto toggles the BTC value field visibility and clears the value when switching away.
+The **Transactions** card is a ledger built on the shared `createLedger` (§1.2) over `investmentData.transactions`, each row grouped by its account. Storage and the CSV layout (§7.1) are unchanged; parse → generate reproduces an investments CSV byte-for-byte.
+
+- **Columns:** **Date** · **Description** · **Amount** · **Account** · **BTC** · delete. The header row (`#transaction-head`, `aria-hidden`) is shown from 640px; on phones each row stacks (account chip, date and delete; description; amount and BTC). Every row carries `data-id`; inputs carry `data-field`.
+- **Account chip:** a real `<select>` (`aria-label` "Account", options Discretionary, TFSA, Crypto) styled as a rounded chip (`.account-chip`). The ledger keeps its `data-value` equal to the selected account, and `app.css` colours the chip's border and dot with the History donut colours (`HISTORY_CATEGORIES` in `src/charts/chart_history.js`): Discretionary `#6366f1`, TFSA `#10b981`, Crypto `#f59e0b`.
+- **BTC:** a number input (`aria-label` "BTC quantity") shown only on Crypto rows; other rows have an empty cell. Changing a row's account swaps the cell in place, and changing it away from Crypto clears the row's `cryptoValue`.
+- **Order:** newest first (`sortByDateThenIdDesc`: date descending, then creation order descending). Edits do not re-sort; the next full render does.
+- **Filters:** **All** · **Discretionary** · **TFSA** · **Crypto**, each chip showing its count and total contributed, e.g. *TFSA (3) · R 12,000* (whole rand). Real buttons with `aria-pressed`; the choice is remembered per browser in `localStorage` (`investments.accountFilter`) and is not written to config.
+- **Footer:** *Total contributed R x* on All, or *TFSA contributed R x* for the selected account.
+- **Edits** write straight to the transaction (amounts as numbers via `bindAmountInput`) and update the chips, the footer, the per-account performance panels (§2.1), the TFSA cap bar, the Total BTC figure and the KPI strip, then auto-save. The History tab re-reads the transactions when it is shown.
+- **Quick-add:** a text field above the table (*Add a transaction — e.g. "tfsa etf 3000" or "luno 0.012 btc 6k"*), with a visually hidden label and a live preview line: *Will add **Crypto** · **Luno** · **R 6,000.00** · **0.012 BTC** on **2026-10-15***. Parsing is `parseInvestmentQuickAdd(text)` in `src/lib/quick-add.js`, on top of `parseQuickAddTokens`:
+  1. A number followed by `btc` (for example `0.012 btc`) is the BTC quantity, not the rand amount.
+  2. **Account keyword** (case-insensitive): `tfsa` → TFSA; `crypto` or `btc` → Crypto; `disc` or `discretionary` → Discretionary. Without a keyword the account is Crypto when a BTC quantity was typed, else Discretionary. An explicit TFSA/Discretionary keyword wins over a BTC quantity, which is then dropped (BTC belongs to Crypto rows only).
+  3. **Date:** `YYYY-MM-DD` or `<month> YYYY`; **today** when none is typed (transactions record what already happened).
+  4. **Amount** and **description** as in §1.3. Both are required; the preview says which is missing.
+  **Enter** adds the row, clears the field and auto-saves; if the current filter hides the new row, the filter switches to All. **Enter on an empty field** adds a blank Discretionary row dated today and focuses its description. There is no **+ Add** button.
+- **Delete** uses the shared delete-with-undo (§0.5); Undo restores the same transaction at its old index and the panels update again.
+- **Empty state:** *No transactions yet. Type one above, for example "tfsa etf 3000".*
 
 ---
 
@@ -587,6 +595,7 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `parseBudgetCSV(text)` / `generateBudgetCSV(data)` | Budget CSV serialization |
 | `changeCommitmentType(data, id, newKind)` | Moves a budget commitment between `debts` / `provisions` / `futureCosts` (kinds `'debt'`, `'provision'`, `'futureCost'`), keeping id, description and amount; drops the date when moving to debt. Returns the input by reference on a no-op |
 | `summariseCommitments(data)` | Per-kind and overall counts and amount totals of the commitments (blank or non-numeric amounts count as 0). Kept as a tested pure helper; the ledger no longer uses it, because `createLedger` computes its filter counts and footer totals itself |
+| `parseInvestmentQuickAdd(text, { today? })` (`src/lib/quick-add.js`) | Parses an Investments quick-add line into `{ account, description, amount, date, btc }` or `{ error, missing }` (§2.2); the date defaults to today |
 | `parseQuickAdd(text)` | Parses a Budget quick-add line into `{ kind, description, amount, date }` or `{ error, missing }` (§1.3); built on `parseQuickAddTokens` in `src/lib/quick-add.js` |
 | `parseInvestmentCSV(text)` / `generateInvestmentCSV(data)` | Investment CSV serialization |
 | `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |

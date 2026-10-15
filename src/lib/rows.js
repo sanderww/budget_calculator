@@ -222,17 +222,23 @@ export function createLedgerCell(item, col, ctx = {}) {
         let input;
         if (col.type === 'select') {
             input = document.createElement('select');
+            let shown = null;
             for (const opt of col.options || []) {
                 const { value, label } = typeof opt === 'string' ? { value: opt, label: opt } : opt;
                 const option = document.createElement('option');
                 option.value = value;
                 option.textContent = label;
-                if (String(item[col.key] ?? '') === String(value)) option.selected = true;
+                if (String(item[col.key] ?? '') === String(value)) {
+                    option.selected = true;
+                    shown = String(value);
+                }
                 input.appendChild(option);
             }
             // The shown value is mirrored into data-value, so CSS can colour
             // a select styled as a chip (e.g. the Investments account chip).
-            input.dataset.value = input.value;
+            // With no matching option the browser shows the first one.
+            const first = col.options?.[0];
+            input.dataset.value = shown ?? (first === undefined ? '' : String(typeof first === 'string' ? first : first.value));
             input.addEventListener('change', () => {
                 item[col.key] = input.value;
                 input.dataset.value = input.value;

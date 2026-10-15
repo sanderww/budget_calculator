@@ -5,8 +5,10 @@ import {
     generateInvestmentCSV as _generateInvestmentCSV,
     tfsaLifetimeContributions as _tfsaLifetimeContributions,
 } from '../calculations.js';
-import { fmtZAR as formatCurrency, fmtZAR, fmtNum } from '../lib/format.js';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
+import { fmtZAR as formatCurrency, fmtZAR, fmtZARWhole, fmtNum } from '../lib/format.js';
+import { generateId, bindAmountInput } from '../lib/rows.js';
+import { createLedger, strong } from '../lib/ledger.js';
+import { parseInvestmentQuickAdd, todayISO } from '../lib/quick-add.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
@@ -26,8 +28,6 @@ let investmentData = {
     marginalRate: 41
 };
 
-const transactionList = document.getElementById('transaction-list');
-const addTransactionBtn = document.getElementById('add-transaction');
 const loadInvCsvBtn = document.getElementById('load-inv-csv');
 
 // Inputs for current values
@@ -100,16 +100,105 @@ const updateCgtExclusionDisplay = (gain) => {
     if (remEl) remEl.textContent = fmtNum(Math.round(remaining));
 };
 
-const renderTransactions = () => {
-    transactionList.innerHTML = '';
-    if (investmentData.transactions.length === 0) {
-        transactionList.innerHTML = emptyStateHTML('No transactions added yet.');
-    } else {
-        // Sort by date descending (latest on top), then by ID (creation time) descending
-        const sorted = [...investmentData.transactions].sort(sortByDateThenIdDesc);
-        sorted.forEach(t => transactionList.appendChild(createTransactionItem(t)));
-    }
+// ---- Transactions ledger (UX-4.2) -------------------------------------------
+// Built on the shared ledger (src/lib/ledger.js) over
+// investmentData.transactions, newest-first; each row's group is its account.
+const ACCOUNTS = ['Discretionary', 'TFSA', 'Crypto'];
+const TRANSACTION_COLUMNS = [
+    { key: 'date', type: 'date', label: 'Date' },
+    { key: 'description', type: 'text', label: 'Description' },
+    { key: 'amount', type: 'amount', label: 'Amount' },
+    // A select styled as a chip; the ledger keeps data-value = the account,
+    // which app.css colours like the History donut.
+    { key: 'type', type: 'select', label: 'Account', options: ACCOUNTS, inputClass: 'type-input account-chip' },
+    // BTC quantity, only on Crypto rows.
+    { key: 'cryptoValue', type: 'number', label: 'BTC', ariaLabel: 'BTC quantity', inputClass: 'crypto-value-input',
+        when: (item) => item.type === 'Crypto' },
+];
+let ledger;
+const renderTransactions = () => ledger.render();
+const saveInvestments = () => debouncedSave('transactions_investments', generateInvestmentCSV);
+
+const MISSING_TEXT = {
+    'description,amount': 'Add a description and an amount.',
+    description: 'Add a description.',
+    amount: 'Add an amount, e.g. 3k or 3000.',
 };
+const quickAddPreviewFor = (parsed) => {
+    if (parsed.error === 'empty') {
+        return { state: 'idle', content: 'Press Enter on an empty field to add a blank row dated today.' };
+    }
+    if (parsed.error) return { state: 'error', content: MISSING_TEXT[parsed.missing.join(',')] };
+    const parts = ['Will add ', strong(parsed.account), ' · ', strong(parsed.description), ' · ',
+        strong(formatCurrency(parsed.amount))];
+    if (parsed.btc !== '') parts.push(' · ', strong(`${parsed.btc} BTC`));
+    parts.push(' on ', strong(parsed.date));
+    return { state: 'ok', content: parts };
+};
+
+const addTransaction = (fields) => {
+    const item = { id: generateId(), ...fields };
+    investmentData.transactions.push(item);
+    ledger.ensureVisible({ item, group: item.type });
+    renderTransactions();
+    updatePerformanceDisplay();
+    saveInvestments();
+    return item;
+};
+
+// Enter: add the parsed row and clear the field. On an empty field, add a
+// blank Discretionary row dated today and focus its description.
+const submitQuickAdd = (parsed) => {
+    if (parsed.error === 'empty') {
+        const item = addTransaction({ date: todayISO(), description: '', amount: '', cryptoValue: '', type: 'Discretionary' });
+        ledger.rowElement(item.id)?.querySelector('.description-input')?.focus();
+        return false;
+    }
+    if (parsed.error) return false;
+    addTransaction({
+        date: parsed.date,
+        description: parsed.description,
+        amount: parsed.amount,
+        type: parsed.account,
+        cryptoValue: parsed.btc === '' ? '' : String(parsed.btc),
+    });
+    return true;
+};
+
+ledger = createLedger({
+    elements: {
+        list: document.getElementById('transaction-list'),
+        filters: document.getElementById('transaction-filters'),
+        footer: document.getElementById('transaction-footer'),
+        head: document.getElementById('transaction-head'),
+        quickAdd: document.getElementById('transaction-quick-add'),
+        preview: document.getElementById('transaction-quick-add-preview'),
+    },
+    getRows: () => investmentData.transactions.map(item => ({ item, group: item.type })),
+    getList: () => investmentData.transactions,
+    columns: TRANSACTION_COLUMNS,
+    rowClass: 'ledger-row inv-ledger',
+    filters: {
+        storageKey: 'investments.accountFilter',
+        options: [{ value: 'all', label: 'All' }, ...ACCOUNTS.map(a => ({ value: a, label: a }))],
+        chipText: (o, { count, total }) => `${o.label} (${count}) · ${fmtZARWhole(total)}`,
+    },
+    footer: ({ filter, stats }) => {
+        const total = document.createElement('span');
+        total.className = 'font-semibold text-slate-800';
+        total.textContent = `${filter === 'all' ? 'Total' : filter} contributed ${formatCurrency(stats[filter].total)}`;
+        return [total];
+    },
+    empty: { none: 'No transactions yet. Type one above, for example "tfsa etf 3000".' },
+    quickAdd: { parse: (text) => parseInvestmentQuickAdd(text), preview: quickAddPreviewFor, onSubmit: submitQuickAdd },
+    onChange: ({ item, field }) => {
+        // A BTC quantity belongs to Crypto rows only.
+        if (field === 'type' && item.type !== 'Crypto') item.cryptoValue = '';
+        updatePerformanceDisplay();
+        saveInvestments();
+    },
+    onRemove: () => { updatePerformanceDisplay(); saveInvestments(); },
+});
 
 const renderFullInvestmentUI = () => {
     // Update Inputs from State
@@ -119,12 +208,6 @@ const renderFullInvestmentUI = () => {
     renderTransactions();
     updatePerformanceDisplay();
 };
-
-const createTransactionItem = (item) => createRowElement(item, {
-    gridTemplateColumns: '1fr 2fr 1fr 0.8fr 1fr auto',
-    fields: ['date', 'description', 'amount', 'cryptoValue', { select: ['Discretionary', 'TFSA', 'Crypto'] }],
-    compact: true,
-});
 
 const calculatePerformance = (type, currentValueStr, invId, gainId, annId, moneyGainId) => {
     const currentValue = parseFloat(currentValueStr) || 0;
@@ -160,66 +243,6 @@ const calculatePerformance = (type, currentValueStr, invId, gainId, annId, money
         netAfterTax:  document.getElementById(`net-savings-after-tax-${typeKey}`),
     }, { fmt: fmtZAR, mutedNet: typeKey === 'discretionary' });
 };
-
-// Investment Event Handlers
-addTransactionBtn.addEventListener('click', () => {
-    const today = new Date().toISOString().split('T')[0];
-    investmentData.transactions.push({
-        id: generateId(),
-        date: today,
-        description: '',
-        amount: '',
-        cryptoValue: '',
-        type: 'Discretionary'
-    });
-    renderTransactions();
-    updatePerformanceDisplay();
-    debouncedSave('transactions_investments', generateInvestmentCSV);
-});
-
-transactionList.addEventListener('input', (e) => {
-    const target = e.target;
-    const itemDiv = target.closest('[data-id]');
-    if (!itemDiv) return;
-    const id = itemDiv.dataset.id;
-    const item = investmentData.transactions.find(i => i.id === id);
-    if (!item) return;
-
-    if (target.classList.contains('description-input')) item.description = target.value;
-    else if (target.classList.contains('amount-input')) { /* stored by the row's amount binding */ }
-    else if (target.classList.contains('date-input')) item.date = target.value;
-    else if (target.classList.contains('type-input')) {
-        item.type = target.value;
-        const cryptoInputDiv = itemDiv.querySelector('.crypto-value-input').parentElement;
-        if (item.type === 'Crypto') {
-            cryptoInputDiv.classList.remove('invisible');
-        } else {
-            cryptoInputDiv.classList.add('invisible');
-            item.cryptoValue = '';
-            cryptoInputDiv.querySelector('input').value = '';
-        }
-    } else if (target.classList.contains('crypto-value-input')) {
-        item.cryptoValue = target.value;
-    }
-
-    updatePerformanceDisplay();
-    debouncedSave('transactions_investments', generateInvestmentCSV);
-});
-
-transactionList.addEventListener('click', (e) => {
-    if (e.target.closest('.remove-btn')) {
-        const itemDiv = e.target.closest('[data-id]');
-        deleteWithUndo({
-            getList: () => investmentData.transactions,
-            id: itemDiv.dataset.id,
-            onChange: () => {
-                renderTransactions();
-                updatePerformanceDisplay();
-                debouncedSave('transactions_investments', generateInvestmentCSV);
-            },
-        });
-    }
-});
 
 marginalRateInput.addEventListener('input', (e) => {
     const v = parseFloat(e.target.value);

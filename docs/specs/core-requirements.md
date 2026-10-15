@@ -42,7 +42,7 @@ Every displayed amount — summary cards, tables, tooltips, chart axes and chart
 | **Provision** | Money set aside for a known future obligation, treated as already spent for planning purposes. Each provision has a description, amount, and a target date. |
 | **Future Cost** | An anticipated expense at a specific future date. Unlike provisions, future costs are not yet deducted — they are projected against a chosen future date. Each future cost has a description, amount, and date. |
 | **Commitment** | The umbrella term for a debt, a provision or a future cost (its *kind*). The Budget tab shows all commitments in one ledger, sorted soonest-first with undated rows (all debts, fresh rows) at the top. Changing a commitment's kind moves it between the three lists and keeps its id, description and amount; a debt has no due date, so becoming a debt drops the date (`changeCommitmentType`). Storage is unchanged: `budgetData` keeps `debts`, `provisions` and `futureCosts`, and the budget CSV layout is the same. |
-| **Ledger** | The shared editable-table pattern (`createLedger` in `src/lib/ledger.js`): rows, filter chips with counts, footer totals, quick-add with a preview line, empty state and delete-with-undo. Quick-add lines are split by the general `parseQuickAddTokens(text, { keywords })` (`src/lib/quick-add.js`); each tab maps keywords to its own row type. The Budget Commitments table is the first ledger; Investments, Debt and RA follow (UX-4.2 to UX-4.4). |
+| **Ledger** | The shared editable-table pattern (`createLedger` in `src/lib/ledger.js`): rows, filter chips with counts, footer totals, quick-add with a preview line, empty state and delete-with-undo. Quick-add lines are split by the general `parseQuickAddTokens(text, { keywords })` (`src/lib/quick-add.js`); each tab maps keywords to its own row type. The Budget Commitments table is the first ledger; the Investments transactions (filtered by account), Debt extra repayments (by calendar year) and RA contributions (by SA tax year) use the same component, newest first, with quick-add lines dated today when no date is typed (UX-4.2 to UX-4.4). Edits refresh only the filter chips and footer; a generated filter (a year) whose last row is edited away stays selected until the next full render. |
 
 ### 1.1a Future Cost → Provision
 
@@ -315,8 +315,11 @@ Total BTC = sum of btc_value across all Crypto transactions
 ### 2.4 Transaction Rules
 
 - Each transaction belongs to exactly one account.
-- Transactions are displayed sorted by date descending (most recent first).
-- BTC quantity is only relevant for Crypto transactions; it is not applicable to other account types.
+- Transactions are displayed sorted by date descending (most recent first), in a ledger (see **Ledger**, §1.1) filtered by account (All, Discretionary, TFSA, Crypto), each filter showing its count and total contributed.
+- BTC quantity is only relevant for Crypto transactions; it is not applicable to other account types. Moving a transaction away from Crypto clears its BTC quantity.
+- Account colours are the same everywhere: the ledger's account chip uses the History donut colours (Discretionary indigo `#6366f1`, TFSA emerald `#10b981`, Crypto amber `#f59e0b`).
+- Quick-add: `tfsa`, `crypto`/`btc` and `disc`/`discretionary` pick the account (default Discretionary); a number followed by `btc` is the BTC quantity, not the rand amount, and makes the row Crypto unless another account is named. A line without a date is dated today.
+- The investments CSV layout is unchanged.
 
 ---
 

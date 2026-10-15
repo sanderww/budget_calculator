@@ -106,3 +106,49 @@ export function parseQuickAddTokens(text, { keywords = {}, units: unitWords = []
     const description = rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : '';
     return { empty: false, keyword, description, amount, date, units };
 }
+
+// ---- Transaction tabs (UX-4.2 to UX-4.4) -----------------------------------
+// Rows on these tabs record things that already happened, so a line without
+// a date is dated `today` (a YYYY-MM-DD string or a function returning one;
+// default todayISO). Both a description and an amount are required.
+// Returns the row fields, or { error: 'empty' | 'missing', missing: [...] }.
+const missingParts = (t) => {
+    if (t.empty) return { error: 'empty', missing: ['description', 'amount'] };
+    const missing = [];
+    if (!t.description) missing.push('description');
+    if (t.amount === null) missing.push('amount');
+    return missing.length ? { error: 'missing', missing } : null;
+};
+
+// Debt extra repayments and RA contributions: "5k bonus repayment".
+// → { description, amount, date }
+export function parseTransactionQuickAdd(text, { today = todayISO } = {}) {
+    const t = parseQuickAddTokens(text, { defaultDate: today });
+    return missingParts(t) || { description: t.description, amount: t.amount, date: t.date };
+}
+
+// Investment accounts by quick-add keyword (case-insensitive).
+export const INVESTMENT_KEYWORDS = {
+    tfsa: 'TFSA', crypto: 'Crypto', btc: 'Crypto', disc: 'Discretionary', discretionary: 'Discretionary',
+};
+
+// Investment transactions: "tfsa etf 3000", "luno 0.012 btc 6k".
+// → { account, description, amount, date, btc }
+// account: the keyword's account, else Crypto when a BTC quantity was typed,
+// else Discretionary. A number followed by "btc" is the BTC quantity, not
+// the rand amount; it is kept only on Crypto rows (btc '' otherwise), so an
+// explicit "tfsa"/"disc" wins over a BTC quantity.
+export function parseInvestmentQuickAdd(text, { today = todayISO } = {}) {
+    const t = parseQuickAddTokens(text, { keywords: INVESTMENT_KEYWORDS, units: ['btc'], defaultDate: today });
+    const bad = missingParts(t);
+    if (bad) return bad;
+    const hasBtc = 'btc' in t.units;
+    const account = t.keyword || (hasBtc ? 'Crypto' : 'Discretionary');
+    return {
+        account,
+        description: t.description,
+        amount: t.amount,
+        date: t.date,
+        btc: account === 'Crypto' && hasBtc ? t.units.btc : '',
+    };
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseQuickAddTokens, todayISO } from '../src/lib/quick-add.js';
+import { parseQuickAddTokens, todayISO, parseTransactionQuickAdd, parseInvestmentQuickAdd } from '../src/lib/quick-add.js';
 
 const BUDGET = { keywords: { debt: 'debt', provision: 'provision' } };
 const INVEST = {
@@ -64,5 +64,65 @@ describe('todayISO', () => {
     it('formats the local date as YYYY-MM-DD', () => {
         expect(todayISO(new Date(2026, 0, 5, 23, 30))).toBe('2026-01-05');
         expect(todayISO()).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+});
+
+const TODAY = { today: () => '2026-10-15' };
+
+describe('parseTransactionQuickAdd (Debt, RA)', () => {
+    it.each([
+        ['5k bonus repayment', { description: 'Bonus repayment', amount: 5000, date: '2026-10-15' }],
+        ['monthly 2,500 2026-03-01', { description: 'Monthly', amount: 2500, date: '2026-03-01' }],
+        ['extra R 9,500 jun 2026', { description: 'Extra', amount: 9500, date: '2026-06-01' }],
+        ['top-up 12000 feb 2027', { description: 'Top-up', amount: 12000, date: '2027-02-01' }],
+    ])('reads %j', (text, expected) => {
+        expect(parseTransactionQuickAdd(text, TODAY)).toEqual(expected);
+    });
+
+    it('dates a row without a date today by default', () => {
+        expect(parseTransactionQuickAdd('bonus 5k').date).toBe(todayISO());
+    });
+
+    it('accepts a fixed date string for today', () => {
+        expect(parseTransactionQuickAdd('bonus 5k', { today: '2025-01-01' }).date).toBe('2025-01-01');
+    });
+
+    it('names what is missing', () => {
+        expect(parseTransactionQuickAdd('  ', TODAY)).toEqual({ error: 'empty', missing: ['description', 'amount'] });
+        expect(parseTransactionQuickAdd('bonus', TODAY)).toEqual({ error: 'missing', missing: ['amount'] });
+        expect(parseTransactionQuickAdd('5k', TODAY)).toEqual({ error: 'missing', missing: ['description'] });
+    });
+});
+
+describe('parseInvestmentQuickAdd', () => {
+    it.each([
+        ['etf top-up 5k', { account: 'Discretionary', description: 'Etf top-up', amount: 5000, date: '2026-10-15', btc: '' }],
+        ['tfsa etf 3000 2026-03-02', { account: 'TFSA', description: 'Etf', amount: 3000, date: '2026-03-02', btc: '' }],
+        ['TFSA etf 3000', { account: 'TFSA', description: 'Etf', amount: 3000, date: '2026-10-15', btc: '' }],
+        ['disc shares 1k', { account: 'Discretionary', description: 'Shares', amount: 1000, date: '2026-10-15', btc: '' }],
+        ['discretionary shares 1k', { account: 'Discretionary', description: 'Shares', amount: 1000, date: '2026-10-15', btc: '' }],
+        ['crypto luno 2k', { account: 'Crypto', description: 'Luno', amount: 2000, date: '2026-10-15', btc: '' }],
+        ['btc buy 3k', { account: 'Crypto', description: 'Buy', amount: 3000, date: '2026-10-15', btc: '' }],
+        ['crypto luno 0.012 btc 6k', { account: 'Crypto', description: 'Luno', amount: 6000, date: '2026-10-15', btc: 0.012 }],
+    ])('reads %j', (text, expected) => {
+        expect(parseInvestmentQuickAdd(text, TODAY)).toEqual(expected);
+    });
+
+    it('treats "0.012 btc" as the BTC quantity, not the rand amount, and makes the row Crypto', () => {
+        expect(parseInvestmentQuickAdd('luno 0.012 btc 6000', TODAY))
+            .toEqual({ account: 'Crypto', description: 'Luno', amount: 6000, date: '2026-10-15', btc: 0.012 });
+        expect(parseInvestmentQuickAdd('luno 0.012 btc', TODAY))
+            .toEqual({ error: 'missing', missing: ['amount'] });
+    });
+
+    it('lets an explicit non-Crypto account win and drops the BTC quantity', () => {
+        expect(parseInvestmentQuickAdd('tfsa etf 0.5 btc 2k', TODAY))
+            .toEqual({ account: 'TFSA', description: 'Etf', amount: 2000, date: '2026-10-15', btc: '' });
+    });
+
+    it('names what is missing', () => {
+        expect(parseInvestmentQuickAdd('', TODAY)).toEqual({ error: 'empty', missing: ['description', 'amount'] });
+        expect(parseInvestmentQuickAdd('tfsa 3k', TODAY)).toEqual({ error: 'missing', missing: ['description'] });
+        expect(parseInvestmentQuickAdd('tfsa', TODAY)).toEqual({ error: 'missing', missing: ['description', 'amount'] });
     });
 });

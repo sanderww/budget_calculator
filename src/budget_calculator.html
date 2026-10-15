@@ -448,26 +448,19 @@
                             </div>
                         </div>
 
-                        <!-- Transactions -->
-                        <div class="card">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Transactions</h2>
-                                <button id="add-transaction" class="btn btn-secondary text-sm">+ Add
-                                    Transaction</button>
-                            </div>
-
-                            <!-- Header Row -->
-                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
-                                style="grid-template-columns: 1fr 2fr 1fr 1fr auto;">
-                                <div>Date</div>
-                                <div>Description</div>
-                                <div>Amount</div>
-                                <div>BTC</div>
-                                <div>Account</div>
-                                <div></div>
-                            </div>
-
+                        <!-- Transactions ledger (UX-4.2) -->
+                        <div class="card" id="transactions-card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Transactions</h2>
+                            <label for="transaction-quick-add" class="sr-only">Add a transaction</label>
+                            <input type="text" id="transaction-quick-add" class="input-field" autocomplete="off"
+                                placeholder="Add a transaction — e.g. &quot;tfsa etf 3000&quot; or &quot;luno 0.012 btc 6k&quot;"
+                                aria-describedby="transaction-quick-add-preview">
+                            <p id="transaction-quick-add-preview" class="quick-add-preview" aria-live="polite"></p>
+                            <div id="transaction-filters" class="flex flex-wrap gap-2 mt-3 mb-3" role="group"
+                                aria-label="Filter transactions by account"></div>
+                            <div id="transaction-head" class="ledger-head inv-ledger" aria-hidden="true"></div>
                             <div id="transaction-list" class="space-y-2"></div>
+                            <div id="transaction-footer" class="ledger-footer"></div>
                         </div>
 
             </div>

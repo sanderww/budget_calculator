@@ -385,7 +385,8 @@ input[type="number"].input-field {
     font-weight: 600;
 }
 
-.commitment-footer {
+.commitment-footer,
+.ledger-footer {
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
@@ -399,7 +400,8 @@ input[type="number"].input-field {
     /* slate-600 */
 }
 
-.commitment-footer:empty {
+.commitment-footer:empty,
+.ledger-footer:empty {
     display: none;
 }
 
@@ -439,11 +441,127 @@ input[type="number"].input-field {
 }
 
 /* Ledger row picked from a chart marker (UX-2.3), cleared after 1.5 s. */
-.commitment-row.row-highlight {
+.commitment-row.row-highlight,
+.ledger-row.row-highlight {
     background-color: #eff6ff;
     /* blue-50 */
     box-shadow: 0 0 0 2px #93c5fd;
     /* blue-300 */
     border-radius: 0.5rem;
     transition: background-color 0.3s, box-shadow 0.3s;
+}
+
+/* ---- Transaction ledgers (UX-4.2 to UX-4.4) -------------------------------
+   Investments (.inv-ledger): Date · Description · Amount · Account · BTC.
+   Debt and RA (.tx-ledger): Date · Description · Amount. Cells are placed by
+   their data-col. Phone: stacked areas; from 640px: one line per row under
+   the column header (the header spans follow the column order). */
+.ledger-row {
+    display: grid;
+    gap: 0.5rem;
+    align-items: center;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+    /* slate-100 */
+}
+
+.ledger-row > [data-col="date"] { grid-area: date; }
+.ledger-row > [data-col="description"] { grid-area: desc; }
+.ledger-row > [data-col="amount"] { grid-area: amount; }
+.ledger-row > [data-col="type"] { grid-area: account; justify-self: start; }
+.ledger-row > [data-col="cryptoValue"] { grid-area: btc; }
+.ledger-row > .remove-btn { grid-area: remove; justify-self: end; }
+
+.ledger-row.tx-ledger {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+        "date amount remove"
+        "desc desc desc";
+}
+
+.ledger-row.inv-ledger {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+    grid-template-areas:
+        "account date remove"
+        "desc desc desc"
+        "amount btc btc";
+}
+
+.ledger-head {
+    display: none;
+}
+
+@media (min-width: 640px) {
+    .ledger-row.tx-ledger,
+    .ledger-head.tx-ledger {
+        grid-template-columns: 10rem minmax(0, 2fr) minmax(0, 1fr) 2.5rem;
+    }
+
+    .ledger-row.tx-ledger {
+        grid-template-areas: "date desc amount remove";
+    }
+
+    .ledger-row.inv-ledger,
+    .ledger-head.inv-ledger {
+        grid-template-columns: 10rem minmax(0, 1.6fr) minmax(0, 1fr) 9rem 7rem 2.5rem;
+    }
+
+    .ledger-row.inv-ledger {
+        grid-template-areas: "date desc amount account btc remove";
+    }
+
+    .ledger-head {
+        display: grid;
+        gap: 0.5rem;
+        padding: 0 0 0.375rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #64748b;
+        /* slate-500 */
+    }
+}
+
+/* Investment account select styled as a chip. The border and dot colours are
+   the History donut's (HISTORY_CATEGORIES in src/charts/chart_history.js);
+   the ledger keeps data-value equal to the selected account. */
+.input-field.account-chip {
+    width: auto;
+    max-width: 100%;
+    padding: 0.25rem 0.625rem 0.25rem 1.5rem;
+    border: 1px solid var(--account-color, #cbd5e1);
+    border-radius: 9999px;
+    background-color: var(--account-tint, white);
+    background-image: radial-gradient(circle, var(--account-color, #94a3b8) 0 0.25rem, transparent 0.27rem);
+    background-repeat: no-repeat;
+    background-position: 0.5rem center;
+    background-size: 0.75rem 0.75rem;
+    color: var(--account-text, #334155);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.input-field.account-chip:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+}
+
+.account-chip[data-value="Discretionary"] {
+    --account-color: #6366f1;
+    --account-tint: #eef2ff;
+    --account-text: #4338ca;
+}
+
+.account-chip[data-value="TFSA"] {
+    --account-color: #10b981;
+    --account-tint: #ecfdf5;
+    --account-text: #047857;
+}
+
+.account-chip[data-value="Crypto"] {
+    --account-color: #f59e0b;
+    --account-tint: #fffbeb;
+    --account-text: #b45309;
 }
