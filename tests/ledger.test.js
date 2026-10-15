@@ -189,6 +189,38 @@ describe('createLedger', () => {
         expect(ledger.getFilter()).toBe('all');
     });
 
+    it('mirrors a select cell\'s value into data-value so CSS can colour it', () => {
+        const sel = rowFor('Top-up').querySelector('select[data-field="type"]');
+        expect(sel.dataset.value).toBe('Discretionary');
+        expect(rowFor('First').querySelector('select').dataset.value).toBe('TFSA');
+        typeInto(sel, 'Crypto', 'change');
+        expect(sel.dataset.value).toBe('Crypto');
+        expect(data[2].type).toBe('Crypto');
+    });
+
+    it('keeps a generated filter whose last row was edited away until the next full render', () => {
+        chip('2025').click();
+        expect(descs()).toEqual(['First']);
+        // The only 2025 row moves to 2026: the 2025 option is gone from the data.
+        typeInto(rowFor('First').querySelector('.date-input'), '2026-07-01');
+        expect(data[0].date).toBe('2026-07-01');
+        // The list was not re-rendered, so the chips must still say 2025.
+        expect(ledger.getFilter()).toBe('2025');
+        expect(chip('2025').getAttribute('aria-pressed')).toBe('true');
+        expect(chip('all').getAttribute('aria-pressed')).toBe('false');
+        expect(chip('all').textContent).toBe('All (3)');
+        expect(chip('2025').textContent).toBe('2025 (0)');
+        expect(descs()).toEqual(['First']);
+        expect($('footer').textContent).toBe('Total R 0.00');
+        expect(localStorage.getItem(STORAGE_KEY)).toBe('2025');
+        // The next full render falls back to All.
+        ledger.render();
+        expect(ledger.getFilter()).toBe('all');
+        expect(chip('2025')).toBeNull();
+        expect(chip('all').getAttribute('aria-pressed')).toBe('true');
+        expect(descs()).toEqual(['First', 'Top-up', 'Coins']);
+    });
+
     it('shows the empty states', () => {
         chip('2025').click();
         data.splice(0, 1);

@@ -32,6 +32,9 @@
 //           is the catch-all (no match = every row); other options match
 //           row.group === value unless `match` is given.
 //       chipText?: (opt, { count, total }) => string   default "Label (n)"
+//       A generated option whose last row is edited away stays selected (and
+//       its chip stays, with a count of 0) until the next full render, since
+//       edits refresh only the chips and footer, never the list.
 //   },
 //   footer?: ({ filter, option, stats, visible }) => Node[],
 //       Default: "Total R x" for the visible rows. stats maps each option
@@ -86,11 +89,19 @@ export function createLedger(config) {
     };
     const matches = (opt, row, first) => (opt === first ? true
         : opt.match ? opt.match(row) : row.group === opt.value);
+    // The option the last full render showed. Between full renders (edits
+    // only refresh the chips and footer), a generated option whose last row
+    // was edited away is kept, so the chips never claim a filter the list
+    // does not show; the next full render falls back to the first option.
+    let shown = null;
     // The remembered value is kept until rows exist that prove it stale, so a
     // generated filter (a year) survives a render before the data has loaded.
-    const resolve = (rows) => {
+    const resolve = (rows, { keep = false } = {}) => {
         const opts = optionsFor(rows);
         let opt = opts.find(o => o.value === filter);
+        if (!opt && keep && shown && shown.value === filter) {
+            return { opts: [...opts, shown], opt: shown };
+        }
         if (!opt) {
             opt = opts[0];
             if (rows.length || filter === null) filter = opt.value;
@@ -103,7 +114,7 @@ export function createLedger(config) {
             try { localStorage.setItem(filters.storageKey, value); } catch { /* per-viewer convenience only */ }
         }
     };
-    const getFilter = () => resolve(getRows()).opt.value;
+    const getFilter = () => resolve(getRows(), { keep: true }).opt.value;
 
     const statsFor = (rows, opts) => {
         const stats = {};
@@ -158,7 +169,7 @@ export function createLedger(config) {
     // Chips and footer only (used while typing: never rebuilds the rows).
     const renderFooter = () => {
         const rows = getRows();
-        const { opts, opt } = resolve(rows);
+        const { opts, opt } = resolve(rows, { keep: true });
         const stats = statsFor(rows, opts);
         renderFilters(opts, opt, stats);
         renderFooterFrom(rows, opts, opt, stats);
@@ -171,6 +182,7 @@ export function createLedger(config) {
     const render = () => {
         const rows = getRows();
         const { opts, opt } = resolve(rows);
+        shown = opt;
         const stats = statsFor(rows, opts);
         renderHead();
         renderFilters(opts, opt, stats);
@@ -198,7 +210,7 @@ export function createLedger(config) {
     // Switch to the catch-all filter when the current one hides `row`.
     const ensureVisible = (row) => {
         const rows = getRows();
-        const { opts, opt } = resolve(rows);
+        const { opts, opt } = resolve(rows, { keep: true });
         if (!matches(opt, row, opts[0])) setFilter(opts[0].value);
     };
 

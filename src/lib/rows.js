@@ -206,7 +206,8 @@ export const COMMITMENT_KIND_LABELS = { debt: 'Debt', provision: 'Provision', fu
 //   render(item, ctx) → Node, for type 'custom'
 // Every cell root carries data-col=key; every input carries data-field=key and
 // writes its value back to item[key] as it is edited (amounts as numbers via
-// bindAmountInput, selects on change, the rest on input). ctx is { group }.
+// bindAmountInput, selects on change, the rest on input). A select also keeps
+// data-value equal to its shown value (a styling hook). ctx is { group }.
 const kebab = (key) => key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
 
 export function createLedgerCell(item, col, ctx = {}) {
@@ -229,7 +230,13 @@ export function createLedgerCell(item, col, ctx = {}) {
                 if (String(item[col.key] ?? '') === String(value)) option.selected = true;
                 input.appendChild(option);
             }
-            input.addEventListener('change', () => { item[col.key] = input.value; });
+            // The shown value is mirrored into data-value, so CSS can colour
+            // a select styled as a chip (e.g. the Investments account chip).
+            input.dataset.value = input.value;
+            input.addEventListener('change', () => {
+                item[col.key] = input.value;
+                input.dataset.value = input.value;
+            });
         } else {
             input = document.createElement('input');
             if (col.type !== 'amount') {
