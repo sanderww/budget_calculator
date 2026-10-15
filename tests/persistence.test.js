@@ -39,3 +39,17 @@ describe('retryFailedSaves', () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 });
+
+describe('#save-status markup', () => {
+    it('is a real button inside a polite live region (the button keeps its role)', async () => {
+        const { readFileSync } = await import('node:fs');
+        const { resolve } = await import('node:path');
+        const html = readFileSync(resolve(process.cwd(), 'src/budget_calculator.html'), 'utf8');
+        document.body.innerHTML = html.slice(html.indexOf('<header'), html.indexOf('</header>') + 9);
+        const chip = document.getElementById('save-status');
+        expect(chip.tagName).toBe('BUTTON');
+        expect(chip.hasAttribute('role')).toBe(false);
+        expect(chip.parentElement.getAttribute('role')).toBe('status');
+        expect(chip.parentElement.getAttribute('aria-live')).toBe('polite');
+    });
+});
