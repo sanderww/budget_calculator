@@ -8,7 +8,9 @@ import {
     generateDebtCSV as _generateDebtCSV,
 } from '../calculations.js';
 import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
+import { generateId, bindAmountInput } from '../lib/rows.js';
+import { createLedger, strong } from '../lib/ledger.js';
+import { parseTransactionQuickAdd, todayISO } from '../lib/quick-add.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // --- DEBT CALCULATOR LOGIC ---
@@ -16,8 +18,6 @@ let debtData = {
     repayments: []
 };
 
-const repaymentList = document.getElementById('repayment-list');
-const addRepaymentBtn = document.getElementById('add-repayment');
 const loadDebtCsvBtn = document.getElementById('load-debt-csv');
 
 // Inputs
@@ -174,66 +174,95 @@ const calculateDebtProjection = () => {
     }
 };
 
-const renderRepayments = () => {
-    repaymentList.innerHTML = '';
-    if (debtData.repayments.length === 0) {
-        repaymentList.innerHTML = emptyStateHTML('No extra repayments added.');
-    } else {
-        // Sort by date descending (latest on top)
-        const sorted = [...debtData.repayments].sort(sortByDateThenIdDesc);
-        sorted.forEach(item => {
-            repaymentList.appendChild(createRowElement(item, {
-                gridTemplateColumns: '1fr 2fr 1fr auto',
-                fields: ['date', 'description', 'amount'],
-                compact: true,
-            }));
-        });
+// ---- Extra repayments ledger (UX-4.3) ---------------------------------------
+// Built on the shared ledger (src/lib/ledger.js) over debtData.repayments,
+// newest-first. Rows are grouped by calendar year, the same way the History
+// tab groups debt repayments (the YYYY part of the ISO date).
+const yearOf = (iso) => {
+    const year = iso ? String(iso).split('-')[0] : '';
+    return year.length === 4 ? year : '';
+};
+const saveDebt = () => debouncedSave('transactions_debt', generateDebtCSV);
+
+const MISSING_TEXT = {
+    'description,amount': 'Add a description and an amount.',
+    description: 'Add a description.',
+    amount: 'Add an amount, e.g. 5k or 5000.',
+};
+const quickAddPreviewFor = (parsed) => {
+    if (parsed.error === 'empty') {
+        return { state: 'idle', content: 'Press Enter on an empty field to add a blank row dated today.' };
     }
-    calculateDebtProjection();
+    if (parsed.error) return { state: 'error', content: MISSING_TEXT[parsed.missing.join(',')] };
+    return { state: 'ok', content: ['Will add ', strong(parsed.description), ' · ',
+        strong(formatCurrency(parsed.amount)), ' on ', strong(parsed.date)] };
 };
 
-// Event Listeners
-addRepaymentBtn.addEventListener('click', () => {
-    const today = new Date().toISOString().split('T')[0];
-    debtData.repayments.push({
-        id: generateId(),
-        date: today,
-        description: '',
-        amount: ''
-    });
+const addRepayment = (fields) => {
+    const item = { id: generateId(), ...fields };
+    debtData.repayments.push(item);
+    ledger.ensureVisible({ item, group: yearOf(item.date) });
     renderRepayments();
-    debouncedSave('transactions_debt', generateDebtCSV);
-});
+    saveDebt();
+    return item;
+};
 
-repaymentList.addEventListener('input', (e) => {
-    const target = e.target;
-    const itemDiv = target.closest('[data-id]');
-    if (!itemDiv) return;
-    const id = itemDiv.dataset.id;
-    const item = debtData.repayments.find(i => i.id === id);
-    if (!item) return;
-
-    if (target.classList.contains('description-input')) item.description = target.value;
-    else if (target.classList.contains('amount-input')) { /* stored by the row's amount binding */ }
-    else if (target.classList.contains('date-input')) item.date = target.value;
-
-    calculateDebtProjection();
-    debouncedSave('transactions_debt', generateDebtCSV);
-});
-
-repaymentList.addEventListener('click', (e) => {
-    if (e.target.closest('.remove-btn')) {
-        const itemDiv = e.target.closest('[data-id]');
-        deleteWithUndo({
-            getList: () => debtData.repayments,
-            id: itemDiv.dataset.id,
-            onChange: () => {
-                renderRepayments();
-                debouncedSave('transactions_debt', generateDebtCSV);
-            },
-        });
+// Enter: add the parsed row and clear the field. On an empty field, add a
+// blank row dated today and focus its description.
+const submitQuickAdd = (parsed) => {
+    if (parsed.error === 'empty') {
+        const item = addRepayment({ date: todayISO(), description: '', amount: '' });
+        ledger.rowElement(item.id)?.querySelector('.description-input')?.focus();
+        return false;
     }
+    if (parsed.error) return false;
+    addRepayment({ date: parsed.date, description: parsed.description, amount: parsed.amount });
+    return true;
+};
+
+const ledger = createLedger({
+    elements: {
+        list: document.getElementById('repayment-list'),
+        filters: document.getElementById('repayment-filters'),
+        footer: document.getElementById('repayment-footer'),
+        head: document.getElementById('repayment-head'),
+        quickAdd: document.getElementById('repayment-quick-add'),
+        preview: document.getElementById('repayment-quick-add-preview'),
+    },
+    getRows: () => debtData.repayments.map(item => ({ item, group: yearOf(item.date) })),
+    getList: () => debtData.repayments,
+    columns: [
+        { key: 'date', type: 'date', label: 'Date' },
+        { key: 'description', type: 'text', label: 'Description' },
+        { key: 'amount', type: 'amount', label: 'Amount' },
+    ],
+    rowClass: 'ledger-row tx-ledger',
+    filters: {
+        storageKey: 'debt.repaymentFilter',
+        // All, then one chip per calendar year present, newest first.
+        options: (rows) => [{ value: 'all', label: 'All' },
+            ...[...new Set(rows.map(r => r.group).filter(Boolean))].sort().reverse()
+                .map(year => ({ value: year, label: year }))],
+    },
+    footer: ({ filter, stats }) => {
+        const total = document.createElement('span');
+        total.className = 'font-semibold text-slate-800';
+        total.textContent = `${filter === 'all' ? 'Total' : `${filter} total`} ${formatCurrency(stats[filter].total)}`;
+        return [total];
+    },
+    empty: {
+        none: 'No extra repayments yet. Type one above, for example "5k bonus repayment".',
+        filtered: (opt) => `No extra repayments in ${opt.label}.`,
+    },
+    quickAdd: { parse: (text) => parseTransactionQuickAdd(text), preview: quickAddPreviewFor, onSubmit: submitQuickAdd },
+    onChange: () => { calculateDebtProjection(); saveDebt(); },
+    onRemove: () => { calculateDebtProjection(); saveDebt(); },
 });
+
+const renderRepayments = () => {
+    ledger.render();
+    calculateDebtProjection();
+};
 
 DEBT_INPUT_BINDINGS.forEach(([key, input]) => {
     if (DEBT_AMOUNT_INPUTS.has(input)) {

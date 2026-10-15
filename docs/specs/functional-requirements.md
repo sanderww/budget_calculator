@@ -253,14 +253,18 @@ Fixed set of loan parameters:
 
 **Upcoming 25th logic**: if today's date > 25, next payment is the 25th of next month; otherwise the 25th of the current month.
 
-### 3.2 Extra Repayments
+### 3.2 Extra Repayments ledger (UX-4.3)
 
-- Dynamic list of extra (additional) repayments made toward the mortgage, each with:
-  - **Date** (date)
-  - **Description** (text)
-  - **Amount** (R, numeric)
-- Users can add and remove entries.
-- Displayed sorted by date descending.
+The **Extra Repayments** card is a ledger built on the shared `createLedger` (§1.2) over `debtData.repayments`. Storage and the debt CSV layout (§7.1) are unchanged; parse → generate reproduces a debt CSV byte-for-byte.
+
+- **Columns:** **Date** · **Description** · **Amount** · delete, under a header row (`#repayment-head`, shown from 640px; phones stack date, amount and delete above the description).
+- **Order:** newest first (`sortByDateThenIdDesc`).
+- **Filters by calendar year:** **All (n)** plus one chip per year present, newest year first, e.g. *2026 (2)*. A repayment's year is the `YYYY` part of its ISO date, the same grouping the History tab uses for *Debt Repaid*; rows without a valid date appear only under All. The choice is remembered per browser in `localStorage` (`debt.repaymentFilter`). When an edit moves the last row of the selected year to another year, that year stays selected (count 0) until the next full render, which falls back to All.
+- **Footer:** *Total R x* on All, or *2026 total R x* for the selected year.
+- **Edits** write straight to the repayment and re-run the projection (§3.3) and the KPI strip at once, then auto-save.
+- **Quick-add:** *Add a repayment — e.g. "5k bonus repayment" or "extra 4000 2026-03-25"*, with a live preview (*Will add **Bonus repayment** · **R 5,000.00** on **2026-10-15***). Parsing is `parseTransactionQuickAdd(text)` in `src/lib/quick-add.js` (no keywords): date as in §1.3, **today** when none is typed; a description and an amount are both required. **Enter** adds the row (switching the filter to All if its year is hidden) and clears the field; **Enter on an empty field** adds a blank row dated today and focuses its description. There is no **+ Add Repayment** button.
+- **Delete** uses the shared delete-with-undo (§0.5).
+- **Empty states:** *No extra repayments yet. Type one above, for example "5k bonus repayment".*; under a year with no rows, *No extra repayments in 2026.*
 
 ### 3.3 Projection Results
 
@@ -596,6 +600,7 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `changeCommitmentType(data, id, newKind)` | Moves a budget commitment between `debts` / `provisions` / `futureCosts` (kinds `'debt'`, `'provision'`, `'futureCost'`), keeping id, description and amount; drops the date when moving to debt. Returns the input by reference on a no-op |
 | `summariseCommitments(data)` | Per-kind and overall counts and amount totals of the commitments (blank or non-numeric amounts count as 0). Kept as a tested pure helper; the ledger no longer uses it, because `createLedger` computes its filter counts and footer totals itself |
 | `parseInvestmentQuickAdd(text, { today? })` (`src/lib/quick-add.js`) | Parses an Investments quick-add line into `{ account, description, amount, date, btc }` or `{ error, missing }` (§2.2); the date defaults to today |
+| `parseTransactionQuickAdd(text, { today? })` (`src/lib/quick-add.js`) | Parses a Debt or RA quick-add line into `{ description, amount, date }` or `{ error, missing }` (§3.2, §4.1); the date defaults to today |
 | `parseQuickAdd(text)` | Parses a Budget quick-add line into `{ kind, description, amount, date }` or `{ error, missing }` (§1.3); built on `parseQuickAddTokens` in `src/lib/quick-add.js` |
 | `parseInvestmentCSV(text)` / `generateInvestmentCSV(data)` | Investment CSV serialization |
 | `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |

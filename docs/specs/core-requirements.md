@@ -336,7 +336,7 @@ Total BTC = sum of btc_value across all Crypto transactions
 | **Interest Rate** | Annual interest rate (%). |
 | **Loan Start Date** | When the loan originated. |
 | **Original Term** | Agreed loan duration in months. |
-| **Extra Repayments** | Additional voluntary payments made toward the principal, each with a date, description, and amount. |
+| **Extra Repayments** | Additional voluntary payments made toward the principal, each with a date, description, and amount. Shown newest first in a ledger filtered by **calendar year** (the `YYYY` of the date, matching how History groups *Debt Repaid*), with the year's total in the footer. Quick-add (`5k bonus repayment`) dates a line without a date today. The debt CSV layout is unchanged. |
 
 ### 3.2 Interest Calculation
 

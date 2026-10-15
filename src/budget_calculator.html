@@ -591,23 +591,19 @@
                             </div>
                         </div>
 
-                        <!-- Extra Repayments -->
-                        <div class="card lg:col-span-2">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Extra Repayments</h2>
-                                <button id="add-repayment" class="btn btn-secondary text-sm">+ Add Repayment</button>
-                            </div>
-
-                            <!-- Header Row -->
-                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
-                                style="grid-template-columns: 1fr 2fr 1fr auto;">
-                                <div>Date</div>
-                                <div>Description</div>
-                                <div>Amount</div>
-                                <div></div>
-                            </div>
-
+                        <!-- Extra Repayments ledger (UX-4.3) -->
+                        <div class="card lg:col-span-2" id="repayments-card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Extra Repayments</h2>
+                            <label for="repayment-quick-add" class="sr-only">Add an extra repayment</label>
+                            <input type="text" id="repayment-quick-add" class="input-field" autocomplete="off"
+                                placeholder="Add a repayment — e.g. &quot;5k bonus repayment&quot; or &quot;extra 4000 2026-03-25&quot;"
+                                aria-describedby="repayment-quick-add-preview">
+                            <p id="repayment-quick-add-preview" class="quick-add-preview" aria-live="polite"></p>
+                            <div id="repayment-filters" class="flex flex-wrap gap-2 mt-3 mb-3" role="group"
+                                aria-label="Filter repayments by year"></div>
+                            <div id="repayment-head" class="ledger-head tx-ledger" aria-hidden="true"></div>
                             <div id="repayment-list" class="space-y-2"></div>
+                            <div id="repayment-footer" class="ledger-footer"></div>
                         </div>
 
             </div>
