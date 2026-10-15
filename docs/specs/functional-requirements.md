@@ -112,20 +112,20 @@ The "Breakdown" subsection (Total Savings / Total Debts / Total Provisions / Tot
 Compact subsection inside the right-column Financial Summary card (no longer a standalone card in the main column). Splits available end-of-month money across investment categories:
 
 - **Inputs**:
-  - Available Money at End of Month (R)
-  - Mortgage Repayment (%, default 50)
-  - EFT (%, default 50)
-  - Crypto (%, default 0)
-- **Validation** (failures render as an inline red message below the Calculate button — element `#allocation-error` — instead of a browser `alert()`; the results list is hidden while an error is shown):
-  - Total percentage must not exceed 100%.
-  - At least one percentage must be > 0.
-  - Available money must exceed the monthly savings target.
-- **Outputs** (shown on "Calculate Allocation" click):
+  - Available Money at End of Month (R, formatted amount input)
+  - Mortgage Repayment (%, default 50, editable)
+  - ETF (%, default 50, editable; label "ETF" = exchange-traded fund; the element id stays `eft-percentage`)
+  - Crypto (%, read-only, always 100 − Mortgage − ETF; `#crypto-percentage`)
+- **Live update**: there is no Calculate button and no `#allocation-error`. Every input recalculates the results immediately.
+- **Self-balancing**: percentages are rounded to 0.1 and clamped to 0–100. If an edit would push Mortgage + ETF over 100, the other editable field is reduced to fit and a one-line hint (`#allocation-hint`, e.g. "ETF reduced to 20% so the total stays at 100%.") says so; the hint clears on the next edit that needs no reduction.
+- **Persistence**: Available money and the two percentages are saved to private config as `budget_alloc_available`, `budget_alloc_mortgage_pct` and `budget_alloc_etf_pct`, and restored at startup (and when Sample data is toggled) by `applyBudgetConfig()`. Blank available money removes its key. Missing percentage keys fall back to 50 / 50.
+- **Outputs**: one horizontal stacked bar (`#allocation-bar`: Required savings, Mortgage, ETF, Crypto; widths proportional to available money) with the four amounts under it:
   - Required Savings (= monthly savings target from summary)
   - Mortgage Repayment amount = (Available - Savings Target) * Mortgage%
-  - EFT amount = (Available - Savings Target) * EFT%
+  - ETF amount = (Available - Savings Target) * ETF%
   - Crypto amount = (Available - Savings Target) * Crypto%
-  - Total Allocated = Savings + Mortgage + EFT + Crypto
+  - **Leftover** row appears only when it is not zero.
+- **Shortfall**: if available money is below the savings target, the remainder amounts show as zero and `#allocation-note` states how much the available money is short.
 
 ### 1.7 Timeline Overview Chart (runway)
 

@@ -79,7 +79,7 @@ const toggleSampleData = async () => {
     updateTestModeUI();
     try {
         await loadConfigFromServer();           // config first — tabs read it
-        applyBudgetConfig();                    // prefill planned savings + buffer
+        applyBudgetConfig();                    // prefill planned savings, buffer, allocation
         await Promise.all([
             loadBudgetCSVFromServer(),
             loadInvestmentCSVFromServer(),
@@ -102,7 +102,7 @@ initPopovers();
 // --- INITIALIZATION ---
 (async () => {
     await loadConfigFromServer();          // must run before tabs that read the config
-    applyBudgetConfig();                   // prefill planned savings + buffer
+    applyBudgetConfig();                   // prefill planned savings, buffer, allocation
     try {
         await loadBudgetCSVFromServer();
     } catch (err) {

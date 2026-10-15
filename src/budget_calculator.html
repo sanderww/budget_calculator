@@ -234,41 +234,37 @@
                                     </div>
                                     <div class="grid grid-cols-3 gap-2">
                                         <div>
-                                            <label class="block text-[10px] font-medium text-slate-500 mb-1">Mortgage %</label>
+                                            <label for="mortgage-percentage" class="block text-[10px] font-medium text-slate-500 mb-1">Mortgage %</label>
                                             <input type="number" id="mortgage-percentage" class="input-field text-sm" placeholder="50" value="50" min="0" max="100" step="0.1">
                                         </div>
                                         <div>
-                                            <label class="block text-[10px] font-medium text-slate-500 mb-1">EFT %</label>
+                                            <label for="eft-percentage" class="block text-[10px] font-medium text-slate-500 mb-1">ETF %</label>
                                             <input type="number" id="eft-percentage" class="input-field text-sm" placeholder="50" value="50" min="0" max="100" step="0.1">
                                         </div>
                                         <div>
-                                            <label class="block text-[10px] font-medium text-slate-500 mb-1">Crypto %</label>
-                                            <input type="number" id="crypto-percentage" class="input-field text-sm" placeholder="0" min="0" max="100" step="0.1">
+                                            <label for="crypto-percentage" class="block text-[10px] font-medium text-slate-500 mb-1">Crypto % (remainder)</label>
+                                            <input type="number" id="crypto-percentage" class="input-field text-sm bg-slate-50 text-slate-500" value="0" readonly tabindex="-1" aria-readonly="true">
                                         </div>
                                     </div>
-                                    <button id="calculate-allocation" class="btn btn-primary w-full text-sm py-2">Calculate Allocation</button>
-                                    <p id="allocation-error" class="hidden text-xs text-red-600" role="alert"></p>
-                                    <div id="allocation-results" class="hidden space-y-1 text-xs">
-                                        <div class="flex justify-between p-1.5 bg-green-50 rounded">
-                                            <span class="text-slate-600">Required Savings</span>
-                                            <span id="allocation-savings" class="font-medium text-green-600">R 0.00</span>
+                                    <p id="allocation-hint" class="hidden text-xs text-amber-700" role="status" aria-live="polite"></p>
+                                    <div id="allocation-results" class="space-y-2 text-xs">
+                                        <div id="allocation-bar" class="flex h-4 w-full overflow-hidden rounded-full bg-slate-100" role="img" aria-label="Allocation of available money">
+                                            <div id="allocation-bar-savings" class="h-full bg-green-500" style="width:0%"></div>
+                                            <div id="allocation-bar-mortgage" class="h-full bg-blue-500" style="width:0%"></div>
+                                            <div id="allocation-bar-eft" class="h-full bg-purple-500" style="width:0%"></div>
+                                            <div id="allocation-bar-crypto" class="h-full bg-orange-500" style="width:0%"></div>
                                         </div>
-                                        <div class="flex justify-between p-1.5 bg-blue-50 rounded">
-                                            <span class="text-slate-600">Mortgage</span>
-                                            <span id="allocation-mortgage" class="font-medium text-blue-600">R 0.00</span>
+                                        <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                                            <div class="flex justify-between items-center gap-2"><span class="inline-flex items-center gap-1 text-slate-600"><span class="inline-block h-2 w-2 rounded-full bg-green-500"></span>Required savings</span><span id="allocation-savings" class="font-medium text-green-600 tabular-nums">R 0.00</span></div>
+                                            <div class="flex justify-between items-center gap-2"><span class="inline-flex items-center gap-1 text-slate-600"><span class="inline-block h-2 w-2 rounded-full bg-blue-500"></span>Mortgage</span><span id="allocation-mortgage" class="font-medium text-blue-600 tabular-nums">R 0.00</span></div>
+                                            <div class="flex justify-between items-center gap-2"><span class="inline-flex items-center gap-1 text-slate-600"><span class="inline-block h-2 w-2 rounded-full bg-purple-500"></span>ETF</span><span id="allocation-eft" class="font-medium text-purple-600 tabular-nums">R 0.00</span></div>
+                                            <div class="flex justify-between items-center gap-2"><span class="inline-flex items-center gap-1 text-slate-600"><span class="inline-block h-2 w-2 rounded-full bg-orange-500"></span>Crypto</span><span id="allocation-crypto" class="font-medium text-orange-600 tabular-nums">R 0.00</span></div>
                                         </div>
-                                        <div class="flex justify-between p-1.5 bg-purple-50 rounded">
-                                            <span class="text-slate-600">EFT</span>
-                                            <span id="allocation-eft" class="font-medium text-purple-600">R 0.00</span>
+                                        <div id="allocation-leftover-row" class="hidden flex justify-between p-1.5 bg-slate-50 rounded">
+                                            <span class="text-slate-600">Leftover</span>
+                                            <span id="allocation-leftover" class="font-medium text-slate-700 tabular-nums">R 0.00</span>
                                         </div>
-                                        <div class="flex justify-between p-1.5 bg-orange-50 rounded">
-                                            <span class="text-slate-600">Crypto</span>
-                                            <span id="allocation-crypto" class="font-medium text-orange-600">R 0.00</span>
-                                        </div>
-                                        <div class="flex justify-between p-1.5 bg-slate-50 rounded border-t">
-                                            <span class="font-medium text-slate-700">Total</span>
-                                            <span id="allocation-total" class="font-bold text-slate-800">R 0.00</span>
-                                        </div>
+                                        <p id="allocation-note" class="hidden text-xs text-red-600" role="status"></p>
                                     </div>
                                 </div>
                             </div>

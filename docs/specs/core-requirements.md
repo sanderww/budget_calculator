@@ -105,24 +105,26 @@ Given a known end-of-month surplus, the user allocates it across:
 
 - **Required Savings** — the monthly savings target from §1.4.
 - **Mortgage repayment** — percentage of remainder.
-- **EFT investment** — percentage of remainder.
-- **Crypto investment** — percentage of remainder.
+- **ETF investment** (exchange-traded fund) — percentage of remainder.
+- **Crypto investment** — percentage of remainder; always the balance (see below).
 
 ```
 Remainder = Available Money − Monthly Savings Target
 
 Mortgage Amount = Remainder × Mortgage%
-EFT Amount      = Remainder × EFT%
+ETF Amount      = Remainder × ETF%
 Crypto Amount   = Remainder × Crypto%
 
-Total Allocated = Monthly Savings Target + Mortgage Amount + EFT Amount + Crypto Amount
+Total Allocated = Monthly Savings Target + Mortgage Amount + ETF Amount + Crypto Amount
 Leftover        = Available Money − Total Allocated
 ```
 
+**Self-balancing percentages** (`balanceAllocation`, pure, in `src/calc/budget.js`): Mortgage % and ETF % are the editable inputs; **Crypto % = 100 − Mortgage % − ETF %** and is never typed. Each percentage is rounded to 0.1 and clamped to [0, 100]. If an edit would push Mortgage + ETF over 100, the *other* editable field is reduced so the total is exactly 100 (the field being edited wins). The three percentages therefore always sum to 100.
+
 **Hard constraints:**
-- The sum of all percentages must not exceed 100%.
-- At least one percentage must be greater than 0%.
-- Available money must exceed the monthly savings target (otherwise there is nothing to allocate).
+- The allocation recalculates live on every input; there is no Calculate action.
+- If available money is below the monthly savings target, there is nothing to allocate: the amounts show as zero and a note states the shortfall.
+- Available money and the Mortgage % / ETF % are persisted to private config (`budget_alloc_available`, `budget_alloc_mortgage_pct`, `budget_alloc_etf_pct`).
 
 ### 1.6 Timeline Overview Chart (runway)
 

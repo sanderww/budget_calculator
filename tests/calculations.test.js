@@ -9,6 +9,7 @@ import {
     summariseCommitments,
     COMMITMENT_KINDS,
     calculateMonthlyAllocation,
+    balanceAllocation,
     calculateInvestmentPerformance,
     monthlyInterestFactor,
     simulateDebt,
@@ -160,6 +161,47 @@ describe('calculateMonthlyAllocation', () => {
     it('correctly handles fractional percentages', () => {
         const result = calculateMonthlyAllocation(1000, 0, 33.33, 33.33, 33.34);
         expect(result.totalAllocated).toBeCloseTo(1000, 2);
+    });
+});
+
+describe('balanceAllocation', () => {
+    it('sets crypto to the remainder', () => {
+        expect(balanceAllocation({ mortgage: 50, eft: 30 }, 'mortgage')).toEqual({ mortgage: 50, eft: 30, crypto: 20 });
+    });
+
+    it('reduces ETF when a mortgage edit pushes the total over 100', () => {
+        expect(balanceAllocation({ mortgage: 80, eft: 50 }, 'mortgage')).toEqual({ mortgage: 80, eft: 20, crypto: 0 });
+    });
+
+    it('reduces mortgage when an ETF edit pushes the total over 100', () => {
+        expect(balanceAllocation({ mortgage: 70, eft: 60 }, 'eft')).toEqual({ mortgage: 40, eft: 60, crypto: 0 });
+    });
+
+    it('clamps each field to [0, 100]', () => {
+        expect(balanceAllocation({ mortgage: 150, eft: 50 }, 'mortgage')).toEqual({ mortgage: 100, eft: 0, crypto: 0 });
+        expect(balanceAllocation({ mortgage: -5, eft: 20 }, 'mortgage')).toEqual({ mortgage: 0, eft: 20, crypto: 80 });
+        expect(balanceAllocation({ mortgage: 10, eft: 250 }, 'eft')).toEqual({ mortgage: 0, eft: 100, crypto: 0 });
+    });
+
+    it('rounds to 0.1 without float drift', () => {
+        expect(balanceAllocation({ mortgage: 33.33, eft: 33.33 }, 'mortgage')).toEqual({ mortgage: 33.3, eft: 33.3, crypto: 33.4 });
+        expect(balanceAllocation({ mortgage: 0.1, eft: 0.2 }, 'eft')).toEqual({ mortgage: 0.1, eft: 0.2, crypto: 99.7 });
+    });
+
+    it('treats non-numeric input as 0', () => {
+        expect(balanceAllocation({ mortgage: NaN, eft: undefined }, 'mortgage')).toEqual({ mortgage: 0, eft: 0, crypto: 100 });
+    });
+
+    it('always sums to 100', () => {
+        for (const field of ['mortgage', 'eft']) {
+            for (const m of [0, 12.34, 33.33, 50, 99.9, 100, 140]) {
+                for (const e of [0, 0.7, 33.33, 66.6, 100, 180]) {
+                    const r = balanceAllocation({ mortgage: m, eft: e }, field);
+                    expect(Math.round((r.mortgage + r.eft + r.crypto) * 10)).toBe(1000);
+                    expect(r.crypto).toBeGreaterThanOrEqual(0);
+                }
+            }
+        }
     });
 });
 

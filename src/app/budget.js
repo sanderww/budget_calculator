@@ -2,6 +2,7 @@
 import {
     calculateBudgetSummary as _calculateBudgetSummary,
     calculateMonthlyAllocation as _calcMonthlyAllocation,
+    balanceAllocation,
     parseBudgetCSV as _parseBudgetCSV,
     generateBudgetCSV as _generateBudgetCSV,
     isPastDue,
@@ -43,12 +44,21 @@ const listOf = (kind) => budgetData[KIND_LIST[kind]];
 
 const availableMoneyInput = document.getElementById('available-money');
 let availableMoney = '';
-bindAmountInput(availableMoneyInput, { get: () => availableMoney, set: (v) => { availableMoney = v === null ? '' : v; } });
+const refreshAvailableMoney = bindAmountInput(availableMoneyInput, {
+    get: () => availableMoney,
+    set: (v) => {
+        availableMoney = v === null ? '' : v;
+        if (v === null) {
+            if ('budget_alloc_available' in getConfigMap()) unsetConfig('budget_alloc_available');
+        } else {
+            setConfig('budget_alloc_available', v);
+        }
+        renderAllocation();
+    },
+});
 const mortgagePercentageInput = document.getElementById('mortgage-percentage');
 const eftPercentageInput = document.getElementById('eft-percentage');
 const cryptoPercentageInput = document.getElementById('crypto-percentage');
-const calculateAllocationBtn = document.getElementById('calculate-allocation');
-const allocationResults = document.getElementById('allocation-results');
 
 // Current savings is a formatted amount field; the stored value stays a number.
 const refreshSavings = bindAmountInput(savingsInput, {
@@ -257,6 +267,7 @@ const calculateAndDisplaySummary = () => {
     if (kpiNetDate) kpiNetDate.textContent = futureDateInput.value || '—';
 
     currentMonthlySavingsTarget = r.monthlySavingsTarget;
+    renderAllocation();
 
     try {
         const plannedInput = document.getElementById('budget-timeline-planned-savings');
@@ -291,47 +302,78 @@ const calculateAndDisplaySummary = () => {
     }
 };
 
-const allocationError = document.getElementById('allocation-error');
-const showAllocationError = (msg) => {
-    allocationError.textContent = msg;
-    allocationError.classList.remove('hidden');
-    allocationResults.classList.add('hidden');
+const ALLOC_LABELS = { mortgage: 'Mortgage', eft: 'ETF' };
+const fmtPct = (n) => String(n);
+
+// Live allocation (UX-3.1). Reads the amount and the two editable
+// percentages, derives Crypto, and redraws the stacked bar and amounts.
+const renderAllocation = () => {
+    const available = Number.isFinite(parseFloat(availableMoney)) ? parseFloat(availableMoney) : 0;
+    const savingsTarget = currentMonthlySavingsTarget || 0;
+    const short = available < savingsTarget;
+    const r = _calcMonthlyAllocation(
+        short ? savingsTarget : available, savingsTarget,
+        parseFloat(mortgagePercentageInput.value) || 0,
+        parseFloat(eftPercentageInput.value) || 0,
+        parseFloat(cryptoPercentageInput.value) || 0,
+    );
+    const base = short ? savingsTarget : available;
+    const pct = (amount) => `${base > 0 ? Math.max(0, (amount / base) * 100) : 0}%`;
+    const set = (id, text) => { document.getElementById(id).textContent = text; };
+    set('allocation-savings', formatCurrency(savingsTarget));
+    set('allocation-mortgage', formatCurrency(r.mortgageAmount));
+    set('allocation-eft', formatCurrency(r.eftAmount));
+    set('allocation-crypto', formatCurrency(r.cryptoAmount));
+    document.getElementById('allocation-bar-savings').style.width = pct(savingsTarget);
+    document.getElementById('allocation-bar-mortgage').style.width = pct(r.mortgageAmount);
+    document.getElementById('allocation-bar-eft').style.width = pct(r.eftAmount);
+    document.getElementById('allocation-bar-crypto').style.width = pct(r.cryptoAmount);
+    const leftoverRow = document.getElementById('allocation-leftover-row');
+    const hasLeftover = Math.abs(r.leftover) >= 0.005;
+    leftoverRow.classList.toggle('hidden', !hasLeftover);
+    if (hasLeftover) set('allocation-leftover', formatCurrency(r.leftover));
+    const note = document.getElementById('allocation-note');
+    note.classList.toggle('hidden', !short);
+    note.textContent = short
+        ? `Available money is ${formatCurrency(savingsTarget - available)} short of the required savings.`
+        : '';
 };
 
-const calculateMonthlyAllocation = () => {
-    const availableMoneyValue = parseAmount(availableMoneyInput.value) ?? 0;
-    const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
-    const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
-    const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
-    const monthlySavingsTarget = currentMonthlySavingsTarget || 0;
-
-    const totalPercentage = mortgagePercentage + eftPercentage + cryptoPercentage;
-
-    if (totalPercentage > 100) {
-        showAllocationError('Total percentage cannot exceed 100%. Please adjust your percentages.');
-        return;
-    }
-    if (totalPercentage === 0) {
-        showAllocationError('Please enter at least one percentage allocation.');
-        return;
-    }
-
-    const r = _calcMonthlyAllocation(availableMoneyValue, monthlySavingsTarget, mortgagePercentage, eftPercentage, cryptoPercentage);
-
-    if (r.remainingMoney < 0) {
-        showAllocationError('Available money is less than required monthly savings. Increase your available money or reduce your financial commitments.');
-        return;
-    }
-
-    allocationError.classList.add('hidden');
-    document.getElementById('allocation-savings').textContent = formatCurrency(monthlySavingsTarget);
-    document.getElementById('allocation-mortgage').textContent = formatCurrency(r.mortgageAmount);
-    document.getElementById('allocation-eft').textContent = formatCurrency(r.eftAmount);
-    document.getElementById('allocation-crypto').textContent = formatCurrency(r.cryptoAmount);
-    document.getElementById('allocation-total').textContent = formatCurrency(r.totalAllocated);
-
-    allocationResults.classList.remove('hidden');
+const allocationHint = document.getElementById('allocation-hint');
+const persistAllocation = () => {
+    setConfig('budget_alloc_mortgage_pct', parseFloat(mortgagePercentageInput.value) || 0);
+    setConfig('budget_alloc_etf_pct', parseFloat(eftPercentageInput.value) || 0);
 };
+// Applies balanceAllocation to the inputs. The edited field is only rewritten
+// when it was clamped, so typing "3." is never disturbed.
+const syncAllocationInputs = (changedField) => {
+    const typed = {
+        mortgage: parseFloat(mortgagePercentageInput.value) || 0,
+        eft: parseFloat(eftPercentageInput.value) || 0,
+    };
+    const r = balanceAllocation(typed, changedField);
+    const other = changedField === 'eft' ? 'mortgage' : 'eft';
+    const inputs = { mortgage: mortgagePercentageInput, eft: eftPercentageInput };
+    const reduced = r[other] !== typed[other];
+    if (reduced) inputs[other].value = fmtPct(r[other]);
+    if (r[changedField] !== typed[changedField]) inputs[changedField].value = fmtPct(r[changedField]);
+    cryptoPercentageInput.value = fmtPct(r.crypto);
+    allocationHint.classList.toggle('hidden', !reduced);
+    allocationHint.textContent = reduced
+        ? `${ALLOC_LABELS[other]} reduced to ${fmtPct(r[other])}% so the total stays at 100%.`
+        : '';
+    return r;
+};
+mortgagePercentageInput.addEventListener('input', () => {
+    syncAllocationInputs('mortgage');
+    persistAllocation();
+    renderAllocation();
+});
+eftPercentageInput.addEventListener('input', () => {
+    syncAllocationInputs('eft');
+    persistAllocation();
+    renderAllocation();
+});
 
 // Row edits. The amount is already stored (as a number) by the row's amount
 // binding; description and date are copied here. Totals update live.
@@ -561,7 +603,7 @@ const readConfigAmount = (key) => {
     return v === null ? undefined : v;
 };
 
-// Prefill the planned-savings and minimum-buffer inputs from
+// Prefill the planned-savings, minimum-buffer and allocation inputs from
 // config.private.json. Must run after loadConfigFromServer and before the
 // first chart render.
 const applyBudgetConfig = () => {
@@ -573,9 +615,20 @@ const applyBudgetConfig = () => {
         minBuffer = readConfigAmount('budget_min_buffer');
         refreshMinBuffer();
     }
+    // Live allocation inputs (UX-3.1). Missing keys keep the 50 / 50 defaults.
+    const avail = readConfigAmount('budget_alloc_available');
+    availableMoney = avail === undefined ? '' : avail;
+    refreshAvailableMoney();
+    const savedPct = (key, fallback) => {
+        const n = parseFloat(getConfigMap()[key]);
+        return Number.isFinite(n) ? n : fallback;
+    };
+    mortgagePercentageInput.value = String(savedPct('budget_alloc_mortgage_pct', 50));
+    eftPercentageInput.value = String(savedPct('budget_alloc_etf_pct', 50));
+    syncAllocationInputs('mortgage');
+    allocationHint.classList.add('hidden');
+    renderAllocation();
 };
-
-calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 
 const parseBudgetCSV = (text) => _parseBudgetCSV(text);
 const generateBudgetCSV = () => _generateBudgetCSV(budgetData);

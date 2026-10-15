@@ -64,6 +64,23 @@ export function calculateMonthlyAllocation(availableMoney, monthlySavingsTarget,
     const leftover = availableMoney - totalAllocated;
     return { remainingMoney, mortgageAmount, eftAmount, cryptoAmount, totalAllocated, leftover };
 }
+// Keeps Mortgage % + ETF % + Crypto % at exactly 100. Crypto is derived (the
+// remainder). The field the user edited wins: if Mortgage + ETF would exceed
+// 100, the OTHER field is reduced to fit. Works in integer tenths so rounding
+// to 0.1 never drifts. `eft` keeps its internal name; the UI label is "ETF".
+export function balanceAllocation({ mortgage, eft }, changedField) {
+    const tenths = (v) => {
+        const n = Math.round((Number(v) || 0) * 10);
+        return Math.min(1000, Math.max(0, n));
+    };
+    let m = tenths(mortgage);
+    let e = tenths(eft);
+    if (m + e > 1000) {
+        if (changedField === 'eft') m = 1000 - e;
+        else e = 1000 - m;
+    }
+    return { mortgage: m / 10, eft: e / 10, crypto: (1000 - m - e) / 10 };
+}
 // True only for a parseable date strictly before today. Both sides are
 // normalised to local midnight, so a row dated today reads as still pending
 // rather than flipping to "due" partway through the day.
