@@ -1,13 +1,17 @@
 // A single bottom-of-viewport toast offering Undo after a delete.
 // One element is appended to <body> and reused: a new delete replaces the
 // previous toast. The Undo button is focusable but never steals focus.
+// The toast belongs to the data mode it was shown in: switching between real
+// and sample data (or importing a CSV) dismisses it, and an Undo clicked
+// after the mode changed does nothing, so it can never write across modes.
+import { isTestMode } from '../app/persistence.js';
 
 export const UNDO_TOAST_MS = 8000;
 
 let toastEl = null;
 let timer = null;
 
-const hide = () => {
+export const hideUndoToast = () => {
     clearTimeout(timer);
     timer = null;
     if (toastEl) toastEl.hidden = true;
@@ -32,12 +36,14 @@ export function showUndoToast({ message, onUndo }) {
     btn.type = 'button';
     btn.className = 'undo-toast-btn';
     btn.textContent = 'Undo';
+    const shownInTestMode = isTestMode();
     btn.addEventListener('click', () => {
-        hide();
+        hideUndoToast();
+        if (isTestMode() !== shownInTestMode) return;
         onUndo();
     });
 
     toastEl.replaceChildren(text, btn);
     toastEl.hidden = false;
-    timer = setTimeout(hide, UNDO_TOAST_MS);
+    timer = setTimeout(hideUndoToast, UNDO_TOAST_MS);
 }

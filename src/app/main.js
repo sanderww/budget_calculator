@@ -1,5 +1,6 @@
 // App bootstrap: tab navigation, sample-data mode, and the load sequence.
-import { isTestMode, setTestMode, loadConfigFromServer, retryFailedSaves } from './persistence.js';
+import { isTestMode, loadConfigFromServer, retryFailedSaves } from './persistence.js';
+import { switchDataMode } from './data-mode.js';
 import { initPopovers } from '../lib/popover.js';
 import { renderBudget, loadBudgetCSVFromServer,
          applyBudgetConfig } from './budget.js';
@@ -74,25 +75,29 @@ const updateTestModeUI = () => {
     }
 };
 
-const toggleSampleData = async () => {
-    setTestMode(!isTestMode());
-    updateTestModeUI();
+// Loads every dataset for the current mode (init and the sample-data toggle).
+// Every loader runs even when another fails, so as much as possible is
+// replaced; the call then rejects so a toggle can revert (functional §8).
+const loadAll = async () => {
+    const failures = [];
     try {
-        await loadConfigFromServer();           // config first — tabs read it
-        applyBudgetConfig();                    // prefill planned savings, buffer, allocation
-        await Promise.all([
-            loadBudgetCSVFromServer(),
-            loadInvestmentCSVFromServer(),
-            loadDebtCSVFromServer(),
-            loadRaCSVFromServer(),
-        ]);
-        loadRetirementFromConfig();             // synchronous — uses getConfigMap()
+        await loadConfigFromServer();       // config first — tabs read it
     } catch (err) {
-        console.error('Test mode load failed, reverting:', err);
-        setTestMode(!isTestMode());
-        updateTestModeUI();
+        failures.push(err);
     }
+    applyBudgetConfig();                    // prefill planned savings, buffer, allocation
+    const results = await Promise.allSettled([
+        loadBudgetCSVFromServer(),
+        loadInvestmentCSVFromServer(),
+        loadDebtCSVFromServer(),
+        loadRaCSVFromServer(),
+    ]);
+    results.forEach(r => { if (r.status === 'rejected') failures.push(r.reason); });
+    loadRetirementFromConfig();             // synchronous — uses getConfigMap()
+    if (failures.length) throw new AggregateError(failures, 'Some data failed to load');
 };
+
+const toggleSampleData = () => switchDataMode({ loadAll, onModeChange: updateTestModeUI });
 
 document.getElementById('test-mode-btn').addEventListener('click', toggleSampleData);
 document.getElementById('sample-switch-btn').addEventListener('click', toggleSampleData);
@@ -101,17 +106,10 @@ initPopovers();
 
 // --- INITIALIZATION ---
 (async () => {
-    await loadConfigFromServer();          // must run before tabs that read the config
-    applyBudgetConfig();                   // prefill planned savings, buffer, allocation
     try {
-        await loadBudgetCSVFromServer();
+        await loadAll();
     } catch (err) {
-        console.warn('Automatic Budget CSV load failed.', err);
-        renderBudget();
+        console.warn('Some data failed to load on start-up.', err);
+        renderBudget();                    // show the empty budget if its CSV failed
     }
-
-    await loadInvestmentCSVFromServer();
-    await loadDebtCSVFromServer();
-    await loadRaCSVFromServer();
-    loadRetirementFromConfig();
 })();

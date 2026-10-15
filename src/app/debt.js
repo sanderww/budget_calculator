@@ -12,6 +12,7 @@ import { generateId, bindAmountInput } from '../lib/rows.js';
 import { createLedger, strong } from '../lib/ledger.js';
 import { parseTransactionQuickAdd, todayISO } from '../lib/quick-add.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
+import { hideUndoToast } from '../lib/undo-toast.js';
 
 // --- DEBT CALCULATOR LOGIC ---
 let debtData = {
@@ -287,30 +288,27 @@ DEBT_INPUT_BINDINGS.forEach(([key, input]) => {
 const parseDebtCSV = (text) => _parseDebtCSV(text);
 const generateDebtCSV = () => _generateDebtCSV(debtData.repayments);
 
+// A failed fetch rejects so a data-mode switch can revert (functional §8).
 const loadDebtCSVFromServer = async () => {
-    try {
-        const response = await fetch(dbPath('transactions/debt.csv'), { cache: 'no-store' });
-        if (response.ok) {
-            const text = await response.text();
-            const parsed = parseDebtCSV(text);
-            debtData.repayments = parsed.repayments;
+    const response = await fetch(dbPath('transactions/debt.csv'), { cache: 'no-store' });
+    if (response.ok) {
+        const text = await response.text();
+        const parsed = parseDebtCSV(text);
+        debtData.repayments = parsed.repayments;
 
-            DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
-                const v = getConfigMap()[k] ?? parsed.params[k];
-                if (v !== undefined && v !== '') setDebtInputValue(el, v);
-            });
+        DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
+            const v = getConfigMap()[k] ?? parsed.params[k];
+            if (v !== undefined && v !== '') setDebtInputValue(el, v);
+        });
 
-            // Default to upcoming 25th only if no persisted value.
-            if (!debtNextPaymentInput.value) debtNextPaymentInput.value = getUpcoming25th();
+        // Default to upcoming 25th only if no persisted value.
+        if (!debtNextPaymentInput.value) debtNextPaymentInput.value = getUpcoming25th();
 
-            renderRepayments();
-        } else {
-            debtData.repayments = defaultDebtRepayments();
-            debtNextPaymentInput.value = getUpcoming25th();
-            renderRepayments();
-        }
-    } catch (e) {
-        console.log('Could not auto-load debt.csv');
+        renderRepayments();
+    } else {
+        debtData.repayments = defaultDebtRepayments();
+        debtNextPaymentInput.value = getUpcoming25th();
+        renderRepayments();
     }
 };
 
@@ -325,6 +323,7 @@ loadDebtCsvBtn.addEventListener('click', async () => {
         const file = await handle.getFile();
         const text = await file.text();
         const parsed = parseDebtCSV(text);
+        hideUndoToast(); // an Undo would put a row back into replaced data
         debtData.repayments = parsed.repayments;
 
         DEBT_INPUT_BINDINGS.forEach(([k, el]) => {

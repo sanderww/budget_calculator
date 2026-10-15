@@ -11,6 +11,7 @@ import { createLedger, strong } from '../lib/ledger.js';
 import { parseTransactionQuickAdd, todayISO } from '../lib/quick-add.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
+import { hideUndoToast } from '../lib/undo-toast.js';
 
 // main.js points this at the retirement re-render — the
 // retirement tab reads live RA state; importing that renderer here directly
@@ -205,6 +206,7 @@ document.getElementById('load-ra-csv').addEventListener('click', () => {
         const reader = new FileReader();
         reader.onload = (ev) => {
             const parsed = _parseRaCSV(ev.target.result);
+            hideUndoToast(); // an Undo would put a row back into replaced data
             raTransactions = parsed.transactions;
             raCurrentValue = parsed.currentValue;
             raParams = {
@@ -245,9 +247,10 @@ const loadRaCSVFromServer = async () => {
             raCurrentValue = undefined;
         }
     } catch (err) {
-        console.error('Failed to load RA transactions:', err);
+        // Cleared, then rethrown so a data-mode switch can revert (functional §8).
         raTransactions = [];
         raCurrentValue = undefined;
+        throw err;
     }
     raParams = {
         tax_refund_rate_pct: getConfigMap().tax_refund_rate_pct ?? 41,

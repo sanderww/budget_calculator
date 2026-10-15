@@ -14,7 +14,7 @@ import {
 import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
 import { fmtZARWhole, fmtZARSigned, fmtNum, parseAmount } from '../lib/format.js';
 import { bindAmountInput, generateId } from '../lib/rows.js';
-import { showUndoToast } from '../lib/undo-toast.js';
+import { showUndoToast, hideUndoToast } from '../lib/undo-toast.js';
 import { getConfigMap, persistConfig } from './persistence.js';
 import { getInvestmentData } from './investments.js';
 import { getRaState } from './ra.js';
@@ -182,6 +182,7 @@ function retWireInputs() {
             if (!f) return;
             const reader = new FileReader();
             reader.onload = (ev) => {
+                hideUndoToast(); // an Undo would restore params over the import
                 retirementParams = _parseRetirementCSV(ev.target.result);
                 retApplyParamsToInputs();
                 retPersist();

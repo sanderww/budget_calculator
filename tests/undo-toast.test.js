@@ -1,11 +1,13 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { showUndoToast, UNDO_TOAST_MS } from '../src/lib/undo-toast.js';
+import { showUndoToast, hideUndoToast, UNDO_TOAST_MS } from '../src/lib/undo-toast.js';
+import { setTestMode } from '../src/app/persistence.js';
 
 describe('showUndoToast', () => {
     beforeEach(() => {
         vi.useFakeTimers();
         document.body.innerHTML = '';
+        setTestMode(true);
     });
     afterEach(() => {
         vi.runAllTimers();
@@ -54,5 +56,21 @@ describe('showUndoToast', () => {
         toast.querySelector('button').click();
         expect(second).toHaveBeenCalledTimes(1);
         expect(first).not.toHaveBeenCalled();
+    });
+    it('hideUndoToast dismisses the toast without calling onUndo', () => {
+        const onUndo = vi.fn();
+        showUndoToast({ message: 'm', onUndo });
+        hideUndoToast();
+        expect(document.getElementById('undo-toast').hidden).toBe(true);
+        expect(onUndo).not.toHaveBeenCalled();
+    });
+    it('Undo does nothing once the data mode has changed since the toast was shown', () => {
+        const onUndo = vi.fn();
+        showUndoToast({ message: 'm', onUndo });
+        setTestMode(false); // no save happens: onUndo is a spy
+        document.querySelector('#undo-toast button').click();
+        expect(onUndo).not.toHaveBeenCalled();
+        expect(document.getElementById('undo-toast').hidden).toBe(true);
+        setTestMode(true);
     });
 });

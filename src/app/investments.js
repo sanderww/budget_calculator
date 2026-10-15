@@ -11,6 +11,7 @@ import { createLedger, strong } from '../lib/ledger.js';
 import { parseInvestmentQuickAdd, todayISO } from '../lib/quick-add.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
+import { hideUndoToast } from '../lib/undo-toast.js';
 
 // main.js points this at the retirement re-render — the
 // retirement tab reads live investment values; importing that renderer here
@@ -18,7 +19,7 @@ import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from '.
 let onStateChanged = () => {};
 export const setOnStateChanged = (fn) => { onStateChanged = fn; };
 
-let investmentData = {
+const emptyInvestmentData = () => ({
     transactions: [],
     currentValues: {
         Discretionary: 0,
@@ -26,7 +27,8 @@ let investmentData = {
         Crypto: 0
     },
     marginalRate: 41
-};
+});
+let investmentData = emptyInvestmentData();
 
 const loadInvCsvBtn = document.getElementById('load-inv-csv');
 
@@ -256,21 +258,24 @@ marginalRateInput.addEventListener('input', (e) => {
 const parseInvestmentCSV = (text) => _parseInvestmentCSV(text);
 const generateInvestmentCSV = () => _generateInvestmentCSV(investmentData);
 
-// Try to auto-load investments.csv if available
+// Load investments.csv. A missing file starts empty, so the other data
+// mode's transactions never stay in memory; a failed fetch rejects so a
+// data-mode switch can revert (functional §8).
 const loadInvestmentCSVFromServer = async () => {
-    try {
-        const response = await fetch(dbPath('transactions/investments.csv'), { cache: 'no-store' });
-        if (response.ok) {
-            const text = await response.text();
-            const parsed = parseInvestmentCSV(text);
-            investmentData.transactions = parsed.transactions;
-            investmentData.currentValues = parsed.currentValues;
-            investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
-            renderFullInvestmentUI();
-        }
-    } catch (e) {
-        console.log('Could not auto-load investments.csv');
+    const response = await fetch(dbPath('transactions/investments.csv'), { cache: 'no-store' });
+    if (response.ok) {
+        const text = await response.text();
+        const parsed = parseInvestmentCSV(text);
+        investmentData.transactions = parsed.transactions;
+        investmentData.currentValues = parsed.currentValues;
+        investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
+    } else {
+        const empty = emptyInvestmentData();
+        investmentData.transactions = empty.transactions;
+        investmentData.currentValues = empty.currentValues;
+        investmentData.marginalRate = getConfigMap().marginal_rate ?? empty.marginalRate;
     }
+    renderFullInvestmentUI();
 };
 
 
@@ -284,6 +289,7 @@ loadInvCsvBtn.addEventListener('click', async () => {
         const file = await handle.getFile();
         const text = await file.text();
         const parsed = parseInvestmentCSV(text);
+        hideUndoToast(); // an Undo would put a row back into replaced data
         investmentData.transactions = parsed.transactions;
         investmentData.currentValues = parsed.currentValues;
         investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
