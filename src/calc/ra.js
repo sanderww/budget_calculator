@@ -1,6 +1,6 @@
 // RA (Retirement Annuity) tab: tax-year projections, pot value, and RA CSV parse/generate.
 
-import { generateRecordId as _generateId } from './util.js';
+import { generateRecordId as _generateId, csvText } from './util.js';
 
 // ============================================================================
 // RA (Retirement Annuity) Tab
@@ -63,7 +63,7 @@ export function parseRaCSV(text) {
 export function generateRaTransactionsCSV(transactions, currentValue) {
     let csv = '';
     (transactions || []).forEach(t => {
-        csv += `${t.date},${t.description},${t.amount}\n`;
+        csv += `${t.date},${csvText(t.description)},${t.amount}\n`;
     });
     if (currentValue !== undefined && currentValue !== null && currentValue !== '') {
         const v = Number(currentValue);

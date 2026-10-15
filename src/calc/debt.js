@@ -1,6 +1,6 @@
 // Debt tab: repayment simulation and debt CSV parse/generate.
 
-import { generateRecordId as _generateId } from './util.js';
+import { generateRecordId as _generateId, csvText } from './util.js';
 
 export function monthlyInterestFactor(dailyRate, year, month) {
     const days = new Date(year, month + 1, 0).getDate();
@@ -106,6 +106,6 @@ export function parseDebtCSV(text) {
 
 export function generateDebtCSV(repayments) {
     let csv = 'Date,Description,Amount\n';
-    (repayments || []).forEach(r => { csv += `${r.date},${r.description},${r.amount}\n`; });
+    (repayments || []).forEach(r => { csv += `${r.date},${csvText(r.description)},${r.amount}\n`; });
     return csv;
 }

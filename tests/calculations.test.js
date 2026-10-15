@@ -1877,3 +1877,48 @@ describe('parseQuickAdd', () => {
         expect(parseQuickAdd(undefined)).toEqual({ error: 'empty', missing: ['description', 'amount'] });
     });
 });
+
+// A comma inside a free-text description would split the CSV row, so the
+// generators write it as ";" (comma-free data is unchanged byte-for-byte).
+describe('CSV generators replace commas in descriptions', () => {
+    it('generateBudgetCSV', () => {
+        const csv = generateBudgetCSV({
+            savings: 100,
+            debts: [{ description: 'Loan, car', amount: 10 }],
+            provisions: [{ description: 'Tax, VAT, PAYE', amount: 20, date: '2026-12-01' }],
+            futureCosts: [{ description: 'Trip, NL', amount: 30, date: '2027-01-01' }],
+        });
+        expect(csv).toBe('type,description,amount,date\n'
+            + 'savings,,100,\n'
+            + 'debt,Loan; car,10,\n'
+            + 'provision,Tax; VAT; PAYE,20,2026-12-01\n'
+            + 'costfuturecost,Trip; NL,30,2027-01-01\n');
+        const back = parseBudgetCSV(csv);
+        expect(back.debts[0].amount).toBe(10);
+        expect(back.provisions[0].date).toBe('2026-12-01');
+    });
+
+    it('generateInvestmentCSV', () => {
+        const csv = generateInvestmentCSV({
+            transactions: [{ date: '2025-01-15', description: 'ETF, monthly', amount: 500, type: 'TFSA' }],
+            currentValues: { TFSA: 600 },
+        });
+        expect(csv).toBe('Date,Description,amount,account type,crypto_value\n'
+            + '15-01-2025,ETF; monthly,500,TFSA,\n'
+            + 'current_value,TFSA,600,\n');
+        expect(parseInvestmentCSV(csv).transactions[0].type).toBe('TFSA');
+    });
+
+    it('generateDebtCSV', () => {
+        const csv = generateDebtCSV([{ date: '2025-05-31', description: 'Bonus, May', amount: 4000 }]);
+        expect(csv).toBe('Date,Description,Amount\n2025-05-31,Bonus; May,4000\n');
+        expect(parseDebtCSV(csv).repayments[0].amount).toBe(4000);
+    });
+
+    it('generateRaTransactionsCSV', () => {
+        const csv = generateRaTransactionsCSV(
+            [{ date: '2025-03-01', description: 'Top-up, annual', amount: 1000 }], 5000);
+        expect(csv).toBe('2025-03-01,Top-up; annual,1000\ncurrent_value,RA,5000,\n');
+        expect(parseRaCSV(csv).transactions[0].amount).toBe(1000);
+    });
+});

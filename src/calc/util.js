@@ -1,5 +1,10 @@
 // Shared utilities: record id generation and XIRR.
 
+// A comma inside a free-text CSV field would split the row; the generators
+// write it as ";" instead. Non-strings pass through unchanged, so comma-free
+// data round-trips byte-for-byte.
+export const csvText = (v) => (typeof v === 'string' ? v.replace(/,/g, ';') : v);
+
 // Internal id helper used by CSV row parsers
 export const generateRecordId = () => `id_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 

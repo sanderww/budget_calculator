@@ -1,6 +1,6 @@
 // Budget tab: summary, monthly allocation, and budget CSV parse/generate.
 
-import { generateRecordId as _generateId } from './util.js';
+import { generateRecordId as _generateId, csvText } from './util.js';
 import { parseQuickAddTokens } from '../lib/quick-add.js';
 
 export function getUpcoming25th(today = new Date()) {
@@ -214,8 +214,8 @@ export function parseBudgetCSV(text) {
 export function generateBudgetCSV(data) {
     let csv = 'type,description,amount,date\n';
     csv += `savings,,${data.savings || 0},\n`;
-    data.debts.forEach(d => { csv += `debt,${d.description || ''},${d.amount || 0},\n`; });
-    data.provisions.forEach(p => { csv += `provision,${p.description || ''},${p.amount || 0},${p.date || ''}\n`; });
-    data.futureCosts.forEach(c => { csv += `costfuturecost,${c.description || ''},${c.amount || 0},${c.date || ''}\n`; });
+    data.debts.forEach(d => { csv += `debt,${csvText(d.description || '')},${d.amount || 0},\n`; });
+    data.provisions.forEach(p => { csv += `provision,${csvText(p.description || '')},${p.amount || 0},${p.date || ''}\n`; });
+    data.futureCosts.forEach(c => { csv += `costfuturecost,${csvText(c.description || '')},${c.amount || 0},${c.date || ''}\n`; });
     return csv;
 }

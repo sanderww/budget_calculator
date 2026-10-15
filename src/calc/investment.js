@@ -1,6 +1,6 @@
 // Investments tab: performance metrics and investment CSV parse/generate.
 
-import { generateRecordId as _generateId, xirr } from './util.js';
+import { generateRecordId as _generateId, xirr, csvText } from './util.js';
 
 export function calculateInvestmentPerformance(transactions, currentValue, today = new Date(), marginalRate = 0) {
     const totalInvested = transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
@@ -136,7 +136,7 @@ export function generateInvestmentCSV(data) {
             const [yyyy, mm, dd] = dateStr.split('-');
             dateStr = `${dd}-${mm}-${yyyy}`;
         }
-        csv += `${dateStr},${t.description},${t.amount},${t.type},${t.cryptoValue || ''}\n`;
+        csv += `${dateStr},${csvText(t.description)},${t.amount},${t.type},${t.cryptoValue || ''}\n`;
     });
     Object.keys(data.currentValues).forEach(type => {
         csv += `current_value,${type},${data.currentValues[type]},\n`;
