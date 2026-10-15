@@ -1,10 +1,11 @@
-// App bootstrap: tab navigation, test mode, and the load sequence.
-import { isTestMode, setTestMode, loadConfigFromServer } from './persistence.js';
-import { renderBudget, calculateAndDisplaySummary, loadBudgetCSVFromServer,
+// App bootstrap: tab navigation, sample-data mode, and the load sequence.
+import { isTestMode, setTestMode, loadConfigFromServer, retryFailedSaves } from './persistence.js';
+import { initPopovers } from '../lib/popover.js';
+import { renderBudget, loadBudgetCSVFromServer,
          applyPlannedSavingsFromConfig } from './budget.js';
-import { renderFullInvestmentUI, updatePerformanceDisplay, loadInvestmentCSVFromServer,
+import { loadInvestmentCSVFromServer,
          setOnStateChanged as setInvestmentsChanged } from './investments.js';
-import { calculateDebtProjection, renderRepayments, loadDebtCSVFromServer } from './debt.js';
+import { loadDebtCSVFromServer } from './debt.js';
 import { renderHistory } from './history.js';
 import { renderRa, loadRaCSVFromServer,
          setOnStateChanged as setRaChanged } from './ra.js';
@@ -38,8 +39,6 @@ const TABS = {
     history:    { tab: tabHistory,    content: contentHistory,    onShow: () => renderHistory() },
 };
 
-let currentTab = 'budget';
-
 const switchTab = (name) => {
     Object.values(TABS).forEach(({ tab, content }) => {
         tab.classList.remove('border-indigo-500', 'text-indigo-600');
@@ -50,47 +49,32 @@ const switchTab = (name) => {
     target.tab.classList.add('border-indigo-500', 'text-indigo-600');
     target.tab.classList.remove('border-transparent', 'text-slate-500');
     target.content.classList.remove('hidden');
-    currentTab = name;
     if (target.onShow) target.onShow();
 };
 
 Object.entries(TABS).forEach(([name, { tab }]) =>
     tab.addEventListener('click', () => switchTab(name)));
 
-// One refresh control in the header re-renders whichever tab is active.
-const REFRESH_ACTIONS = {
-    budget:     () => { calculateAndDisplaySummary(); renderBudget(); },
-    investment: () => { renderFullInvestmentUI(); updatePerformanceDisplay(); },
-    debt:       () => { calculateDebtProjection(); renderRepayments(); },
-    ra:         () => renderRa(),
-    retirement: () => renderRetirement(),
-    history:    () => renderHistory(),
-};
-
-document.getElementById('refresh-current').addEventListener('click', () => {
-    REFRESH_ACTIONS[currentTab]();
-});
-
 const updateTestModeUI = () => {
     const btn = document.getElementById('test-mode-btn');
     const dot = document.getElementById('test-mode-dot');
-    const label = document.getElementById('test-mode-label');
+    const banner = document.getElementById('sample-banner');
     if (isTestMode()) {
         btn.classList.remove('border-slate-200', 'text-slate-400', 'hover:text-slate-500', 'hover:border-slate-300');
         btn.classList.add('border-amber-300', 'bg-amber-50', 'text-amber-700');
         dot.classList.remove('bg-slate-300');
         dot.classList.add('bg-amber-400');
-        label.classList.remove('hidden');
+        banner.classList.remove('hidden');
     } else {
         btn.classList.add('border-slate-200', 'text-slate-400', 'hover:text-slate-500', 'hover:border-slate-300');
         btn.classList.remove('border-amber-300', 'bg-amber-50', 'text-amber-700');
         dot.classList.add('bg-slate-300');
         dot.classList.remove('bg-amber-400');
-        label.classList.add('hidden');
+        banner.classList.add('hidden');
     }
 };
 
-document.getElementById('test-mode-btn').addEventListener('click', async () => {
+const toggleSampleData = async () => {
     setTestMode(!isTestMode());
     updateTestModeUI();
     try {
@@ -108,7 +92,12 @@ document.getElementById('test-mode-btn').addEventListener('click', async () => {
         setTestMode(!isTestMode());
         updateTestModeUI();
     }
-});
+};
+
+document.getElementById('test-mode-btn').addEventListener('click', toggleSampleData);
+document.getElementById('sample-switch-btn').addEventListener('click', toggleSampleData);
+document.getElementById('save-status').addEventListener('click', () => retryFailedSaves());
+initPopovers();
 
 // --- INITIALIZATION ---
 (async () => {

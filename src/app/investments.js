@@ -8,7 +8,7 @@ import {
 import { fmtZAR as formatCurrency, fmtZAR, fmtNum } from '../lib/format.js';
 import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
-import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
+import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // main.js points this at the retirement re-render — the
 // retirement tab reads live investment values; importing that renderer here
@@ -29,7 +29,6 @@ let investmentData = {
 const transactionList = document.getElementById('transaction-list');
 const addTransactionBtn = document.getElementById('add-transaction');
 const loadInvCsvBtn = document.getElementById('load-inv-csv');
-const saveInvCsvBtn = document.getElementById('save-inv-csv');
 
 // Inputs for current values
 const valDiscretionary = document.getElementById('val-discretionary');
@@ -161,7 +160,7 @@ addTransactionBtn.addEventListener('click', () => {
     });
     renderTransactions();
     updatePerformanceDisplay();
-    debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
+    debouncedSave('transactions_investments', generateInvestmentCSV);
 });
 
 transactionList.addEventListener('input', (e) => {
@@ -190,7 +189,7 @@ transactionList.addEventListener('input', (e) => {
     }
 
     updatePerformanceDisplay();
-    debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
+    debouncedSave('transactions_investments', generateInvestmentCSV);
 });
 
 transactionList.addEventListener('click', (e) => {
@@ -202,7 +201,7 @@ transactionList.addEventListener('click', (e) => {
             investmentData.transactions.splice(index, 1);
             renderTransactions();
             updatePerformanceDisplay();
-            debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
+            debouncedSave('transactions_investments', generateInvestmentCSV);
         }
     }
 });
@@ -216,7 +215,7 @@ transactionList.addEventListener('click', (e) => {
         updatePerformanceDisplay();
         // Retirement projection reads these current values live — keep it in sync.
         onStateChanged();
-        debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
+        debouncedSave('transactions_investments', generateInvestmentCSV);
     });
 });
 
@@ -225,7 +224,7 @@ marginalRateInput.addEventListener('input', (e) => {
     investmentData.marginalRate = Number.isNaN(v) ? 0 : v;
     setConfig('marginal_rate', investmentData.marginalRate);
     updatePerformanceDisplay();
-    debouncedSave('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
+    debouncedSave('transactions_investments', generateInvestmentCSV);
 });
 
 // Investment CSV Handling
@@ -249,7 +248,6 @@ const loadInvestmentCSVFromServer = async () => {
     }
 };
 
-const saveInvestmentCSV = () => saveToServer('transactions_investments', generateInvestmentCSV, 'save-inv-csv');
 
 loadInvCsvBtn.addEventListener('click', async () => {
     if (!window.showOpenFilePicker) return;
@@ -269,12 +267,12 @@ loadInvCsvBtn.addEventListener('click', async () => {
             persistConfig();
         }
         renderFullInvestmentUI();
+        debouncedSave('transactions_investments', generateInvestmentCSV);
     } catch (err) {
         console.error(err);
     }
 });
 
-saveInvCsvBtn.addEventListener('click', saveInvestmentCSV);
 
 export const getInvestmentData = () => investmentData;
 export { renderFullInvestmentUI, updatePerformanceDisplay, loadInvestmentCSVFromServer };

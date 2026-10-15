@@ -10,7 +10,7 @@ import {
 import { renderBudgetTimeline as _renderBudgetTimeline } from '../charts/chart_budget_timeline.js';
 import { fmtZAR as formatCurrency } from '../lib/format.js';
 import { createRowElement, sortByDateThenIdAsc, emptyStateHTML, generateId } from '../lib/rows.js';
-import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, unsetConfig } from './persistence.js';
+import { dbPath, debouncedSave, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
 let budgetData = {
     savings: 0,
@@ -29,7 +29,6 @@ const addDebtBtn = document.getElementById('add-debt');
 const addProvisionBtn = document.getElementById('add-provision');
 const addFutureCostBtn = document.getElementById('add-future-cost');
 
-const saveCsvBtn = document.getElementById('save-csv');
 
 const availableMoneyInput = document.getElementById('available-money');
 const mortgagePercentageInput = document.getElementById('mortgage-percentage');
@@ -201,25 +200,25 @@ const handleListChange = (e, list) => {
 addDebtBtn.addEventListener('click', () => {
     budgetData.debts.push({ id: generateId(), description: '', amount: '' });
     renderBudget();
-    debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+    debouncedSave('transactions_budget', generateBudgetCSV);
 });
 
 addProvisionBtn.addEventListener('click', () => {
     budgetData.provisions.push({ id: generateId(), description: '', amount: '', date: '' });
     renderBudget();
-    debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+    debouncedSave('transactions_budget', generateBudgetCSV);
 });
 
 addFutureCostBtn.addEventListener('click', () => {
     budgetData.futureCosts.push({ id: generateId(), description: '', amount: '', date: '' });
     renderBudget();
-    debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+    debouncedSave('transactions_budget', generateBudgetCSV);
 });
 
 savingsInput.addEventListener('input', (e) => {
     budgetData.savings = e.target.value;
     calculateAndDisplaySummary();
-    debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+    debouncedSave('transactions_budget', generateBudgetCSV);
 });
 
 futureDateInput.addEventListener('input', calculateAndDisplaySummary);
@@ -262,12 +261,12 @@ const applyPlannedSavingsFromConfig = () => {
     plannedSavingsInput.value = (saved !== undefined && saved !== null && saved !== '') ? saved : '';
 };
 
-debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
-provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
-futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
+provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
+futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV); });
 
-debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
-provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv'); });
+debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
+provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
 // Convert is intercepted before the shared handler: it is the only action
 // that moves a row between two lists, so it owns the whole click.
 futureCostList.addEventListener('click', (e) => {
@@ -278,12 +277,12 @@ futureCostList.addEventListener('click', (e) => {
         if (updated !== budgetData) {
             budgetData = updated;
             renderBudget();
-            debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+            debouncedSave('transactions_budget', generateBudgetCSV);
         }
         return;
     }
     handleListChange(e, budgetData.futureCosts);
-    debouncedSave('transactions_budget', generateBudgetCSV, 'save-csv');
+    debouncedSave('transactions_budget', generateBudgetCSV);
 });
 
 calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
@@ -308,8 +307,6 @@ const loadBudgetCSVFromServer = async () => {
     renderBudget();
 };
 
-const saveBudgetCSV = () => saveToServer('transactions_budget', generateBudgetCSV, 'save-csv');
 
-saveCsvBtn.addEventListener('click', saveBudgetCSV);
 
 export { renderBudget, calculateAndDisplaySummary, loadBudgetCSVFromServer, applyPlannedSavingsFromConfig };

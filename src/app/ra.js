@@ -8,7 +8,7 @@ import {
 import { fmtZAR, fmtZARWhole } from '../lib/format.js';
 import { createRowElement } from '../lib/rows.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
-import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
+import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // main.js points this at the retirement re-render — the
 // retirement tab reads live RA state; importing that renderer here directly
@@ -150,12 +150,8 @@ document.getElementById('ra-current-value').addEventListener('input', (e) => {
 const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions, raCurrentValue);
 
 function raPersist() {
-    debouncedSave('transactions_ra', generateRaCSVFromState, 'save-ra-csv');
+    debouncedSave('transactions_ra', generateRaCSVFromState);
 }
-
-document.getElementById('save-ra-csv').addEventListener('click', () => {
-    saveToServer('transactions_ra', generateRaCSVFromState, 'save-ra-csv');
-});
 
 document.getElementById('load-ra-csv').addEventListener('click', () => {
     const input = document.createElement('input');
@@ -183,6 +179,7 @@ document.getElementById('load-ra-csv').addEventListener('click', () => {
                 dirty = true;
             }
             if (dirty) persistConfig();
+            raPersist();
             renderRa();
         };
         reader.readAsText(f);

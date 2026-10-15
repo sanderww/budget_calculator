@@ -16,11 +16,11 @@ Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, 
 
 ### 0.1 Header
 
-- Title, subtitle, and (when test mode is on) the "SAMPLE DATA" label on the left.
+- Title and subtitle on the left.
 - Right-hand control group:
-  - **Save-status chip** (`#save-status`, desktop only): reflects the auto-save state across all modules — `Saving…` (muted) while one or more POSTs are in flight, `All changes saved` (emerald) after the last one succeeds, `⚠ Save failed` (red) when a save errors. A failure stays visible until the next successful save.
-  - **Refresh button** (`#refresh-current`): the single refresh control for the whole app. Clicking it re-renders/recalculates whichever tab is currently active. There are no longer per-tab refresh icons in the tab bar.
-  - **Test Mode toggle** (see §8).
+  - **Save-status chip** (`#save-status`, shown at every width): the only save indicator. It reflects the auto-save state across all modules — `Saving…` (muted) while one or more POSTs are in flight, `All changes saved` (emerald) after the last one succeeds. When a save errors it becomes an enabled button reading `⚠ Save failed — Retry` (red); clicking it calls `retryFailedSaves()`, which re-sends every save that failed since its last success. The failure stays visible until a save succeeds. There are no manual Save buttons and no Refresh button: every tab re-renders on edit or on show.
+  - **Sample data toggle** (`#test-mode-btn`, see §8).
+- **Sample-data banner** (`#sample-banner`): directly under the header, full-width amber, shown only while sample data is on (see §8).
 
 ### 0.2 KPI Strip
 
@@ -35,11 +35,11 @@ A row of four read-only cards between the header and the tab bar, giving at-a-gl
 
 ### 0.3 Tabs
 
-Tab bar labels: **Budget**, **Investments**, **Debt**, **RA**, **Retirement**, **History**. Each tab button only switches tabs (no embedded refresh icons).
+Tab bar labels: **Budget**, **Investments**, **Debt**, **RA**, **Retirement**, **History**. Each tab button only switches tabs.
 
 ### 0.4 Database Toolbars
 
-The Budget, Investments, Debt, and RA tabs each open with a slim full-width toolbar (replacing the former left sidebar "Database" cards): a database icon in the tab's accent colour, the backing file path (e.g. `db/transactions/budget.csv`), and the tab's Load/Save buttons on the right. Save buttons carry the shared save icon. The main content of these tabs spans the full page width.
+The Investments, Debt, and RA tabs each open with a right-aligned overflow menu button (`⋯`) instead of a database toolbar. Its popover holds **Import CSV…** (the file-picker import; ids `load-inv-csv`, `load-debt-csv`, `load-ra-csv`; an imported dataset is then auto-saved like any edit) and a muted footnote with the backing file path (e.g. `db/transactions/investments.csv`). The Budget tab has no import and therefore no menu and no path text. The Retirement tab's sidebar carries the same `⋯` menu with **Import CSV…** (`ret-load-csv`) and no path footnote. File paths appear nowhere else in the UI. There are no Save buttons: persistence is automatic (§7). The menu is built on the shared popover helper (`src/lib/popover.js`): the trigger has `aria-expanded`, Escape and outside click close it, and choosing an item closes it. The main content of these tabs spans the full page width.
 
 ---
 
@@ -78,7 +78,7 @@ The Budget, Investments, Debt, and RA tabs each open with a slim full-width tool
   - The state transition is `convertFutureCostToProvision(data, id, today)` in `src/calc/budget.js`: pure, never mutating its input, returning a new data object on success and the **input object by reference** when the move is refused (unknown id, blank or unparseable date, or a date not strictly before today). The click handler detects a no-op with `!==` and skips the re-render and save.
   - The conversion is **deliberately manual, never automatic.** Once a future cost's date passes, the money was either saved (it becomes a provision) or spent (the row is simply deleted). The app cannot infer which from the date, so it never converts on its own; the button's appearance is the cue that a row needs that decision.
   - **Effect on the summary:** converting reduces **Net savings now** by the amount and leaves **Net savings on [date]** unchanged. This falls out of the existing formulas rather than any new arithmetic — a past-dated cost already satisfies `date <= target` for every future target, so it was already inside `relevantFutureCosts`; after conversion it sits in `totalProvisions` instead, and `futureNetAmount` derives from `currentNetAmount`.
-- **Default ordering:** the list is always displayed sorted by date ascending — soonest cost at the top — via `sortByDateThenIdAsc` (`src/lib/rows.js`). Rows with a blank or unparseable date sort to the top, keeping a freshly added row in sight so its date can be filled in; date ties break by id ascending (ids embed creation time). The sort is applied to a copy on every render — initial load, the header refresh button, and every add/remove — so the stored order and the CSV are left untouched, and because rows are addressed by `data-id`, re-ordering never disturbs an in-progress edit. Typing into a date field does not re-sort mid-edit; the new position takes effect on the next render.
+- **Default ordering:** the list is always displayed sorted by date ascending — soonest cost at the top — via `sortByDateThenIdAsc` (`src/lib/rows.js`). Rows with a blank or unparseable date sort to the top, keeping a freshly added row in sight so its date can be filled in; date ties break by id ascending (ids embed creation time). The sort is applied to a copy on every render — initial load and every add/remove — so the stored order and the CSV are left untouched, and because rows are addressed by `data-id`, re-ordering never disturbs an in-progress edit. Typing into a date field does not re-sort mid-edit; the new position takes effect on the next render.
 
 ### 1.5 Financial Summary
 
@@ -173,7 +173,7 @@ Each account displays:
 For the **Discretionary** account specifically (only):
 
 - **Marginal tax rate (%)** — editable numeric input below Current Value. Default `41`. Range `0..100`, step `1`. Persisted in `db/config.private.json` as the key `marginal_rate`.
-- **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown. An info icon beside the label carries a hover tooltip explaining that the figure is the worst-case (sell-everything-at-once) estimate, that the R 40,000 exclusion resets each tax year and applies to the gain (not the amount sold), and how **tax-gain harvesting** (staggering disposals under R 40,000/year, selling and rebuying to reset base cost) can reduce or avoid CGT — closing with a "not tax advice" disclaimer.
+- **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown. An info icon button beside the label (`aria-expanded`, keyboard and touch accessible; Escape or an outside click closes it) toggles a help popover explaining that the figure is the worst-case (sell-everything-at-once) estimate, that the R 40,000 exclusion resets each tax year and applies to the gain (not the amount sold), and how **tax-gain harvesting** (staggering disposals under R 40,000/year, selling and rebuying to reset base cost) can reduce or avoid CGT — closing with a "not tax advice" disclaimer.
 - **CGT exclusion progress bar** — directly below the Estimated tax (CGT) line, a bar fills with `min(100, gain / R 40,000 × 100)%`. Below the bar: `<pct>% of CGT exclusion` on the left and `R <remaining> before CGT` on the right, where `remaining = max(0, R 40,000 − gain)`. Bar is emerald below 80%, amber from 80% up to 100%, red at or above 100% (gain has crossed the exclusion). Driven by the gain vs the R 40,000 threshold only — independent of the marginal rate. Resets to 0% when `totalInvested === 0`.
 - **Net vs savings (after tax)** — `Net vs Savings − Estimated Tax`. Green when ≥ 0, red when < 0.
 
@@ -275,7 +275,7 @@ Newton-Raphson method to find the internal rate of return:
 
 ### 4.1 Layout
 
-A purple-accented database toolbar (§0.4 — Load/Save buttons backed by `db/transactions/ra.csv` and `db/config.private.json`) above a full-width main area with two cards:
+The tab-level `⋯` menu (§0.4 — Import CSV…) above a full-width main area with two cards:
 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
@@ -300,7 +300,7 @@ A purple-accented database toolbar (§0.4 — Load/Save buttons backed by `db/tr
 
 ### 5.1 Tab Placement
 
-Between the **RA** and **History** tabs. The tab header is "Retirement"; refreshing happens via the global header refresh control (§0.1).
+Between the **RA** and **History** tabs. The tab header is "Retirement"; it re-renders when shown and on every input or upstream edit.
 
 ### 5.2 Sidebar (left col)
 
@@ -342,7 +342,7 @@ Each scenario has a checkbox + inline inputs (only enabled when checkbox is chec
 7. Annual savings-pot withdrawal: amount R/yr (warning when 0 < amount < R 2,000).
 
 **Persistence**
-- Load Retirement / Save Retirement buttons hit `/api/save/config_public` and `/api/save/config_private` (or their `test_` prefixed variants in test mode), and on every input change a debounced save (800 ms) fires.
+- There are no Load/Save buttons. On every input change a debounced save (800 ms) hits `/api/save/config_public` and `/api/save/config_private` (or their `test_` prefixed variants in test mode). **Import CSV…** (in the sidebar `⋯` menu) applies the imported parameters and then saves them the same way.
 - On page load the tab loads `db/config.public.json` and `db/config.private.json` (merged into a single param map) and falls back to defaults silently when a file is missing.
 
 ### 5.3 Cards
@@ -507,8 +507,8 @@ Date,Description,Amount
 ### 7.2 Auto-Save
 
 - All data changes trigger a debounced save (800ms delay) via POST to the server.
-- Manual save buttons are also available for each module (in the §0.4 database toolbars).
-- The header save-status chip (§0.1) reflects the aggregate state of all in-flight saves: `Saving…` → `All changes saved` on success, `⚠ Save failed` on error (sticky until the next successful save). Save failures are additionally logged to the console.
+- There are no manual save buttons; a failed save is retried from the header chip (§0.1).
+- The header save-status chip (§0.1) reflects the aggregate state of all in-flight saves: `Saving…` → `All changes saved` on success, `⚠ Save failed — Retry` on error (sticky until a successful save; the chip re-sends every failed save). Save failures are additionally logged to the console.
 - On page load, all CSV files are fetched automatically: transaction files per-domain plus both config files (public and private), which are merged client-side into a single param map.
 
 ### 7.3 Server API
@@ -523,11 +523,11 @@ Date,Description,Amount
 
 ---
 
-## 8. Test Mode
+## 8. Sample data (test mode)
 
-- Toggle button in the header switches between real data and sample data.
+- Toggle pill in the header, labelled **Sample data**, switches between real data and sample data.
 - When enabled:
-  - "SAMPLE DATA" label is displayed.
+  - A full-width amber banner under the header reads "You're viewing sample data. Changes are saved to the sample files, not your own." with a **Switch to my data** button that does the same as the pill.
   - All reads/writes use `db/test/` directory instead of `db/`, mirroring the same layout (`db/test/transactions/`, `db/test/config.public.json`, `db/test/config.private.json`).
   - Save keys are prefixed with `test_` (e.g., `test_transactions_budget`, `test_config_private`).
   - Server blocks writes to real data keys when `X-Test-Mode: true` header is present.

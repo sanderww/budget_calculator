@@ -14,26 +14,6 @@
 
 <body class="p-4 sm:p-6 md:p-8">
 
-    <!-- Shared SVG icon definitions (referenced via <use href="#icon-..."/>) -->
-    <svg xmlns="http://www.w3.org/2000/svg" class="hidden" aria-hidden="true">
-        <symbol id="icon-refresh" viewBox="0 0 24 24">
-            <path d="M21 2v6h-6"/>
-            <path d="M3 12a9 9 0 0 1 15-6.7L21 8"/>
-            <path d="M3 22v-6h6"/>
-            <path d="M21 12a9 9 0 0 1-15 6.7L3 16"/>
-        </symbol>
-        <symbol id="icon-save" viewBox="0 0 24 24">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-            <polyline points="17 21 17 13 7 13 7 21"/>
-            <polyline points="7 3 7 8 15 8"/>
-        </symbol>
-        <symbol id="icon-database" viewBox="0 0 24 24">
-            <path d="M3 15a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4z"/>
-            <path d="M7 10l5 5 5-5"/>
-            <path d="M12 15V3"/>
-        </symbol>
-    </svg>
-
     <div class="max-w-7xl mx-auto">
         <!-- Header -->
         <header class="mb-8 flex items-start justify-between gap-4">
@@ -49,26 +29,26 @@
                 <div>
                     <h1 class="text-3xl font-bold tracking-tight text-slate-900">Personal Finance Dashboard</h1>
                     <p class="text-slate-500 mt-0.5">Manage your budget and track your investments.</p>
-                    <p id="test-mode-label" class="hidden text-xs text-amber-600 mt-1 font-medium tracking-wide">SAMPLE DATA</p>
                 </div>
             </div>
             <div class="mt-1 flex items-center gap-2">
-                <span id="save-status"
-                    class="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium border-slate-200 text-slate-400"
-                    role="status" aria-live="polite">All changes saved</span>
-                <button id="refresh-current"
-                    class="refresh-icon p-1.5 rounded-full border border-slate-200 hover:border-slate-300"
-                    title="Refresh calculations on this tab" aria-label="Refresh calculations on this tab">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><use href="#icon-refresh"/></svg>
-                </button>
+                <button id="save-status" type="button" disabled
+                    class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium border-slate-200 text-slate-400"
+                    role="status" aria-live="polite">All changes saved</button>
                 <button id="test-mode-btn"
                     class="flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium transition-colors border-slate-200 text-slate-400 hover:text-slate-500 hover:border-slate-300"
-                    title="Switch between real and sample data">
+                    title="Switch between your data and sample data">
                     <span id="test-mode-dot" class="w-1.5 h-1.5 rounded-full bg-slate-300 transition-colors"></span>
-                    Test Mode
+                    Sample data
                 </button>
             </div>
         </header>
+
+        <!-- Sample-data banner (shown only while sample data is active) -->
+        <div id="sample-banner" class="hidden mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-amber-50 border border-amber-300 rounded-xl text-sm text-amber-800" role="status">
+            <span>You're viewing sample data. Changes are saved to the sample files, not your own.</span>
+            <button id="sample-switch-btn" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Switch to my data</button>
+        </div>
 
         <!-- KPI Strip: at-a-glance numbers mirrored from the tabs -->
         <div class="mb-6 grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -126,17 +106,6 @@
 
         <!-- BUDGET TAB CONTENT -->
         <div id="budget-content">
-            <!-- Database toolbar -->
-            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><use href="#icon-database"/></svg>
-                    <span class="font-mono">db/transactions/budget.csv</span>
-                </div>
-                <button id="save-csv" class="btn btn-primary text-xs py-1.5 px-3">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
-                    Save Budget
-                </button>
-            </div>
 
             <!-- Main Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -289,18 +258,16 @@
 
         <!-- INVESTMENT TAB CONTENT -->
         <div id="investment-content" class="hidden">
-            <!-- Database toolbar -->
-            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600"><use href="#icon-database"/></svg>
-                    <span class="font-mono">db/transactions/investments.csv</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="load-inv-csv" class="btn btn-secondary text-xs py-1.5 px-3">Load Investments</button>
-                    <button id="save-inv-csv" class="btn btn-primary text-xs py-1.5 px-3">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
-                        Save Investments
-                    </button>
+            <!-- Tab menu -->
+            <div class="mb-4 flex justify-end">
+                <div class="relative">
+                    <button type="button" data-popover-trigger aria-controls="inv-menu" aria-expanded="false" aria-haspopup="true"
+                        class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 text-base leading-none"
+                        aria-label="Investments menu" title="Investments menu">&#8943;</button>
+                    <div id="inv-menu" data-popover-menu class="hidden absolute right-0 mt-1 z-20 w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-2">
+                        <button id="load-inv-csv" type="button" class="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700">Import CSV&hellip;</button>
+                        <p class="px-2 pt-1.5 text-[11px] text-slate-400 font-mono">db/transactions/investments.csv</p>
+                    </div>
                 </div>
             </div>
 
@@ -351,13 +318,7 @@
                                             <span id="net-savings-discretionary" class="font-medium">R 0.00</span>
                                         </div>
                                         <div class="flex justify-between text-xs text-slate-500">
-                                            <span class="inline-flex items-center gap-1">Estimated tax (CGT)<span class="cursor-help text-slate-400" title="Worst-case estimate: assumes you sell everything at once, using a single R 40,000 annual exclusion.
-
-The R 40,000 exclusion resets every SA tax year (1 March–end Feb) and covers the GAIN, not the amount sold. By realising gains gradually and keeping each year's gain under R 40,000, you can often pay little or no CGT.
-
-Tax-gain harvesting: sell and immediately rebuy to crystallise the gain (using up that year's exclusion) and reset your base cost higher — shrinking future taxable gains. The exclusion is shared across all your capital gains for the year, and brokerage/spread costs apply each time.
-
-General info, not tax advice — confirm with a tax practitioner."><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></span></span>
+                                            <span class="inline-flex items-center gap-1">Estimated tax (CGT)<span class="relative inline-flex"><button type="button" data-popover-trigger aria-controls="cgt-help" aria-expanded="false" aria-label="About the estimated tax" class="text-slate-400 hover:text-slate-600 rounded-full"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg></button><div id="cgt-help" class="hidden absolute left-0 top-full mt-1 z-20 w-72 max-w-[80vw] bg-white border border-slate-200 rounded-xl shadow-lg p-3 text-[11px] leading-snug text-slate-600 font-normal"><p class="">Worst-case estimate: assumes you sell everything at once, using a single R 40,000 annual exclusion.</p><p class="mt-2 ">The R 40,000 exclusion resets every SA tax year (1 March–end Feb) and covers the GAIN, not the amount sold. By realising gains gradually and keeping each year's gain under R 40,000, you can often pay little or no CGT.</p><p class="mt-2 ">Tax-gain harvesting: sell and immediately rebuy to crystallise the gain (using up that year's exclusion) and reset your base cost higher — shrinking future taxable gains. The exclusion is shared across all your capital gains for the year, and brokerage/spread costs apply each time.</p><p class="mt-2 ">General info, not tax advice — confirm with a tax practitioner.</p></div></span></span>
                                             <span id="tax-discretionary" class="font-medium text-red-500">R 0.00</span>
                                         </div>
                                         <div class="w-full bg-slate-200 rounded-full h-1.5 mt-1 overflow-hidden">
@@ -497,18 +458,16 @@ General info, not tax advice — confirm with a tax practitioner."><svg xmlns="h
 
         <!-- DEBT TAB CONTENT -->
         <div id="debt-content" class="hidden">
-            <!-- Database toolbar -->
-            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600"><use href="#icon-database"/></svg>
-                    <span class="font-mono">db/transactions/debt.csv</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="load-debt-csv" class="btn btn-secondary text-xs py-1.5 px-3">Load Debt Data</button>
-                    <button id="save-debt-csv" class="btn btn-primary text-xs py-1.5 px-3">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
-                        Save Debt Data
-                    </button>
+            <!-- Tab menu -->
+            <div class="mb-4 flex justify-end">
+                <div class="relative">
+                    <button type="button" data-popover-trigger aria-controls="debt-menu" aria-expanded="false" aria-haspopup="true"
+                        class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 text-base leading-none"
+                        aria-label="Debt menu" title="Debt menu">&#8943;</button>
+                    <div id="debt-menu" data-popover-menu class="hidden absolute right-0 mt-1 z-20 w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-2">
+                        <button id="load-debt-csv" type="button" class="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700">Import CSV&hellip;</button>
+                        <p class="px-2 pt-1.5 text-[11px] text-slate-400 font-mono">db/transactions/debt.csv</p>
+                    </div>
                 </div>
             </div>
 
@@ -646,18 +605,16 @@ General info, not tax advice — confirm with a tax practitioner."><svg xmlns="h
 
         <!-- RA TAB CONTENT -->
         <div id="ra-content" class="hidden">
-            <!-- Database toolbar -->
-            <div class="mb-6 flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-white border border-slate-200 rounded-xl shadow-sm">
-                <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-purple-600"><use href="#icon-database"/></svg>
-                    <span class="font-mono">db/transactions/ra.csv</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button id="load-ra-csv" class="btn btn-secondary text-xs py-1.5 px-3">Load RA</button>
-                    <button id="save-ra-csv" class="btn btn-primary text-xs py-1.5 px-3">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline-block mr-1.5"><use href="#icon-save"/></svg>
-                        Save RA
-                    </button>
+            <!-- Tab menu -->
+            <div class="mb-4 flex justify-end">
+                <div class="relative">
+                    <button type="button" data-popover-trigger aria-controls="ra-menu" aria-expanded="false" aria-haspopup="true"
+                        class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 text-base leading-none"
+                        aria-label="RA menu" title="RA menu">&#8943;</button>
+                    <div id="ra-menu" data-popover-menu class="hidden absolute right-0 mt-1 z-20 w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-2">
+                        <button id="load-ra-csv" type="button" class="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700">Import CSV&hellip;</button>
+                        <p class="px-2 pt-1.5 text-[11px] text-slate-400 font-mono">db/transactions/ra.csv</p>
+                    </div>
                 </div>
             </div>
 
@@ -901,8 +858,14 @@ General info, not tax advice — confirm with a tax practitioner."><svg xmlns="h
                             </details>
 
                             <div class="pt-4 border-t border-indigo-100">
-                                <button id="ret-load-csv" class="btn btn-secondary text-xs w-full mb-2">Load Retirement</button>
-                                <button id="ret-save-csv" class="btn btn-primary text-xs w-full">Save Retirement</button>
+                                <div class="relative flex justify-end">
+                                    <button type="button" data-popover-trigger aria-controls="ret-menu" aria-expanded="false" aria-haspopup="true"
+                                        class="px-2.5 py-1 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 hover:border-slate-300 text-base leading-none"
+                                        aria-label="Retirement menu" title="Retirement menu">&#8943;</button>
+                                    <div id="ret-menu" data-popover-menu class="hidden absolute right-0 bottom-full mb-1 z-20 w-60 bg-white border border-slate-200 rounded-xl shadow-lg p-2">
+                                        <button id="ret-load-csv" type="button" class="w-full text-left text-sm px-2 py-1.5 rounded-lg hover:bg-slate-50 text-slate-700">Import CSV&hellip;</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

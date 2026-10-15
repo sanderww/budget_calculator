@@ -7,11 +7,10 @@ import {
     getDefaultRetirementParams as _getDefaultRetirementParams,
     parseRetirementCSV as _parseRetirementCSV,
     calculateRetirementSnapshot as _calculateRetirementSnapshot,
-    generateConfigJSON as _generateConfigJSON,
 } from '../calculations.js';
 import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
 import { fmtZARWhole, fmtZARSigned, fmtNum } from '../lib/format.js';
-import { getConfigMap, persistConfig, saveToServer } from './persistence.js';
+import { getConfigMap, persistConfig } from './persistence.js';
 import { getInvestmentData } from './investments.js';
 import { getRaState } from './ra.js';
 
@@ -140,16 +139,6 @@ function retWireInputs() {
         });
     });
 
-    document.getElementById('ret-save-csv').addEventListener('click', () => {
-        Object.keys(retirementParams).forEach(k => { getConfigMap()[k] = retirementParams[k]; });
-        saveToServer('config_public',
-            () => _generateConfigJSON(getConfigMap(), { public: true }),
-            'ret-save-csv');
-        saveToServer('config_private',
-            () => _generateConfigJSON(getConfigMap(), { public: false }),
-            null);
-    });
-
     document.getElementById('ret-load-csv').addEventListener('click', () => {
         const input = document.createElement('input');
         input.type = 'file';
@@ -161,6 +150,7 @@ function retWireInputs() {
             reader.onload = (ev) => {
                 retirementParams = _parseRetirementCSV(ev.target.result);
                 retApplyParamsToInputs();
+                retPersist();
                 renderRetirement();
             };
             reader.readAsText(f);

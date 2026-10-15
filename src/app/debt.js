@@ -9,7 +9,7 @@ import {
 } from '../calculations.js';
 import { fmtZAR as formatCurrency } from '../lib/format.js';
 import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
-import { dbPath, debouncedSave, saveToServer, getConfigMap, setConfig, persistConfig } from './persistence.js';
+import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // --- DEBT CALCULATOR LOGIC ---
 let debtData = {
@@ -19,7 +19,6 @@ let debtData = {
 const repaymentList = document.getElementById('repayment-list');
 const addRepaymentBtn = document.getElementById('add-repayment');
 const loadDebtCsvBtn = document.getElementById('load-debt-csv');
-const saveDebtCsvBtn = document.getElementById('save-debt-csv');
 
 // Inputs
 const debtAmountInput = document.getElementById('debt-amount');
@@ -184,7 +183,7 @@ addRepaymentBtn.addEventListener('click', () => {
         amount: ''
     });
     renderRepayments();
-    debouncedSave('transactions_debt', generateDebtCSV, null);
+    debouncedSave('transactions_debt', generateDebtCSV);
 });
 
 repaymentList.addEventListener('input', (e) => {
@@ -200,7 +199,7 @@ repaymentList.addEventListener('input', (e) => {
     else if (target.classList.contains('date-input')) item.date = target.value;
 
     calculateDebtProjection();
-    debouncedSave('transactions_debt', generateDebtCSV, null);
+    debouncedSave('transactions_debt', generateDebtCSV);
 });
 
 repaymentList.addEventListener('click', (e) => {
@@ -211,7 +210,7 @@ repaymentList.addEventListener('click', (e) => {
         if (index > -1) {
             debtData.repayments.splice(index, 1);
             renderRepayments();
-            debouncedSave('transactions_debt', generateDebtCSV, null);
+            debouncedSave('transactions_debt', generateDebtCSV);
         }
     }
 });
@@ -254,7 +253,6 @@ const loadDebtCSVFromServer = async () => {
     }
 };
 
-const saveDebtCSV = () => saveToServer('transactions_debt', generateDebtCSV, null);
 
 loadDebtCsvBtn.addEventListener('click', async () => {
     if (!window.showOpenFilePicker) return;
@@ -281,12 +279,12 @@ loadDebtCsvBtn.addEventListener('click', async () => {
         if (!debtNextPaymentInput.value) debtNextPaymentInput.value = getUpcoming25th();
 
         renderRepayments();
+        debouncedSave('transactions_debt', generateDebtCSV);
     } catch (err) {
         console.error(err);
     }
 });
 
-saveDebtCsvBtn.addEventListener('click', saveDebtCSV);
 
 export const getDebtData = () => debtData;
 export { calculateDebtProjection, renderRepayments, loadDebtCSVFromServer };

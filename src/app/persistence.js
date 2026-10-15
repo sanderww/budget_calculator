@@ -9,19 +9,21 @@ export const dbPath = (filename) => testMode ? `db/test/${filename}` : `db/${fil
 const saveKey = (name) => testMode ? `test_${name}` : name;
 
 const _saveTimers = {};
-export const debouncedSave = (name, csvFn, btnId, delayMs = 800) => {
+export const debouncedSave = (name, csvFn, delayMs = 800) => {
     clearTimeout(_saveTimers[name]);
-    _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn, btnId), delayMs);
+    _saveTimers[name] = setTimeout(() => saveToServer(name, csvFn), delayMs);
 };
 
-// Header chip reflecting the auto-save state. Failures stay visible until the
-// next successful save so the user can't miss a write that never landed.
+// Header chip reflecting the auto-save state. Failures stay visible (as a
+// "Save failed - Retry" button) until the next successful save so the user
+// can't miss a write that never landed.
 let _pendingSaves = 0;
-let _saveFailed = false;
+const _failedSaves = new Map(); // name -> csvFn of saves that failed since their last success
 const _setSaveStatus = (state) => {
     const el = document.getElementById('save-status');
     if (!el) return;
-    const base = 'hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium';
+    const base = 'flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium';
+    el.disabled = state !== 'error';
     if (state === 'saving') {
         el.textContent = 'Saving…';
         el.className = `${base} border-slate-200 text-slate-500`;
@@ -29,12 +31,12 @@ const _setSaveStatus = (state) => {
         el.textContent = 'All changes saved';
         el.className = `${base} border-emerald-200 bg-emerald-50 text-emerald-700`;
     } else if (state === 'error') {
-        el.textContent = '⚠ Save failed';
-        el.className = `${base} border-red-200 bg-red-50 text-red-600`;
+        el.textContent = '⚠ Save failed — Retry';
+        el.className = `${base} border-red-200 bg-red-50 text-red-600 hover:bg-red-100 cursor-pointer`;
     }
 };
 
-export const saveToServer = async (name, csvFn, btnId) => {
+export const saveToServer = async (name, csvFn) => {
     const csv = csvFn();
     _pendingSaves++;
     _setSaveStatus('saving');
@@ -47,23 +49,19 @@ export const saveToServer = async (name, csvFn, btnId) => {
             body: csv
         });
         if (!res.ok) throw new Error(`Save failed: ${res.status}`);
-        _saveFailed = false;
-        if (btnId) {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                const orig = btn.innerHTML;
-                btn.innerHTML = 'Saved!';
-                setTimeout(() => btn.innerHTML = orig, 1500);
-            }
-        }
+        _failedSaves.delete(name);
     } catch (err) {
-        _saveFailed = true;
+        _failedSaves.set(name, csvFn);
         console.error(`Failed to save ${name}:`, err);
     } finally {
         _pendingSaves--;
-        if (_pendingSaves <= 0) _setSaveStatus(_saveFailed ? 'error' : 'saved');
+        if (_pendingSaves <= 0) _setSaveStatus(_failedSaves.size ? 'error' : 'saved');
     }
 };
+
+// Re-send every save that failed since its last success.
+export const retryFailedSaves = () =>
+    Promise.all([..._failedSaves].map(([name, csvFn]) => saveToServer(name, csvFn)));
 
 // Single source of truth for every param-style value (config.public.json +
 // config.private.json). Callers must always go through getConfigMap() —
@@ -88,11 +86,9 @@ export const loadConfigFromServer = async () => {
 
 export const persistConfig = () => {
     debouncedSave('config_public',
-        () => generateConfigJSON(configMap, { public: true }),
-        null);
+        () => generateConfigJSON(configMap, { public: true }));
     debouncedSave('config_private',
-        () => generateConfigJSON(configMap, { public: false }),
-        null);
+        () => generateConfigJSON(configMap, { public: false }));
 };
 
 export const setConfig = (key, value) => {
