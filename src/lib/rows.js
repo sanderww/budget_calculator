@@ -111,18 +111,20 @@ export function deleteWithUndo({ getList, id, onChange }) {
 const trashIconSVG = (size) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>`;
 
-const convertIconSVG = (size) =>
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>`;
+// Neutral trash button shared by every editable row.
+const createRemoveButton = (compact = false) => {
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.title = 'Delete';
+    removeBtn.setAttribute('aria-label', 'Delete');
+    removeBtn.innerHTML = trashIconSVG(compact ? 14 : 16);
+    removeBtn.className = `btn btn-icon-danger remove-btn ${compact ? 'p-1.5' : 'p-2'}`;
+    return removeBtn;
+};
 
 // fields: ordered array of 'date' | 'description' | 'amount' | 'cryptoValue'
 // | { select: [...options] }. A remove button is always appended.
-//
-// convertible: optional predicate (item) => boolean. When supplied, a
-// convert button is added before the remove button. Rows where the predicate
-// is false keep the cell but render the button `invisible`, so the remove
-// buttons stay aligned down the list (same technique as cryptoValue above).
-// Omitting the option emits no cell at all, leaving other lists untouched.
-export function createRowElement(item, { gridTemplateColumns, fields, compact = false, convertible = null }) {
+export function createRowElement(item, { gridTemplateColumns, fields, compact = false }) {
     const div = document.createElement('div');
     div.className = 'grid gap-2 items-center';
     div.style.gridTemplateColumns = gridTemplateColumns;
@@ -182,25 +184,95 @@ export function createRowElement(item, { gridTemplateColumns, fields, compact = 
         }
     }
 
-    if (convertible) {
-        const convertBtn = document.createElement('button');
-        convertBtn.type = 'button';
-        convertBtn.innerHTML = convertIconSVG(compact ? 14 : 16);
-        convertBtn.title = 'Move to provisions';
-        convertBtn.setAttribute('aria-label', 'Move to provisions');
-        const usable = convertible(item);
-        convertBtn.className = `btn btn-secondary convert-btn ${compact ? 'p-1.5' : 'p-2'}`
-            + (usable ? '' : ' invisible');
-        if (!usable) convertBtn.disabled = true;
-        div.appendChild(convertBtn);
+    div.appendChild(createRemoveButton(compact));
+    return div;
+}
+
+// Budget commitments ledger. Kinds match COMMITMENT_KINDS in calc/budget.js.
+export const COMMITMENT_KIND_LABELS = { debt: 'Debt', provision: 'Provision', futureCost: 'Future cost' };
+
+// One ledger row: Type chip (select) · Description · Amount · Due · delete.
+// The row carries data-id (the item id) and data-kind. Debts have no due date,
+// so their Due cell is left empty. Future costs also get a full-width
+// "Past due" strip with a text "Move to provisions" button; it is hidden
+// unless `pastDue`, and setCommitmentPastDue() toggles it without a
+// re-render (so editing a date does not steal focus).
+export function createCommitmentRow(item, kind, { pastDue = false } = {}) {
+    const row = document.createElement('div');
+    row.className = 'commitment-row';
+    row.dataset.id = item.id;
+    row.dataset.kind = kind;
+
+    const kindSel = document.createElement('select');
+    kindSel.className = 'kind-select kind-chip';
+    kindSel.dataset.kind = kind;
+    kindSel.setAttribute('aria-label', 'Type');
+    for (const [value, label] of Object.entries(COMMITMENT_KIND_LABELS)) {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = label;
+        if (value === kind) option.selected = true;
+        kindSel.appendChild(option);
     }
 
-    const removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.title = 'Delete';
-    removeBtn.setAttribute('aria-label', 'Delete');
-    removeBtn.innerHTML = trashIconSVG(compact ? 14 : 16);
-    removeBtn.className = `btn btn-icon-danger remove-btn ${compact ? 'p-1.5' : 'p-2'}`;
-    div.appendChild(removeBtn);
-    return div;
+    const desc = document.createElement('input');
+    desc.type = 'text';
+    desc.value = item.description || '';
+    desc.placeholder = 'Description';
+    desc.setAttribute('aria-label', 'Description');
+    desc.className = 'input-field description-input commitment-desc';
+
+    const amtWrap = document.createElement('div');
+    amtWrap.className = 'relative commitment-amount';
+    const prefix = document.createElement('span');
+    prefix.className = 'currency-prefix';
+    prefix.textContent = 'R';
+    const amt = document.createElement('input');
+    amt.placeholder = '0.00';
+    amt.setAttribute('aria-label', 'Amount');
+    amt.className = 'input-field amount-input';
+    bindAmountInput(amt, {
+        get: () => item.amount,
+        set: (v) => { item.amount = v === null ? '' : v; },
+    });
+    amtWrap.append(prefix, amt);
+
+    const due = document.createElement('div');
+    due.className = 'commitment-due';
+    if (kind !== 'debt') {
+        const date = document.createElement('input');
+        date.type = 'date';
+        date.value = item.date || '';
+        date.setAttribute('aria-label', 'Due date');
+        date.className = 'input-field date-input';
+        due.appendChild(date);
+    }
+
+    const removeBtn = createRemoveButton();
+    removeBtn.classList.add('commitment-remove');
+    row.append(kindSel, desc, amtWrap, due, removeBtn);
+
+    if (kind === 'futureCost') {
+        const strip = document.createElement('div');
+        strip.className = 'commitment-pastdue';
+        const badge = document.createElement('span');
+        badge.className = 'past-due-badge';
+        badge.textContent = 'Past due';
+        const hint = document.createElement('span');
+        hint.className = 'commitment-pastdue-hint';
+        hint.textContent = 'Saved the money? Move it to provisions. Spent it? Delete the row.';
+        const convertBtn = document.createElement('button');
+        convertBtn.type = 'button';
+        convertBtn.className = 'btn btn-secondary convert-btn';
+        convertBtn.textContent = 'Move to provisions';
+        strip.append(badge, hint, convertBtn);
+        row.appendChild(strip);
+        setCommitmentPastDue(row, pastDue);
+    }
+    return row;
+}
+
+export function setCommitmentPastDue(row, pastDue) {
+    const strip = row.querySelector('.commitment-pastdue');
+    if (strip) strip.hidden = !pastDue;
 }

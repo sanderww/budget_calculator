@@ -121,32 +121,21 @@
                                 </div>
                             </div>
 
-                            <!-- Debts -->
-                            <div class="card">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-xl font-semibold text-slate-800">Debts</h2>
-                                    <button id="add-debt" class="btn btn-secondary text-sm">+ Add Debt</button>
+                            <!-- Commitments ledger: debts, provisions and future costs in one table -->
+                            <div class="card" id="commitments-card">
+                                <h2 class="text-xl font-semibold text-slate-800 mb-4">Commitments</h2>
+                                <label for="commitment-quick-add" class="sr-only">Add a commitment</label>
+                                <input type="text" id="commitment-quick-add" class="input-field" autocomplete="off"
+                                    placeholder="Add a commitment — e.g. &quot;car service 6.5k mar 2027&quot; or &quot;credit card 12000 debt&quot;"
+                                    aria-describedby="commitment-quick-add-preview">
+                                <p id="commitment-quick-add-preview" class="quick-add-preview" aria-live="polite"></p>
+                                <div id="commitment-filters" class="flex flex-wrap gap-2 mt-3 mb-3" role="group"
+                                    aria-label="Filter commitments"></div>
+                                <div class="commitment-head" aria-hidden="true">
+                                    <span>Type</span><span>Description</span><span class="text-right">Amount</span><span>Due</span><span></span>
                                 </div>
-                                <div id="debt-list" class="space-y-3"></div>
-                            </div>
-
-                            <!-- Provisions -->
-                            <div class="card">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-xl font-semibold text-slate-800">Provisions</h2>
-                                    <button id="add-provision" class="btn btn-secondary text-sm">+ Add
-                                        Provision</button>
-                                </div>
-                                <div id="provision-list" class="space-y-3"></div>
-                            </div>
-
-                            <!-- Future Costs -->
-                            <div class="card">
-                                <div class="flex justify-between items-center mb-4">
-                                    <h2 class="text-xl font-semibold text-slate-800">Future Costs</h2>
-                                    <button id="add-future-cost" class="btn btn-secondary text-sm">+ Add Cost</button>
-                                </div>
-                                <div id="future-cost-list" class="space-y-3"></div>
+                                <div id="commitment-list" class="space-y-2"></div>
+                                <div id="commitment-footer" class="commitment-footer"></div>
                             </div>
 
                         </div>

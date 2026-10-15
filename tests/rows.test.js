@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createRowElement, sortByDateThenIdDesc, sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo, deletedMessage } from '../src/lib/rows.js';
+import { createRowElement, sortByDateThenIdDesc, sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo, deletedMessage, createCommitmentRow, setCommitmentPastDue, COMMITMENT_KIND_LABELS } from '../src/lib/rows.js';
 
 describe('sortByDateThenIdDesc', () => {
     it('sorts newest date first', () => {
@@ -41,48 +41,6 @@ describe('sortByDateThenIdAsc', () => {
     it('lifts unparseable dates to the top too', () => {
         const rows = [{ id: 'a', date: '2026-01-01' }, { id: 'junk', date: 'not-a-date' }];
         expect(rows.sort(sortByDateThenIdAsc).map(r => r.id)).toEqual(['junk', 'a']);
-    });
-});
-
-describe('createRowElement convert button', () => {
-    const row = (over = {}) => createRowElement(
-        { id: 'f1', description: 'rent tax', amount: 5000, date: '2026-08-08', ...over },
-        { gridTemplateColumns: '1fr 1fr 1fr auto auto', fields: ['description', 'amount', 'date'],
-          convertible: (item) => item.date === '2026-08-08' });
-
-    it('renders a convert button before the remove button', () => {
-        const el = row();
-        const buttons = [...el.querySelectorAll('button')];
-        expect(buttons).toHaveLength(2);
-        expect(buttons[0].classList.contains('convert-btn')).toBe(true);
-        expect(buttons[1].classList.contains('remove-btn')).toBe(true);
-    });
-
-    it('leaves the button usable when the predicate passes', () => {
-        const btn = row().querySelector('.convert-btn');
-        expect(btn.classList.contains('invisible')).toBe(false);
-        expect(btn.disabled).toBe(false);
-        expect(btn.title).toBe('Move to provisions');
-    });
-
-    it('keeps the cell but hides and disables the button when the predicate fails', () => {
-        const el = row({ date: '2034-01-06' });
-        const btn = el.querySelector('.convert-btn');
-        // Still present, so the remove buttons stay aligned down the list.
-        expect(btn).not.toBeNull();
-        expect(btn.classList.contains('invisible')).toBe(true);
-        expect(btn.disabled).toBe(true);
-    });
-
-    it('emits no convert cell at all when the option is omitted', () => {
-        const el = createRowElement({ id: 'p1', description: 'x', amount: 1, date: '2026-01-01' },
-            { gridTemplateColumns: '1fr 1fr 1fr auto', fields: ['description', 'amount', 'date'] });
-        expect(el.querySelector('.convert-btn')).toBeNull();
-        expect(el.querySelectorAll('button')).toHaveLength(1);
-    });
-
-    it('does not submit an enclosing form', () => {
-        expect(row().querySelector('.convert-btn').type).toBe('button');
     });
 });
 
@@ -278,5 +236,92 @@ describe('delete then undo (DOM)', () => {
         list.unshift({ id: 'a', description: 'Rent', amount: 100 });
         undo.click();
         expect(list.filter(i => i.id === 'a')).toHaveLength(1);
+    });
+});
+
+describe('createCommitmentRow', () => {
+    const item = (over = {}) => ({ id: 'c1', description: 'School fees', amount: 45000, date: '2027-01-15', ...over });
+
+    it('labels the three kinds', () => {
+        expect(COMMITMENT_KIND_LABELS).toEqual({ debt: 'Debt', provision: 'Provision', futureCost: 'Future cost' });
+    });
+
+    it('carries the item id and kind on the row', () => {
+        const row = createCommitmentRow(item(), 'futureCost');
+        expect(row.dataset.id).toBe('c1');
+        expect(row.dataset.kind).toBe('futureCost');
+        expect(row.classList.contains('commitment-row')).toBe(true);
+    });
+
+    it('renders the type as a labelled chip select with the current kind chosen', () => {
+        const sel = createCommitmentRow(item(), 'provision').querySelector('select.kind-select');
+        expect(sel.getAttribute('aria-label')).toBe('Type');
+        expect([...sel.options].map(o => [o.value, o.textContent])).toEqual([
+            ['debt', 'Debt'], ['provision', 'Provision'], ['futureCost', 'Future cost'],
+        ]);
+        expect(sel.value).toBe('provision');
+        expect(sel.dataset.kind).toBe('provision');
+        expect(sel.classList.contains('kind-chip')).toBe(true);
+    });
+
+    it('lays out description, amount, due and delete in order', () => {
+        const row = createCommitmentRow(item(), 'provision');
+        const desc = row.querySelector('.description-input');
+        expect(desc.value).toBe('School fees');
+        expect(desc.getAttribute('aria-label')).toBe('Description');
+        const amt = row.querySelector('.amount-input');
+        expect(amt.value).toBe('45,000');
+        expect(amt.getAttribute('aria-label')).toBe('Amount');
+        const date = row.querySelector('.date-input');
+        expect(date.type).toBe('date');
+        expect(date.value).toBe('2027-01-15');
+        expect(date.getAttribute('aria-label')).toBe('Due date');
+        const del = row.querySelector('button.remove-btn');
+        expect(del.getAttribute('aria-label')).toBe('Delete');
+    });
+
+    it('writes a typed amount back to the item as a number', () => {
+        const it_ = item();
+        const amt = createCommitmentRow(it_, 'futureCost').querySelector('.amount-input');
+        amt.value = '6.5k';
+        amt.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(it_.amount).toBe(6500);
+    });
+
+    it('leaves the due cell empty and uneditable for a debt', () => {
+        const row = createCommitmentRow(item({ date: '' }), 'debt');
+        expect(row.querySelector('.date-input')).toBeNull();
+        const due = row.querySelector('.commitment-due');
+        expect(due).not.toBeNull();
+        expect(due.querySelector('input')).toBeNull();
+    });
+
+    it('shows the past-due strip with a text Move button on a past-due future cost', () => {
+        const row = createCommitmentRow(item({ date: '2026-01-01' }), 'futureCost', { pastDue: true });
+        const strip = row.querySelector('.commitment-pastdue');
+        expect(strip.hidden).toBe(false);
+        expect(strip.querySelector('.past-due-badge').textContent).toBe('Past due');
+        const btn = strip.querySelector('button.convert-btn');
+        expect(btn.textContent).toBe('Move to provisions');
+        expect(btn.type).toBe('button');
+    });
+
+    it('keeps the strip hidden on a future cost that is not past due', () => {
+        const row = createCommitmentRow(item(), 'futureCost', { pastDue: false });
+        expect(row.querySelector('.commitment-pastdue').hidden).toBe(true);
+    });
+
+    it('never offers the move on provisions or debts', () => {
+        expect(createCommitmentRow(item({ date: '2020-01-01' }), 'provision', { pastDue: true })
+            .querySelector('.convert-btn')).toBeNull();
+        expect(createCommitmentRow(item(), 'debt').querySelector('.convert-btn')).toBeNull();
+    });
+
+    it('setCommitmentPastDue toggles the strip in place', () => {
+        const row = createCommitmentRow(item(), 'futureCost');
+        setCommitmentPastDue(row, true);
+        expect(row.querySelector('.commitment-pastdue').hidden).toBe(false);
+        setCommitmentPastDue(row, false);
+        expect(row.querySelector('.commitment-pastdue').hidden).toBe(true);
     });
 });

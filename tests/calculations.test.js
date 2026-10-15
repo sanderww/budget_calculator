@@ -4,6 +4,10 @@ import {
     calculateBudgetSummary,
     isPastDue,
     convertFutureCostToProvision,
+    changeCommitmentType,
+    parseQuickAdd,
+    summariseCommitments,
+    COMMITMENT_KINDS,
     calculateMonthlyAllocation,
     calculateInvestmentPerformance,
     monthlyInterestFactor,
@@ -462,6 +466,31 @@ describe('CSV round-trips', () => {
             const parsed = parseBudgetCSV(csv);
             expect(parsed.debts).toHaveLength(1);
             expect(parsed.debts[0].amount).toBe(500);
+        });
+
+        it('parse then generate reproduces the CSV byte-for-byte', () => {
+            const csv = 'type,description,amount,date\n'
+                + 'savings,,15000.5,\n'
+                + 'debt,Sample loan,3000,\n'
+                + 'debt,Credit card,12000,\n'
+                + 'provision,Holiday fund,2000,2026-12-01\n'
+                + 'provision,No date yet,750,\n'
+                + 'costfuturecost,Laptop,1500,2026-09-01\n'
+                + 'costfuturecost,Car service,6500.25,2027-03-01\n';
+            expect(generateBudgetCSV(parseBudgetCSV(csv))).toBe(csv);
+        });
+
+        it('still round-trips byte-for-byte after a type change and back', () => {
+            const csv = 'type,description,amount,date\n'
+                + 'savings,,15000,\n'
+                + 'debt,Sample loan,3000,\n'
+                + 'provision,Holiday fund,2000,2026-12-01\n'
+                + 'costfuturecost,Laptop,1500,2026-09-01\n';
+            const data = parseBudgetCSV(csv);
+            const id = data.provisions[0].id;
+            const there = changeCommitmentType(data, id, 'futureCost');
+            const back = changeCommitmentType(there, id, 'provision');
+            expect(generateBudgetCSV(back)).toBe(csv);
         });
 
         it('skips unknown row types silently', () => {
@@ -1638,5 +1667,143 @@ describe('convertFutureCostToProvision', () => {
 
         expect(summaryAfter.currentNetAmount).toBe(summaryBefore.currentNetAmount - 5000);
         expect(summaryAfter.futureNetAmount).toBe(summaryBefore.futureNetAmount);
+    });
+});
+
+describe('COMMITMENT_KINDS', () => {
+    it('lists the three kinds in display order', () => {
+        expect(COMMITMENT_KINDS).toEqual(['debt', 'provision', 'futureCost']);
+    });
+});
+
+describe('changeCommitmentType', () => {
+    const baseData = () => ({
+        savings: 1000,
+        debts: [{ id: 'd1', description: 'Credit card', amount: 12000, date: '' }],
+        provisions: [{ id: 'p1', description: 'Holiday', amount: 2000, date: '2026-12-01' }],
+        futureCosts: [
+            { id: 'f1', description: 'Car service', amount: 6500, date: '2027-03-01' },
+            { id: 'f2', description: 'Geyser', amount: 20000, date: '2034-01-06' },
+        ],
+    });
+
+    it('moves a future cost to provisions, keeping id, description, amount and date', () => {
+        const out = changeCommitmentType(baseData(), 'f1', 'provision');
+        expect(out.futureCosts.map(c => c.id)).toEqual(['f2']);
+        expect(out.provisions[1]).toEqual({ id: 'f1', description: 'Car service', amount: 6500, date: '2027-03-01' });
+    });
+
+    it('moves a provision to future costs', () => {
+        const out = changeCommitmentType(baseData(), 'p1', 'futureCost');
+        expect(out.provisions).toEqual([]);
+        expect(out.futureCosts[2]).toEqual({ id: 'p1', description: 'Holiday', amount: 2000, date: '2026-12-01' });
+    });
+
+    it('drops the date when moving to debt', () => {
+        const out = changeCommitmentType(baseData(), 'f1', 'debt');
+        expect(out.debts[1]).toEqual({ id: 'f1', description: 'Car service', amount: 6500 });
+        expect('date' in out.debts[1]).toBe(false);
+    });
+
+    it('gives a debt moved to provisions an empty date', () => {
+        const out = changeCommitmentType(baseData(), 'd1', 'provision');
+        expect(out.debts).toEqual([]);
+        expect(out.provisions[1]).toEqual({ id: 'd1', description: 'Credit card', amount: 12000, date: '' });
+    });
+
+    it('does not mutate the input data, its arrays or the moved item', () => {
+        const before = baseData();
+        const item = before.futureCosts[0];
+        changeCommitmentType(before, 'f1', 'debt');
+        expect(before.futureCosts).toHaveLength(2);
+        expect(before.debts).toHaveLength(1);
+        expect(item.date).toBe('2027-03-01');
+    });
+
+    it('leaves savings and untouched lists alone', () => {
+        const before = baseData();
+        const out = changeCommitmentType(before, 'f1', 'provision');
+        expect(out.savings).toBe(1000);
+        expect(out.debts).toEqual(before.debts);
+    });
+
+    it('returns the input by reference for an unknown id', () => {
+        const before = baseData();
+        expect(changeCommitmentType(before, 'nope', 'debt')).toBe(before);
+    });
+
+    it('returns the input by reference when the kind does not change', () => {
+        const before = baseData();
+        expect(changeCommitmentType(before, 'p1', 'provision')).toBe(before);
+    });
+
+    it('returns the input by reference for an unknown kind', () => {
+        const before = baseData();
+        expect(changeCommitmentType(before, 'p1', 'savings')).toBe(before);
+    });
+});
+
+describe('summariseCommitments', () => {
+    it('counts and totals each kind and all of them', () => {
+        const out = summariseCommitments({
+            savings: 5,
+            debts: [{ id: 'd1', amount: 100 }, { id: 'd2', amount: '' }],
+            provisions: [{ id: 'p1', amount: '250.5' }],
+            futureCosts: [{ id: 'f1', amount: 1000 }, { id: 'f2', amount: 50 }, { id: 'f3', amount: 'x' }],
+        });
+        expect(out.count).toEqual({ all: 6, debt: 2, provision: 1, futureCost: 3 });
+        expect(out.total).toEqual({ all: 1400.5, debt: 100, provision: 250.5, futureCost: 1050 });
+    });
+
+    it('is all zeros for an empty budget', () => {
+        const out = summariseCommitments({ savings: 0, debts: [], provisions: [], futureCosts: [] });
+        expect(out.count).toEqual({ all: 0, debt: 0, provision: 0, futureCost: 0 });
+        expect(out.total).toEqual({ all: 0, debt: 0, provision: 0, futureCost: 0 });
+    });
+});
+
+describe('parseQuickAdd', () => {
+    const ok = (kind, description, amount, date = '') => ({ kind, description, amount, date });
+    it.each([
+        ['car service 6.5k mar 2027', ok('futureCost', 'Car service', 6500, '2027-03-01')],
+        ['credit card 12000 debt', ok('debt', 'Credit card', 12000)],
+        ['school fees 45k 2027-01-15', ok('futureCost', 'School fees', 45000, '2027-01-15')],
+        ['2027 budget review 5k', ok('futureCost', '2027 budget review', 5000)],
+        ['Provision holiday R 20,000 dec 2026', ok('provision', 'Holiday', 20000, '2026-12-01')],
+        ['DEBT store account 1,250.50', ok('debt', 'Store account', 1250.5)],
+        ['new geyser 20000 January 2034', ok('futureCost', 'New geyser', 20000, '2034-01-01')],
+        ['  tyres    8k   sep 2027  ', ok('futureCost', 'Tyres', 8000, '2027-09-01')],
+        ['car 2000', ok('futureCost', 'Car', 2000)],
+        ['bike 2026 3000', ok('futureCost', 'Bike 2026', 3000)],
+        ['laptop 1.2m', ok('futureCost', 'Laptop', 1200000)],
+        ['laptop R15000', ok('futureCost', 'Laptop', 15000)],
+        ['debts are bad 500', ok('futureCost', 'Debts are bad', 500)],
+        ['medical 3k 2027-02-30', ok('futureCost', 'Medical 2027-02-30', 3000)],
+        ['flights 9k provision 2027-06-01', ok('provision', 'Flights', 9000, '2027-06-01')],
+    ])('parses %j', (text, expected) => {
+        expect(parseQuickAdd(text)).toEqual(expected);
+    });
+
+    it('drops a date typed on a debt (debts have no due date)', () => {
+        expect(parseQuickAdd('car loan 50k debt 2027-01-01')).toEqual(ok('debt', 'Car loan', 50000));
+    });
+
+    it('takes the first amount when several are typed', () => {
+        expect(parseQuickAdd('rates 1500 300')).toEqual(ok('futureCost', 'Rates 300', 1500));
+    });
+
+    it.each([
+        ['', { error: 'empty', missing: ['description', 'amount'] }],
+        ['   ', { error: 'empty', missing: ['description', 'amount'] }],
+        ['car service', { error: 'missing', missing: ['amount'] }],
+        ['6.5k mar 2027', { error: 'missing', missing: ['description'] }],
+        ['debt', { error: 'missing', missing: ['description', 'amount'] }],
+        ['mar 2027', { error: 'missing', missing: ['description', 'amount'] }],
+    ])('reports what is missing for %j', (text, expected) => {
+        expect(parseQuickAdd(text)).toEqual(expected);
+    });
+
+    it('treats non-string input as empty', () => {
+        expect(parseQuickAdd(undefined)).toEqual({ error: 'empty', missing: ['description', 'amount'] });
     });
 });

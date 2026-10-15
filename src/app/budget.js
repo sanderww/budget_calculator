@@ -6,10 +6,18 @@ import {
     generateBudgetCSV as _generateBudgetCSV,
     isPastDue,
     convertFutureCostToProvision,
+    changeCommitmentType,
+    parseQuickAdd,
+    summariseCommitments,
+    COMMITMENT_KINDS,
 } from '../calculations.js';
 import { renderBudgetTimeline as _renderBudgetTimeline } from '../charts/chart_budget_timeline.js';
 import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
-import { createRowElement, sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
+import {
+    sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo,
+    createCommitmentRow, setCommitmentPastDue, COMMITMENT_KIND_LABELS,
+} from '../lib/rows.js';
+import { showUndoToast } from '../lib/undo-toast.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
 let budgetData = {
@@ -20,15 +28,16 @@ let budgetData = {
 };
 
 const savingsInput = document.getElementById('savings');
-const debtList = document.getElementById('debt-list');
-const provisionList = document.getElementById('provision-list');
-const futureCostList = document.getElementById('future-cost-list');
+const commitmentList = document.getElementById('commitment-list');
+const commitmentFilters = document.getElementById('commitment-filters');
+const commitmentFooter = document.getElementById('commitment-footer');
+const quickAddInput = document.getElementById('commitment-quick-add');
+const quickAddPreview = document.getElementById('commitment-quick-add-preview');
 const futureDateInput = document.getElementById('future-date');
 
-const addDebtBtn = document.getElementById('add-debt');
-const addProvisionBtn = document.getElementById('add-provision');
-const addFutureCostBtn = document.getElementById('add-future-cost');
-
+// budgetData array holding each commitment kind.
+const KIND_LIST = { debt: 'debts', provision: 'provisions', futureCost: 'futureCosts' };
+const listOf = (kind) => budgetData[KIND_LIST[kind]];
 
 const availableMoneyInput = document.getElementById('available-money');
 let availableMoney = '';
@@ -45,39 +54,94 @@ const refreshSavings = bindAmountInput(savingsInput, {
     set: (v) => {
         budgetData.savings = v === null ? '' : v;
         calculateAndDisplaySummary();
-        debouncedSave('transactions_budget', generateBudgetCSV);
+        saveBudget();
     },
 });
 
 const renderBudget = () => {
     refreshSavings();
-    renderList(debtList, budgetData.debts, createDebtItem);
-    renderList(provisionList, budgetData.provisions, createProvisionItem);
-    // Future costs always display soonest-first, re-sorted on every render
-    // (load, refresh, add, delete). Sorting a copy leaves the stored order
-    // alone; rows are addressed by id, so this never disturbs an edit.
-    renderList(futureCostList, [...budgetData.futureCosts].sort(sortByDateThenIdAsc), createFutureCostItem);
+    renderCommitments();
     calculateAndDisplaySummary();
 };
 
-const renderList = (container, items, createItemFn) => {
-    container.innerHTML = '';
-    if (items.length === 0) {
-        container.innerHTML = emptyStateHTML('No items added yet.');
-    } else {
-        items.forEach(item => container.appendChild(createItemFn(item)));
-    }
+// ---- Commitments ledger ----------------------------------------------------
+// One table over budgetData.debts/provisions/futureCosts. Each row carries its
+// kind; the arrays (and so the CSV) keep their shape.
+
+const FILTER_KEY = 'budget.commitmentFilter';
+const FILTERS = ['all', ...COMMITMENT_KINDS];
+const FILTER_LABELS = { all: 'All', debt: 'Debts', provision: 'Provisions', futureCost: 'Future costs' };
+const readFilter = () => {
+    try {
+        const v = localStorage.getItem(FILTER_KEY);
+        return FILTERS.includes(v) ? v : 'all';
+    } catch { return 'all'; }
+};
+let commitmentFilter = readFilter();
+const setFilter = (value) => {
+    commitmentFilter = value;
+    try { localStorage.setItem(FILTER_KEY, value); } catch { /* per-viewer convenience only */ }
 };
 
-const createDebtItem = (item) => createRowElement(item, {
-    gridTemplateColumns: '1fr 1fr auto', fields: ['description', 'amount'] });
-const createProvisionItem = (item) => createRowElement(item, {
-    gridTemplateColumns: '1fr 1fr 1fr auto', fields: ['description', 'amount', 'date'] });
-// The extra `auto` column holds the "move to provisions" button, shown only
-// once a cost's date has passed.
-const createFutureCostItem = (item) => createRowElement(item, {
-    gridTemplateColumns: '1fr 1fr 1fr auto auto', fields: ['description', 'amount', 'date'],
-    convertible: (row) => isPastDue(row.date) });
+const renderFilters = (summary) => {
+    commitmentFilters.replaceChildren(...FILTERS.map(f => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'filter-chip';
+        btn.dataset.filter = f;
+        btn.setAttribute('aria-pressed', String(f === commitmentFilter));
+        btn.textContent = `${FILTER_LABELS[f]} (${summary.count[f]})`;
+        return btn;
+    }));
+};
+
+// Footer: total for the current filter; on All, the per-kind subtotals too.
+const renderCommitmentFooter = (summary = summariseCommitments(budgetData)) => {
+    if (summary.count.all === 0) {
+        commitmentFooter.replaceChildren();
+        return;
+    }
+    const total = document.createElement('span');
+    total.className = 'font-semibold text-slate-800';
+    total.textContent = `Total ${formatCurrency(summary.total[commitmentFilter])}`;
+    const parts = [total];
+    if (commitmentFilter === 'all') {
+        const sub = document.createElement('span');
+        sub.textContent = COMMITMENT_KINDS
+            .map(k => `${FILTER_LABELS[k]} ${formatCurrency(summary.total[k])}`).join(' · ');
+        parts.unshift(sub);
+    }
+    commitmentFooter.replaceChildren(...parts);
+};
+
+const renderCommitments = () => {
+    const summary = summariseCommitments(budgetData);
+    renderFilters(summary);
+    // Soonest-first, re-sorted on every render (load, add, delete, type
+    // change). Undated rows (all debts, fresh rows) sit at the top. Sorting
+    // view rows leaves the stored order alone; rows are addressed by id.
+    const kinds = commitmentFilter === 'all' ? COMMITMENT_KINDS : [commitmentFilter];
+    const rows = kinds.flatMap(kind => listOf(kind).map(item => ({ kind, item })))
+        .sort((a, b) => sortByDateThenIdAsc(a.item, b.item));
+
+    commitmentList.innerHTML = '';
+    if (summary.count.all === 0) {
+        commitmentList.innerHTML = emptyStateHTML('No commitments yet. Type one above, for example "school fees 45k 2027-01-15".');
+    } else if (rows.length === 0) {
+        commitmentList.innerHTML = emptyStateHTML(`No ${FILTER_LABELS[commitmentFilter].toLowerCase()} yet.`);
+    } else {
+        rows.forEach(({ kind, item }) => commitmentList.appendChild(
+            createCommitmentRow(item, kind, { pastDue: kind === 'futureCost' && isPastDue(item.date) })));
+    }
+    renderCommitmentFooter(summary);
+};
+
+const saveBudget = () => debouncedSave('transactions_budget', generateBudgetCSV);
+
+// Make sure a row of `kind` is visible after it is added or moved.
+const revealKind = (kind) => {
+    if (commitmentFilter !== 'all' && commitmentFilter !== kind) setFilter('all');
+};
 
 let currentMonthlySavingsTarget = 0;
 
@@ -183,50 +247,153 @@ const calculateMonthlyAllocation = () => {
     allocationResults.classList.remove('hidden');
 };
 
-// getList returns the live array (budgetData can be replaced by a convert or
-// reload, so Undo must not hold on to the array it was deleted from).
-const handleListChange = (e, getList) => {
+// Row edits. The amount is already stored (as a number) by the row's amount
+// binding; description and date are copied here. Totals update live.
+commitmentList.addEventListener('input', (e) => {
     const target = e.target;
-    const itemDiv = target.closest('[data-id]');
-    if (!itemDiv) return;
-
-    const id = itemDiv.dataset.id;
-    const item = getList().find(i => i.id === id);
+    const row = target.closest('[data-id]');
+    if (!row || target.classList.contains('kind-select')) return;
+    const item = listOf(row.dataset.kind).find(i => i.id === row.dataset.id);
     if (!item) return;
-
-    if (target.closest('.remove-btn')) {
-        deleteWithUndo({
-            getList, id,
-            onChange: () => { renderBudget(); debouncedSave('transactions_budget', generateBudgetCSV); },
-        });
-    } else if (target.classList.contains('description-input')) {
+    if (target.classList.contains('description-input')) {
         item.description = target.value;
-    } else if (target.classList.contains('amount-input')) {
-        // Already stored by the row's amount binding (a number, not the
-        // formatted text).
     } else if (target.classList.contains('date-input')) {
         item.date = target.value;
+        if (row.dataset.kind === 'futureCost') setCommitmentPastDue(row, isPastDue(item.date));
     }
+    renderCommitmentFooter();
     calculateAndDisplaySummary();
+    saveBudget();
+});
+
+// Type change: move the row to the other array, keeping id/description/amount.
+// A debt has no due date, so moving a dated row to Debt drops the date and
+// offers Undo (which moves it back and restores the date).
+commitmentList.addEventListener('change', (e) => {
+    const sel = e.target.closest('.kind-select');
+    if (!sel) return;
+    const row = sel.closest('[data-id]');
+    const id = row.dataset.id;
+    const fromKind = row.dataset.kind;
+    const newKind = sel.value;
+    const prevDate = listOf(fromKind).find(i => i.id === id)?.date || '';
+    const updated = changeCommitmentType(budgetData, id, newKind);
+    if (updated === budgetData) return;
+    budgetData = updated;
+    revealKind(newKind);
+    renderBudget();
+    commitmentList.querySelector(`[data-id="${CSS.escape(id)}"] .kind-select`)?.focus();
+    saveBudget();
+    if (newKind === 'debt' && prevDate) {
+        showUndoToast({
+            message: 'Date removed — debts have no due date.',
+            onUndo: () => {
+                // Only undo while the row is still a debt (not deleted or moved again).
+                if (!budgetData.debts.some(i => i.id === id)) return;
+                budgetData = changeCommitmentType(budgetData, id, fromKind);
+                const item = listOf(fromKind).find(i => i.id === id);
+                if (item) item.date = prevDate;
+                revealKind(fromKind);
+                renderBudget();
+                saveBudget();
+            },
+        });
+    }
+});
+
+commitmentList.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-id]');
+    if (!row) return;
+    const id = row.dataset.id;
+    const kind = row.dataset.kind;
+    if (e.target.closest('.convert-btn')) {
+        // Manual by design: a past-due cost was either saved (move it) or
+        // spent (delete it); only the user knows which.
+        const updated = convertFutureCostToProvision(budgetData, id);
+        if (updated !== budgetData) {
+            budgetData = updated;
+            revealKind('provision');
+            renderBudget();
+            saveBudget();
+        }
+    } else if (e.target.closest('.remove-btn')) {
+        // getList reads the live array: budgetData can be replaced (convert,
+        // type change, reload) before Undo is clicked.
+        deleteWithUndo({
+            getList: () => listOf(kind), id,
+            onChange: () => { renderBudget(); saveBudget(); },
+        });
+    }
+});
+
+commitmentFilters.addEventListener('click', (e) => {
+    const btn = e.target.closest('.filter-chip');
+    if (!btn) return;
+    setFilter(btn.dataset.filter);
+    renderCommitments();
+    commitmentFilters.querySelector(`[data-filter="${btn.dataset.filter}"]`)?.focus();
+});
+
+// ---- Quick-add ---------------------------------------------------------------
+const MISSING_TEXT = {
+    'description,amount': 'Add a description and an amount.',
+    description: 'Add a description.',
+    amount: 'Add an amount, e.g. 6.5k or 12000.',
 };
 
-addDebtBtn.addEventListener('click', () => {
-    budgetData.debts.push({ id: generateId(), description: '', amount: '' });
-    renderBudget();
-    debouncedSave('transactions_budget', generateBudgetCSV);
-});
+const strong = (text) => {
+    const el = document.createElement('strong');
+    el.textContent = text;
+    return el;
+};
 
-addProvisionBtn.addEventListener('click', () => {
-    budgetData.provisions.push({ id: generateId(), description: '', amount: '', date: '' });
-    renderBudget();
-    debouncedSave('transactions_budget', generateBudgetCSV);
-});
+const renderQuickAddPreview = () => {
+    const parsed = parseQuickAdd(quickAddInput.value);
+    if (parsed.error === 'empty') {
+        quickAddPreview.dataset.state = 'idle';
+        quickAddPreview.textContent = 'Press Enter on an empty field to add a blank row.';
+        return parsed;
+    }
+    if (parsed.error) {
+        quickAddPreview.dataset.state = 'error';
+        quickAddPreview.textContent = MISSING_TEXT[parsed.missing.join(',')];
+        return parsed;
+    }
+    quickAddPreview.dataset.state = 'ok';
+    const parts = ['Will add ', strong(COMMITMENT_KIND_LABELS[parsed.kind]), ' · ',
+        strong(parsed.description), ' · ', strong(formatCurrency(parsed.amount))];
+    if (parsed.date) parts.push(' · due ', strong(parsed.date));
+    quickAddPreview.replaceChildren(...parts);
+    return parsed;
+};
 
-addFutureCostBtn.addEventListener('click', () => {
-    budgetData.futureCosts.push({ id: generateId(), description: '', amount: '', date: '' });
+const addCommitment = (kind, fields) => {
+    const item = { id: generateId(), ...fields };
+    listOf(kind).push(item);
+    revealKind(kind);
     renderBudget();
-    debouncedSave('transactions_budget', generateBudgetCSV);
+    saveBudget();
+    return item;
+};
+
+quickAddInput.addEventListener('input', renderQuickAddPreview);
+quickAddInput.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    const parsed = renderQuickAddPreview();
+    if (parsed.error === 'empty') {
+        // Blank row: a Future cost; the user picks the type in the row.
+        const item = addCommitment('futureCost', { description: '', amount: '', date: '' });
+        commitmentList.querySelector(`[data-id="${CSS.escape(item.id)}"] .description-input`)?.focus();
+        return;
+    }
+    if (parsed.error) return;
+    const { kind, description, amount, date } = parsed;
+    addCommitment(kind, kind === 'debt' ? { description, amount } : { description, amount, date });
+    quickAddInput.value = '';
+    renderQuickAddPreview();
 });
+renderQuickAddPreview();
 
 futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 
@@ -274,30 +441,6 @@ const applyPlannedSavingsFromConfig = () => {
     plannedSavings = v === null ? undefined : v;
     refreshPlannedSavings();
 };
-
-debtList.addEventListener('input', (e) => { handleListChange(e, () => budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
-provisionList.addEventListener('input', (e) => { handleListChange(e, () => budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
-futureCostList.addEventListener('input', (e) => { handleListChange(e, () => budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV); });
-
-debtList.addEventListener('click', (e) => { handleListChange(e, () => budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
-provisionList.addEventListener('click', (e) => { handleListChange(e, () => budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
-// Convert is intercepted before the shared handler: it is the only action
-// that moves a row between two lists, so it owns the whole click.
-futureCostList.addEventListener('click', (e) => {
-    const convertBtn = e.target.closest('.convert-btn');
-    if (convertBtn) {
-        const id = convertBtn.closest('[data-id]')?.dataset.id;
-        const updated = convertFutureCostToProvision(budgetData, id);
-        if (updated !== budgetData) {
-            budgetData = updated;
-            renderBudget();
-            debouncedSave('transactions_budget', generateBudgetCSV);
-        }
-        return;
-    }
-    handleListChange(e, () => budgetData.futureCosts);
-    debouncedSave('transactions_budget', generateBudgetCSV);
-});
 
 calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
 

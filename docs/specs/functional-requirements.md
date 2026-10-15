@@ -43,7 +43,7 @@ The Investments, Debt, and RA tabs each open with a right-aligned overflow menu 
 
 ### 0.5 Undo and amount fields
 
-**Undo for deletes.** Deleting a row in any editable list (Budget debts, provisions and future costs; investment transactions; debt extra repayments; RA contributions) removes it and auto-saves immediately, then shows a toast at the bottom-centre of the viewport: `Deleted "School fees" (R 45,000.00)` with an **Undo** button. The toast (`src/lib/undo-toast.js`, `showUndoToast({ message, onUndo })`) is a single `role="status"` / `aria-live="polite"` element on `<body>`; the Undo button is keyboard-focusable but never takes focus automatically. It disappears after 8 seconds or when the next delete replaces it. **Undo** puts the same row object (same `id`) back at its original index, re-renders and saves as a normal edit. The shared `deleteWithUndo` in `src/lib/rows.js` does this for every list. The trash button is a neutral grey icon button (`aria-label` "Delete") that turns red on hover and focus.
+**Undo for deletes.** Deleting a row in any editable list (Budget commitments — debts, provisions and future costs; investment transactions; debt extra repayments; RA contributions) removes it and auto-saves immediately, then shows a toast at the bottom-centre of the viewport: `Deleted "School fees" (R 45,000.00)` with an **Undo** button. The toast (`src/lib/undo-toast.js`, `showUndoToast({ message, onUndo })`) is a single `role="status"` / `aria-live="polite"` element on `<body>`; the Undo button is keyboard-focusable but never takes focus automatically. It disappears after 8 seconds or when the next delete replaces it. **Undo** puts the same row object (same `id`) back at its original index, re-renders and saves as a normal edit. The shared `deleteWithUndo` in `src/lib/rows.js` does this for every list. The trash button is a neutral grey icon button (`aria-label` "Delete") that turns red on hover and focus.
 
 **Formatted amount fields.** All rand amount inputs (list-row amounts, Current Savings, Available money, planned monthly savings, the three investment current values, the four mortgage rand fields, RA current value) are `type="text" inputmode="decimal"` and wired by `bindAmountInput(el, { get, set })` in `src/lib/rows.js`. When idle they show a grouped value (`400,000`, `45,000.50`); while focused they show the raw value. Accepted input: `45000`, `45,000`, `45000.5`, `R 45,000.50`, `45k`, `1.2m`, `-500`. Invalid text (for example `1,2` or `abc`) leaves the stored value unchanged and shows a red border with `aria-invalid="true"` until corrected; clearing the field clears the value. Stored state, config and CSV values remain plain numbers. The Retirement tab's money inputs (RA vested balance, RA monthly extra, house value, bond balance, savings-pot withdrawal, inheritance and Dutch pension EUR amounts, scenario monthly drawdown) are formatted the same way, bound in `src/app/retirement.js` via the `'amount'` binding type. Percent, age, BTC, interest-rate and EUR/ZAR-rate inputs stay `type="number"`.
 
@@ -56,35 +56,41 @@ The Investments, Debt, and RA tabs each open with a right-aligned overflow menu 
 - Single amount input representing total liquid savings (R), a formatted amount field (see §0.5).
 - Changes trigger an immediate recalculation of the financial summary.
 
-### 1.2 Debts
+### 1.2 Commitments ledger
 
-- Dynamic list of debt line items, each with:
-  - **Description** (text)
-  - **Amount** (R, formatted amount field, §0.5)
-- Users can add items and delete them (delete is undoable, §0.5).
+Debts, provisions and future costs ("commitments") share one card, **Commitments**, below Current Savings. It replaces the three separate Debts / Provisions / Future Costs cards; there are no "+ Add" buttons.
 
-### 1.3 Provisions
+- **Storage is unchanged.** `budgetData` keeps `{ savings, debts, provisions, futureCosts }` and the budget CSV layout (§8) is the same; parse → generate reproduces a budget CSV byte-for-byte. The ledger is a view built from the three arrays, each row tagged with its kind (`'debt'`, `'provision'`, `'futureCost'`).
+- **Columns:** **Type** · **Description** · **Amount** · **Due** · delete. A column header is shown from 640 px; on phones each row stacks (type + delete, description, amount + due).
+  - **Type** is a `<select>` (`aria-label` "Type") styled as a coloured chip: Debt (red), Provision (amber), Future cost (blue).
+  - **Amount** is a formatted amount field (§0.5).
+  - **Due** is a date input (`aria-label` "Due date"). Debt rows leave the cell empty and not editable, because the budget CSV stores no date for debts.
+  - The trash button deletes with undo (§0.5).
+- Every row carries `data-id="<item id>"` and `data-kind="<kind>"` (built by `createCommitmentRow` in `src/lib/rows.js`).
+- **Ordering:** rows are sorted soonest-first with `sortByDateThenIdAsc` (`src/lib/rows.js`). Rows with a blank or unparseable date (all debts, any freshly added row) sort to the top; ties break by id ascending (ids embed creation time). The sort is applied to view rows on every render (load, add, delete, type change, move), so the stored order and the CSV are untouched, and because rows are addressed by `data-id`, re-ordering never disturbs an edit. Typing into a field never re-renders the table; a changed date takes its new position on the next render.
+- **Changing the type** moves the row to the other array via `changeCommitmentType(data, id, newKind)` (`src/calc/budget.js`): pure, never mutating its input, appending the row to the target array with the same `id`, `description` and `amount`. Moving to Debt drops the `date`; moving a debt elsewhere gives it an empty date. Unknown id, unknown kind or the same kind returns the **input by reference**. The table re-renders, focus returns to the row's Type chip, and the change auto-saves. Changing a dated row to Debt also shows the undo toast *"Date removed — debts have no due date."* — **Undo** moves it back to its previous kind and restores the date (only while the row is still a debt).
+- **Filters:** a chip group above the table — **All (n)** · **Debts (n)** · **Provisions (n)** · **Future costs (n)** — real buttons with `aria-pressed`. The chosen filter is remembered per browser in `localStorage` (`budget.commitmentFilter`, every access wrapped in try/catch) and is not written to config. Adding, moving or converting a row whose kind is hidden by the current filter switches the filter to All so the row stays in sight. Counts and totals come from `summariseCommitments(data)`.
+- **Footer:** the total for the current filter (`Total R 7,000.00`); on All it also shows the per-kind subtotals (`Debts R … · Provisions R … · Future costs R …`). Totals update live while an amount is typed.
+- **Empty state:** *No commitments yet. Type one above, for example "school fees 45k 2027-01-15".* When a filter has no rows: *No debts yet.* (or provisions / future costs).
 
-- Dynamic list of provision line items, each with:
-  - **Description** (text)
-  - **Amount** (R, numeric)
-  - **Date** (date)
-- Users can add and remove items.
-- Provisions can also arrive by conversion from a past-due future cost (§1.4). Converted rows are appended at the end; the Provisions list is not sorted.
+### 1.3 Quick-add
 
-### 1.4 Future Costs
+- A single text field above the table: *Add a commitment — e.g. "car service 6.5k mar 2027" or "credit card 12000 debt"*, with a visually hidden label and a live preview line (`aria-live="polite"`) beneath it.
+- While the user types, the preview shows what will be added: *Will add **Future cost** · **Car service** · **R 6,500.00** · due **2027-03-01*** (the "due" part is omitted when there is no date). When something is missing it says what: *Add a description.*, *Add an amount, e.g. 6.5k or 12000.*, or *Add a description and an amount.* With the field empty it reads *Press Enter on an empty field to add a blank row.*
+- **Enter** adds the row only when both a description and an amount were found, clears the field, keeps focus in it and auto-saves. **Enter on an empty field** adds a blank Future cost row and moves focus to its description; the user changes the type in the row if needed. The field can be skipped by tabbing into the table.
+- Parsing is the pure `parseQuickAdd(text)` in `src/calc/budget.js` → `{ kind, description, amount, date }` (date `''` when none) or `{ error: 'empty' | 'missing', missing: ['description' | 'amount', …] }`. Rules, in order, on whitespace-separated tokens:
+  1. **Type:** the word `debt` or `provision` anywhere (case-insensitive, whole word). Default: Future cost.
+  2. **Date:** a valid `YYYY-MM-DD`, or `<month name or 3-letter abbreviation> YYYY` (→ the 1st of that month). A date typed on a debt is dropped (debts have no due date).
+  3. **Amount:** the first token `parseAmount` accepts (a lone `R` joins the number after it, so `R 20,000` counts). A bare year (`19xx`/`20xx`) is only used when nothing else parses, so in "2027 budget review 5k" the amount is R 5,000 and "2027" stays in the description.
+  4. **Description:** the remaining tokens, whitespace collapsed, first letter capitalised.
 
-- Dynamic list of anticipated future costs, each with:
-  - **Description** (text)
-  - **Amount** (R, numeric)
-  - **Date** (date)
-- Users can add and remove items.
-- **Move to provisions:** each row carries a second button (an arrow, `→`, titled "Move to provisions") beside the trash icon. It is active **only on rows whose date is strictly before today** — `isPastDue` in `src/calc/budget.js`, which normalises both dates to local midnight, so a cost due *today* is still pending. On non-past-due rows the button keeps its grid cell but renders `invisible` and `disabled`, so every row's trash icon stays aligned (the same technique `createRowElement` uses for the crypto BTC field).
-  - Clicking it moves the row out of Future Costs and appends it to Provisions with its `id`, description, amount and **original date** intact — the date is preserved so the provision stays identifiable as the cost that was due on that day. The list re-renders and auto-saves on the same path as add/remove.
+### 1.4 Past-due future costs (Move to provisions)
+
+- A future-cost row whose date is **strictly before today** (`isPastDue` in `src/calc/budget.js`, which normalises both dates to local midnight, so a cost due *today* is still pending) shows a full-width strip under the row: a **Past due** badge, the hint *"Saved the money? Move it to provisions. Spent it? Delete the row."* and a text button **Move to provisions**. On other future-cost rows the strip is hidden; editing a date shows or hides it immediately without re-rendering. Provisions and debts never get the strip.
+  - Clicking **Move to provisions** moves the row out of Future Costs and appends it to Provisions with its `id`, description, amount and **original date** intact — the date is preserved so the provision stays identifiable as the cost that was due on that day. The table re-renders and auto-saves.
   - The state transition is `convertFutureCostToProvision(data, id, today)` in `src/calc/budget.js`: pure, never mutating its input, returning a new data object on success and the **input object by reference** when the move is refused (unknown id, blank or unparseable date, or a date not strictly before today). The click handler detects a no-op with `!==` and skips the re-render and save.
-  - The conversion is **deliberately manual, never automatic.** Once a future cost's date passes, the money was either saved (it becomes a provision) or spent (the row is simply deleted). The app cannot infer which from the date, so it never converts on its own; the button's appearance is the cue that a row needs that decision.
+  - The conversion is **deliberately manual, never automatic.** Once a future cost's date passes, the money was either saved (it becomes a provision) or spent (the row is simply deleted). The app cannot infer which from the date, so it never converts on its own; the badge is the cue that a row needs that decision.
   - **Effect on the summary:** converting reduces **Net savings now** by the amount and leaves **Net savings on [date]** unchanged. This falls out of the existing formulas rather than any new arithmetic — a past-dated cost already satisfies `date <= target` for every future target, so it was already inside `relevantFutureCosts`; after conversion it sits in `totalProvisions` instead, and `futureNetAmount` derives from `currentNetAmount`.
-- **Default ordering:** the list is always displayed sorted by date ascending — soonest cost at the top — via `sortByDateThenIdAsc` (`src/lib/rows.js`). Rows with a blank or unparseable date sort to the top, keeping a freshly added row in sight so its date can be filled in; date ties break by id ascending (ids embed creation time). The sort is applied to a copy on every render — initial load and every add/remove — so the stored order and the CSV are left untouched, and because rows are addressed by `data-id`, re-ordering never disturbs an in-progress edit. Typing into a date field does not re-sort mid-edit; the new position takes effect on the next render.
 
 ### 1.5 Financial Summary
 
@@ -557,6 +563,9 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `calculateDebtResults({currentPrincipal, totalRepayment, serviceFee, interestRate, nextPaymentDateStr, repayments})` | Orchestrates baseline vs actual simulation, computes savings |
 | `xirr(cashFlows, guess?)` | Newton-Raphson XIRR calculation |
 | `parseBudgetCSV(text)` / `generateBudgetCSV(data)` | Budget CSV serialization |
+| `changeCommitmentType(data, id, newKind)` | Moves a budget commitment between `debts` / `provisions` / `futureCosts` (kinds `'debt'`, `'provision'`, `'futureCost'`), keeping id, description and amount; drops the date when moving to debt. Returns the input by reference on a no-op |
+| `summariseCommitments(data)` | Per-kind and overall counts and amount totals for the commitments ledger filters and footer |
+| `parseQuickAdd(text)` | Parses a Budget quick-add line into `{ kind, description, amount, date }` or `{ error, missing }` (§1.3) |
 | `parseInvestmentCSV(text)` / `generateInvestmentCSV(data)` | Investment CSV serialization |
 | `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |
 | `taxYearLabel(date)` | Returns the SA tax-year bucket label `YYYY/YY` (e.g. `2026/27`) |
