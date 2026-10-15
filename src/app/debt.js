@@ -80,6 +80,15 @@ const debtTimeReducedEl = document.getElementById('debt-time-reduced');
 const debtNewEndDateEl = document.getElementById('debt-new-end-date');
 const debtOriginalEndDateEl = document.getElementById('debt-original-end-date');
 
+// Without a balance, a repayment and a next payment date there is no
+// projection: show "—" rather than the figures of an earlier one.
+const clearDebtResults = () => {
+    [debtSavedAmountEl, debtTotalExtraEl, debtNetReturnEl, debtYieldEl,
+     debtTimeReducedEl, debtNewEndDateEl, debtOriginalEndDateEl,
+     document.getElementById('kpi-debt-free')]
+        .forEach(el => { if (el) el.textContent = '—'; });
+};
+
 const calculateDebtProjection = () => {
     const currentPrincipal = amountValue(debtCurrentBalanceInput) || amountValue(debtAmountInput);
     const totalRepayment = amountValue(debtRepaymentInput);
@@ -87,7 +96,10 @@ const calculateDebtProjection = () => {
     const interestRate = parseFloat(debtInterestRateInput.value) || 0;
     const nextPaymentDateStr = debtNextPaymentInput.value;
 
-    if (currentPrincipal <= 0 || totalRepayment <= 0 || !nextPaymentDateStr) return;
+    if (currentPrincipal <= 0 || totalRepayment <= 0 || !nextPaymentDateStr) {
+        clearDebtResults();
+        return;
+    }
 
     const dailyRate = (interestRate / 100) / 365;
     const effectiveRepayment = totalRepayment - serviceFee;
