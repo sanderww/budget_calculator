@@ -9,7 +9,8 @@ import {
     calculateRetirementSnapshot as _calculateRetirementSnapshot,
 } from '../calculations.js';
 import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
-import { fmtZARWhole, fmtZARSigned, fmtNum } from '../lib/format.js';
+import { fmtZARWhole, fmtZARSigned, fmtNum, parseAmount } from '../lib/format.js';
+import { bindAmountInput } from '../lib/rows.js';
 import { getConfigMap, persistConfig } from './persistence.js';
 import { getInvestmentData } from './investments.js';
 import { getRaState } from './ra.js';
@@ -73,32 +74,49 @@ const retInputBindings = [
     ['ret-include-crypto',            'opt_include_crypto',                    'checkbox'],
 
     ['ret-ra-commute',                'ra_commute_third',                      'checkbox'],
-    ['ret-ra-vested',                 'ra_vested_balance',                     'number'],
+    ['ret-ra-vested',                 'ra_vested_balance',                     'amount'],
 
     ['ret-opt-dutch',                 'opt_dutch_enabled',                     'checkbox'],
     ['ret-opt-dutch-rate',            'opt_dutch_eur_zar',                     'number'],
     ['ret-opt-dutch-age',             'opt_dutch_age',                         'number'],
-    ['ret-opt-dutch-eur',             'opt_dutch_eur_monthly',                 'number'],
+    ['ret-opt-dutch-eur',             'opt_dutch_eur_monthly',                 'amount'],
     ['ret-opt-tfsa',                  'opt_tfsa_enabled',                      'checkbox'],
     ['ret-opt-ra-monthly',            'opt_ra_monthly_enabled',                'checkbox'],
-    ['ret-opt-ra-monthly-amount',     'opt_ra_monthly_amount',                 'number'],
+    ['ret-opt-ra-monthly-amount',     'opt_ra_monthly_amount',                 'amount'],
     ['ret-opt-house',                 'opt_house_enabled',                     'checkbox'],
-    ['ret-opt-house-value',           'opt_house_value',                       'number'],
+    ['ret-opt-house-value',           'opt_house_value',                       'amount'],
     ['ret-opt-inherit',               'opt_inheritance_enabled',               'checkbox'],
-    ['ret-opt-inherit-eur',           'opt_inheritance_eur',                   'number'],
+    ['ret-opt-inherit-eur',           'opt_inheritance_eur',                   'amount'],
     ['ret-opt-bond',                  'opt_bond_enabled',                      'checkbox'],
-    ['ret-opt-bond-balance',          'opt_bond_balance',                      'number'],
+    ['ret-opt-bond-balance',          'opt_bond_balance',                      'amount'],
     ['ret-opt-savings-pot',           'opt_savings_pot_withdrawal_enabled',    'checkbox'],
-    ['ret-opt-savings-pot-amount',    'opt_savings_pot_withdrawal_annual',     'number'],
+    ['ret-opt-savings-pot-amount',    'opt_savings_pot_withdrawal_annual',     'amount'],
 
-    ['ret-scenario-drawdown',         'ret_scenario_monthly_drawdown',         'number'],
+    ['ret-scenario-drawdown',         'ret_scenario_monthly_drawdown',         'amount'],
 ];
+
+// Rand/EUR amount inputs ('amount' type) are formatted fields; params keep numbers.
+const retAmountRefreshers = new Map();
+function retBindAmount(el, key) {
+    if (!retAmountRefreshers.has(el)) {
+        retAmountRefreshers.set(el, bindAmountInput(el, {
+            get: () => retirementParams[key],
+            set: (v) => {
+                retirementParams[key] = v === null ? 0 : v;
+                retPersist();
+                renderRetirement();
+            },
+        }));
+    }
+    return retAmountRefreshers.get(el);
+}
 
 function retApplyParamsToInputs() {
     retInputBindings.forEach(([id, key, type]) => {
         const el = document.getElementById(id);
         if (!el) return;
         if (type === 'checkbox') el.checked = !!retirementParams[key];
+        else if (type === 'amount') retBindAmount(el, key)();
         else el.value = retirementParams[key] ?? '';
     });
 }
@@ -106,6 +124,7 @@ function retApplyParamsToInputs() {
 function retReadInput(el, type) {
     if (type === 'checkbox') return el.checked ? 1 : 0;
     if (type === 'string') return el.value;
+    if (type === 'amount') return parseAmount(el.value) ?? 0;
     const v = parseFloat(el.value);
     return Number.isNaN(v) ? 0 : v;
 }
@@ -119,6 +138,7 @@ function retWireInputs() {
     retInputBindings.forEach(([id, key, type]) => {
         const el = document.getElementById(id);
         if (!el) return;
+        if (type === 'amount') { retBindAmount(el, key); return; }
         const evt = (type === 'checkbox') ? 'change' : 'input';
         el.addEventListener(evt, () => {
             retirementParams[key] = retReadInput(el, type);
