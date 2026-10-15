@@ -18,7 +18,7 @@ Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, 
 
 - Title and subtitle on the left.
 - Right-hand control group:
-  - **Save-status chip** (`#save-status`, shown at every width): the only save indicator. It reflects the auto-save state across all modules — `Saving…` (muted) while one or more POSTs are in flight, `All changes saved` (emerald) after the last one succeeds. When a save errors it becomes an enabled button reading `⚠ Save failed — Retry` (red); clicking it calls `retryFailedSaves()`, which re-sends every save that failed since its last success. The failure stays visible until a save succeeds. There are no manual Save buttons and no Refresh button: every tab re-renders on edit or on show.
+  - **Save-status chip** (`#save-status`, shown at every width): the only save indicator. It reflects the auto-save state across all modules — `Saving…` (muted) while one or more POSTs are in flight, `All changes saved` (emerald) after the last one succeeds. When a save errors it becomes an enabled button reading `⚠ Save failed — Retry` (red); clicking it calls `retryFailedSaves()`, which re-sends every save that failed since its last success. The failure stays visible until a save succeeds. The chip is a real `<button>`; the polite live region (`role="status"`, `aria-live="polite"`) is a wrapping `<span>`, so the button keeps its button role. Two further states belong to the sample-data toggle (§8): `⚠ Save failed — Retry before switching data` (enabled, red) when a switch is refused because of failed saves, and `⚠ Data failed to load — reload the page` (disabled, red) when saves are blocked after a failed switch. There are no manual Save buttons and no Refresh button: every tab re-renders on edit or on show.
   - **Sample data toggle** (`#test-mode-btn`, see §8).
 - **Sample-data banner** (`#sample-banner`): directly under the header, full-width amber, shown only while sample data is on (see §8).
 
@@ -31,7 +31,7 @@ A row of four read-only cards between the header and the tab bar, giving at-a-gl
 | Net savings now (green ≥ 0, red < 0) | Budget summary (`calculateAndDisplaySummary`) |
 | Net savings on [selected date] | Budget summary; label shows the §1.5 future-date picker value |
 | Portfolio value | Sum of the three Investments current-value inputs |
-| Debt-free by (month + year; `Never` when the loan never amortises) | Debt projection's new end date |
+| Debt-free by (month + year; `Never` when the loan never amortises; `—` while the balance, repayment or next payment date is missing, and the Debt results card shows `—` too) | Debt projection's new end date |
 
 ### 0.3 Tabs
 
@@ -43,7 +43,7 @@ The Investments, Debt, and RA tabs each open with a right-aligned overflow menu 
 
 ### 0.5 Undo and amount fields
 
-**Undo for deletes.** Deleting a row in any editable list (Budget commitments — debts, provisions and future costs; investment transactions; debt extra repayments; RA contributions) removes it and auto-saves immediately, then shows a toast at the bottom-centre of the viewport: `Deleted "School fees" (R 45,000.00)` with an **Undo** button. The toast (`src/lib/undo-toast.js`, `showUndoToast({ message, onUndo })`) is a single `role="status"` / `aria-live="polite"` element on `<body>`; the Undo button is keyboard-focusable but never takes focus automatically. It disappears after 8 seconds or when the next delete replaces it. **Undo** puts the same row object (same `id`) back at its original index, re-renders and saves as a normal edit. The shared `deleteWithUndo` in `src/lib/rows.js` does this for every list. The trash button is a neutral grey icon button (`aria-label` "Delete") that turns red on hover and focus.
+**Undo for deletes.** Deleting a row in any editable list (Budget commitments — debts, provisions and future costs; investment transactions; debt extra repayments; RA contributions) removes it and auto-saves immediately, then shows a toast at the bottom-centre of the viewport: `Deleted "School fees" (R 45,000.00)` with an **Undo** button. The toast (`src/lib/undo-toast.js`, `showUndoToast({ message, onUndo })`) is a single `role="status"` / `aria-live="polite"` element on `<body>`; the Undo button is keyboard-focusable but never takes focus automatically. It disappears after 8 seconds or when the next delete replaces it; switching between real and sample data and every Import CSV… dismiss it too (`hideUndoToast()`), and an Undo clicked after the data mode changed does nothing (§8). **Undo** puts the same row object (same `id`) back at its original index, re-renders and saves as a normal edit. The shared `deleteWithUndo` in `src/lib/rows.js` does this for every list. The trash button is a neutral grey icon button (`aria-label` "Delete") that turns red on hover and focus.
 
 **Formatted amount fields.** All rand amount inputs (list-row amounts, Current Savings, Available money, planned monthly savings, the three investment current values, the four mortgage rand fields, RA current value) are `type="text" inputmode="decimal"` and wired by `bindAmountInput(el, { get, set })` in `src/lib/rows.js`. When idle they show a grouped value (`400,000`, `45,000.50`); while focused they show the raw value. Accepted input: `45000`, `45,000`, `45000.5`, `R 45,000.50`, `45k`, `1.2m`, `-500`. Invalid text (for example `1,2` or `abc`) leaves the stored value unchanged and shows a red border with `aria-invalid="true"` until corrected; clearing the field clears the value. Stored state, config and CSV values remain plain numbers. The Retirement tab's money inputs (RA vested balance, RA monthly extra, house value, bond balance, savings-pot withdrawal, inheritance and Dutch pension EUR amounts, scenario monthly drawdown) are formatted the same way, bound in `src/app/retirement.js` via the `'amount'` binding type. Percent, age, BTC, interest-rate and EUR/ZAR-rate inputs stay `type="number"`.
 
@@ -504,6 +504,8 @@ When there is no activity at all, both charts show an explanatory placeholder in
 
 Application state is spread across six CSV files under `db/`:
 
+Descriptions are free text, so a comma in one would split its row: every generator (budget, investments, debt, RA) writes a `,` inside a description as `;`. Data without commas in descriptions round-trips byte-for-byte.
+
 **Budget transactions** (`db/transactions/budget.csv`):
 ```
 type,description,amount,date
@@ -562,7 +564,8 @@ Date,Description,Amount
 - All data changes trigger a debounced save (800ms delay) via POST to the server.
 - There are no manual save buttons; a failed save is retried from the header chip (§0.1).
 - The header save-status chip (§0.1) reflects the aggregate state of all in-flight saves: `Saving…` → `All changes saved` on success, `⚠ Save failed — Retry` on error (sticky until a successful save; the chip re-sends every failed save). Save failures are additionally logged to the console.
-- On page load, all CSV files are fetched automatically: transaction files per-domain plus both config files (public and private), which are merged client-side into a single param map.
+- On page load, all CSV files are fetched automatically (`loadAll()`, shared with the sample-data toggle, §8): transaction files per-domain plus both config files (public and private), which are merged client-side into a single param map.
+- The param map is shared by every tab, so each tab writes back only its own keys. The Retirement tab loads and saves only the keys of the retirement defaults (`getDefaultRetirementParams()`); it never copies other tabs' keys, so a retirement edit cannot revert a newer budget, investments, RA or debt value, nor bring back an unset key.
 
 ### 7.3 Server API
 
@@ -585,7 +588,15 @@ Date,Description,Amount
   - Save keys are prefixed with `test_` (e.g., `test_transactions_budget`, `test_config_private`).
   - Server blocks writes to real data keys when `X-Test-Mode: true` header is present.
 - Toggling reloads all datasets from the appropriate directory — transaction files for every domain plus both config files — so every tab reflects the test data without a page refresh.
-- If the test-mode load fails, the mode reverts automatically.
+- **Nothing crosses modes.** A save reads its data and its save key when it is sent, so the toggle (`switchDataMode`, `src/app/data-mode.js`) works in this order:
+  1. The undo toast (§0.5) is dismissed; its Undo would otherwise write into the other mode.
+  2. `flushPendingSaves()` sends every debounced save immediately, in the old mode, and waits for it and for every save already in flight (repeating if an edit queued a new save meanwhile).
+  3. If any save has failed since its last success, the switch is refused and the save-status chip reads `⚠ Save failed — Retry before switching data`; a retry after the switch would send the other mode's data. Clicking the chip retries as usual; the toggle works again once the saves succeed.
+  4. Only then does the mode flip and `loadAll()` reload every dataset (config first, then the four transaction files, then the Retirement params). Saves are suspended while it runs: an edit in that window changes data that is about to be replaced, so its save is dropped.
+- A second click while a switch is running is ignored.
+- `loadAll()` is shared by page start-up and the toggle. Every loader runs even if another fails; the call then rejects. Loaders never keep the previous mode's data: a failed fetch rejects, and a missing file starts empty (Investments, RA) or with the default seed (Debt; a missing budget file is a failure).
+- **If the load fails, the mode reverts** and `loadAll()` runs again for the original mode, so memory holds only that mode's data. If that reload fails too, memory may hold a mix of both modes: every save is blocked for the rest of the page's life and the chip reads `⚠ Data failed to load — reload the page` (disabled).
+- An open undo toast is also dismissed by every **Import CSV…** (Investments, Debt, RA, Retirement), since its Undo would put an item back into replaced data. The toast records the mode it was shown in, and an Undo clicked after the mode changed does nothing.
 
 ---
 
