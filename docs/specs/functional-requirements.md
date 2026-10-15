@@ -94,7 +94,7 @@ Debts, provisions and future costs ("commitments") share one card, **Commitments
 
 ### 1.5 Financial Summary
 
-Right-column sidebar card. Calculated in real time whenever any input changes. Displays only three values plus the future-date picker. The Monthly Money Allocation controls (§1.6) live as a compact subsection inside this same card, below the three values.
+Right-column sidebar card, beside the Commitments ledger (below the timeline card). Calculated in real time whenever any input changes. Displays only three values plus the future-date picker. The Monthly Money Allocation controls (§1.6) live as a compact subsection inside this same card, below the three values.
 
 - **Current Savings** — the savings input value (R), formatted.
 - **Net savings now** = Current Savings − Total Debts − Total Provisions
@@ -103,7 +103,7 @@ Right-column sidebar card. Calculated in real time whenever any input changes. D
 - **Net savings on [selected date]** = Net savings now − sum of Future Costs whose date <= selected date
   - Underlying value is identical to the previous "Future Net Amount"; only the visible label changes.
   - Displayed indigo when >= 0, red when < 0.
-- **Future-date picker** — selects the planning date. Defaults to 1 year from today on first load.
+- **Future-date picker** — selects the planning (target) date. Defaults to 1 year from today on first load. The §1.7 target-date slider writes the same value.
 
 The "Breakdown" subsection (Total Savings / Total Debts / Total Provisions / Total Future Costs rows) and the visible "Monthly Savings Needed" row are no longer rendered in the sidebar. The monthly savings target value is still computed by `calculateBudgetSummary` and consumed by §1.6 Monthly Money Allocation; it is just not displayed in the sidebar.
 
@@ -127,33 +127,41 @@ Compact subsection inside the right-column Financial Summary card (no longer a s
   - Crypto amount = (Available - Savings Target) * Crypto%
   - Total Allocated = Savings + Mortgage + EFT + Crypto
 
-### 1.7 Timeline Overview Chart
+### 1.7 Timeline Overview Chart (runway)
 
-Full-width card at the bottom of the budget tab. Read-only overview chart, rendered with ApexCharts loaded from CDN. Refreshes whenever the budget summary recalculates (savings input, debt/provision/future-cost edits, future-date change, data load).
+Full-width card at the **top** of the budget tab (`#budget-timeline-card`), above the Current Savings / Commitments column and the Financial Summary column. Rendered with ApexCharts loaded from CDN. Refreshes whenever the budget summary recalculates (savings input, commitment edits, target-date change from the date input or the slider, planned-savings or buffer edits, data load).
 
-**Time window:**
-- X-axis runs from `today` to the user's selected "Future Net Amount by" date (the §1.5 future-date picker).
+**Time window** (see core-requirements §1.6 for the formulas):
+- X-axis runs from `today` to the **horizon**: the later of (target date, latest dated future cost) + 3 months, and at least 12 months from today. The target date is the §1.5 future-date picker.
+- While the target-date slider is held, the horizon is frozen so the chart doesn't rescale under the pointer; it is recomputed on release (`change`) and whenever the date is typed.
 - If the future date is missing or in the past, the card shows a short placeholder instead of a chart.
-- If no future cost has a date inside `[today, future-date]`, the card shows a different placeholder (e.g. "Add a future cost with a date inside the planning window to see the timeline.").
+- If no future cost is dated inside `[today, horizon]`, the chart is still drawn (the planned line is straight) and a note under it (`#budget-timeline-empty`) says so.
 
-**Visual elements** (see core-requirements §1.6 for semantics). Single x-axis with a **single y-axis**:
+**Read-outs above the chart:**
+- **Lowest point ahead** (`#budget-lowest-point`) — the lowest value of (planned trajectory − floor) between today and the horizon, with its date ("R 12,000.00 on 01 Mar 2027"). The box turns amber (`data-warn="true"`) and shows "Below your minimum buffer" when the value is below the minimum buffer.
+- **Save per month to stay above buffer** (`#budget-buffer-savings`) — the smallest monthly rate that keeps the trajectory at or above floor + minimum buffer at every cost date up to the horizon and at the horizon.
 
-Single y-axis "Amount (R)":
-- Indigo column bars per in-window future cost (one per dated entry inside `[today, future-date]`).
-- Solid **Planned trajectory** line starting at `(today, Current Savings)`, sloping up by the *planned* monthly rate, stepping down at each in-window cost, and extending out to `future-date`. Green normally; red if its lowest point dips below the floor.
-- Dashed amber **Recommended trajectory** line built the same way but always using the chart-derived `Required Monthly Savings`. Always drawn; when no planned override is set it coincides with (overlaps) the Planned line.
-- Slate dashed line for `Total Debts + Total Provisions` ("floor"), drawn as a regular line series (not an ApexCharts annotation) so it is always visible alongside the trajectories.
+**Inputs above the chart:**
+- **Monthly savings (planned)** (`#budget-timeline-planned-savings`) — drives the Planned line. Persisted to `db/config.private.json` under `budget_planned_monthly_savings` with the standard debounced auto-save. When blank, the input shows the rounded recommended amount as a placeholder and the Planned line follows the recommendation. Clearing the input, or pressing **"Use recommended"**, removes the saved override.
+- **Minimum buffer (R)** (`#budget-min-buffer`) — formatted amount input (`bindAmountInput`). Persisted as the private config key `budget_min_buffer` (default 0); leaving it blank removes the key. Prefilled from config on load, together with the planned amount (`applyBudgetConfig`).
 
-**Planned monthly savings override:** numeric input above the chart (id `budget-timeline-planned-savings`, labelled "Monthly savings (planned)"). It drives the Planned line. It is **persisted** to `db/config.private.json` under `budget_planned_monthly_savings` using the app's standard debounced auto-save (same as other config inputs) — entering an amount saves it and it reloads next session. When blank, the input shows the rounded recommended amount as a placeholder and the Planned line follows the recommendation. Clearing the input, or pressing the **"Use recommended"** button, removes the saved override and reverts to the recommended default.
+**Visual elements.** Single datetime x-axis, single y-axis "Amount (R)":
+- **Future-cost events** — one point per dated future cost in `[today, horizon]`, sitting on the Planned line at its date (just before the step-down), coloured like the Future-cost chip (blue). Hovering shows the description, date and amount. Clicking a point scrolls to that cost's Commitments row (matched by `data-id`) and highlights it (`row-highlight`) for 1.5 s; if the ledger filter hides the row, the filter switches to All first. Provisions are not drawn.
+- Solid **Planned trajectory** line starting at `(today, Current Savings)`, sloping up by the *planned* monthly rate, stepping down at each cost, and extending to the horizon. Green normally; red if its lowest point dips below the floor.
+- Dashed amber **Recommended trajectory** line built the same way but always using the chart-derived `Required Monthly Savings` (costs up to the target date only). Always drawn; when no planned override is set it coincides with the Planned line.
+- Slate dashed line for `Total Debts + Total Provisions` ("floor"), drawn as a regular line series.
+- **Floor + buffer** — dashed amber horizontal annotation at floor + buffer, drawn only when a buffer is set.
+- **Target-date marker** — a vertical indigo x-axis annotation labelled "Target DD MMM YYYY".
 
-X-axis is datetime. Legend at bottom centre. Headline above the chart in plain language: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.`
+Legend at bottom centre. Headline above the chart in plain language: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.` When no cost falls before the target date the "through … in future costs" part is left out.
+
+**Target-date slider:** a native `<input type="range">` (`#budget-target-range`, label "Target date", `aria-valuetext` = the formatted date) under the chart, over the same range (1 day after today → horizon, one step per day). Dragging it writes the ISO date into `#future-date`, so the Financial Summary card and the KPI strip's "Net savings on [date]" update live. Typing in `#future-date` moves the slider and the marker. The date input stays as the keyboard fallback; the slider also responds to arrow keys.
 
 **Interaction**:
 - Pan and zoom via the chart toolbar (zoom in/out, pan, reset). Selection and image download are disabled.
-- Custom tooltip on bars shows the future-cost description, date, and amount.
-- The user-adjusted time window is not persisted (resets on reload).
+- The user-adjusted zoom window is not persisted (resets on reload).
 
-**Data source**: pure series-builder `buildBudgetTimelineSeries` in `src/charts/chart_budget_timeline.js`. It does not consume `calculateBudgetSummary` outputs — it derives `requiredMonthlySavings` independently from `savings`, `totalDebts`, `totalProvisions`, `futureCosts`, and `futureDate`.
+**Data source**: pure series-builder `buildBudgetTimelineSeries` in `src/charts/chart_budget_timeline.js`. It does not consume `calculateBudgetSummary` outputs — it derives `requiredMonthlySavings` independently from `savings`, `totalDebts`, `totalProvisions`, `futureCosts` and `futureDate`. It takes `horizonDate` (how far the chart runs; defaults to `futureDate`) and `minBuffer`, and returns, alongside the earlier fields, `targetDate`, `events`, `lowest`, `minBuffer`, `bufferMonthlySavings` and `belowBuffer`. With `horizonDate === futureDate` the earlier fields are identical to the pre-horizon output (`tests/chart_budget_timeline.regression.test.js`). Pure helpers in the same module: `timelineHorizon`, `lowestPoint`, `requiredMonthlySavings`.
 
 ---
 

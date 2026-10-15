@@ -124,43 +124,62 @@ Leftover        = Available Money − Total Allocated
 - At least one percentage must be greater than 0%.
 - Available money must exceed the monthly savings target (otherwise there is nothing to allocate).
 
-### 1.6 Timeline Overview Chart
+### 1.6 Timeline Overview Chart (runway)
 
-A read-only visualisation at the bottom of the budget tab that answers: "what monthly savings rate do I need so my running balance stays at or above the debts + provisions floor at every in-window future cost, and how does the cumulative savings need grow toward my selected future date?"
+A read-only visualisation at the **top** of the budget tab, full width above the Commitments ledger. It answers: "what monthly savings rate do I need so my running balance stays at or above the debts + provisions floor at every future cost up to my target date, how close does my planned line get to the floor, and when?"
 
-**Time window:**
-- X-axis runs from `today → user's selected "Future Net Amount by" date` (the §1.3 `future-date` input).
+**Target date and horizon (two separate dates):**
+- The **target date** is the §1.3 `future-date` value ("Net savings on"). It drives the recommended rate below and the "Net savings on [date]" figures, exactly as before.
+- The **horizon** is how far the chart runs:
+
+```
+horizon = max( addMonths(max(target date, latest dated future cost), 3),
+               addMonths(today, 12) )
+```
+
+  Future costs dated before today are ignored for the horizon. Moving the target date inside `[today, latest cost]` does not move the horizon, and while the target-date slider is held the horizon is frozen; it is recomputed when the slider is released or the date is typed.
 - If `future-date` is missing or in the past, the chart card shows a short placeholder.
-- If no future cost has a date inside `[today, future-date]`, a different placeholder is shown.
+- If no future cost is dated inside `[today, horizon]`, the chart is still drawn (a straight planned line) with an empty-state note under it.
 
-**Required monthly savings (chart-derived):**
+**Required monthly savings (chart-derived, "Recommended"):**
 
 ```
 floor = Total Debts + Total Provisions
-in-window costs = future costs with today ≤ cost.date ≤ future-date
+in-window costs = future costs with today ≤ cost.date ≤ target date
 
-For each in-window cost i (and for the future-date endpoint), let
+For each in-window cost i (and for the target-date endpoint), let
   t_i      = months between today and this point
   cum_i    = sum of in-window cost amounts with date ≤ this point
-  needed_i = max(0, (cum_i + floor − Current Savings) / t_i)
+  needed_i = max(0, (cum_i + floor + buffer − Current Savings) / t_i)
 
-Required Monthly Savings = max over all such i of needed_i
+Required Monthly Savings = max over all such i of needed_i      (buffer = 0)
 ```
 
-This rate is the smallest constant monthly contribution that keeps the running savings balance at or above the floor at every in-window cost date AND at `future-date`. It is computed by the chart and does **not** override §1.4's `Monthly Savings Target` — the two answer different questions.
+This rate is the smallest constant monthly contribution that keeps the running savings balance at or above the floor at every in-window cost date AND at the target date. Costs after the target date (but before the horizon) are drawn but do not count. It is computed by the chart and does **not** override §1.4's `Monthly Savings Target` — the two answer different questions. Pure helper: `requiredMonthlySavings({ startSavings, floor, costs, todayMs, endMs, buffer })`.
+
+**Minimum buffer and "Save per month to stay above buffer":**
+- `Minimum buffer (R)` is an amount input next to "Monthly savings (planned)", persisted as the private config key `budget_min_buffer` (default 0; leaving it blank removes the key).
+- `Save per month to stay above buffer` = the same loop with `buffer = budget_min_buffer`, over **every dated cost up to the horizon**, with the **horizon** as the endpoint. It is the smallest monthly rate that keeps the trajectory at or above `floor + buffer` at every cost date and at the horizon.
+
+**Lowest point ahead:**
+
+```
+lowest point = min over the planned trajectory points p in [today, horizon] of (p.y − floor)
+```
+
+reported with the date of that point (the earliest one on a tie). It is shown above the chart and turns amber when `lowest point < budget_min_buffer`. Pure helper: `lowestPoint(trajectory, floor)`.
 
 **Planned vs recommended monthly savings:** there is a numeric input above the chart labelled "Monthly savings (planned)". The chart draws two trajectories: a solid **Planned** line using this input value (the *effective* monthly rate) and a dashed amber **Recommended** line always using the `Required Monthly Savings`. When the Planned line's lowest point dips below the floor (i.e. the chosen rate is too low), it turns from green to red, making the deficit visible against the always-present recommendation. The input is **persisted** to `db/config.private.json` under `budget_planned_monthly_savings` via the standard debounced auto-save; when blank it shows the recommended amount as a placeholder and the Planned line follows (overlaps) the Recommended line. The "Use recommended" button (and clearing the input) removes the saved override. The headline always reports the *required* rate.
 
-**Series shown (single x-axis, single y-axis):**
+**Series shown (single x-axis, single y-axis "Amount (R)"):**
+- **Future-cost events** — one point per dated future cost in `[today, horizon]`, on the Planned line at its date (the balance just before the step-down), coloured like the Future-cost chip. Hover shows description, date and amount; clicking scrolls to that row in the Commitments ledger and highlights it for 1.5 s. Provisions are not drawn: they are already subtracted from today's figure.
+- **Planned / Recommended trajectories** — piecewise-linear lines starting at `(today, Current Savings)`, sloping up by their monthly rate, stepping down by each cost amount on that cost's date, and extending to the horizon.
+- **Debts + provisions floor** — slate dashed flat line at `Total Debts + Total Provisions`, drawn as a real line series. The per-row dates on debts and provisions are ignored. When a minimum buffer is set, a dashed amber "Floor + buffer" y-axis annotation is drawn at `floor + buffer`.
+- **Target-date marker** — a vertical x-axis annotation at the target date.
 
-Single y-axis "Amount (R)":
-- **Future-cost bars** — indigo columns, one per in-window future cost entry, plotted at its date with its amount.
-- **Savings trajectory** — green piecewise-linear line starting at `(today, Current Savings)`, sloping up by `Required Monthly Savings` per month, stepping down by each cost amount on that cost's date, and extending past the last cost out to `future-date`. By construction it just touches the floor at the binding constraint and stays at or above it elsewhere.
-- **Debts + provisions floor** — slate dashed flat line at `Total Debts + Total Provisions`, drawn as a real line series (not an ApexCharts annotation). The per-row dates on debts and provisions are ignored.
+**Headline:** above the chart, in plain words: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.` (without the "through … in future costs" part when no cost falls before the target date).
 
-**Headline:** above the chart, in plain words: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.`
-
-**Interaction:** pan/zoom enabled via the chart toolbar; the adjusted window is **not** persisted.
+**Interaction:** pan/zoom enabled via the chart toolbar; the adjusted window is **not** persisted. The target date can be set by dragging the range slider under the chart (same range as the chart, today → horizon) or by typing in the date input; both write the same `future-date` value, so the summary card and the KPI strip's "Net savings on [date]" follow.
 
 ---
 
@@ -646,6 +665,7 @@ Two ApexCharts visualisations accompany the table. Both use one shared category 
 | R38 | The Retirement tab renders one interactive scenario timeline (`snapshot.scenario`, from `buildRetirementScenarioTimeline`; §5.5a) below the Snapshot card, replacing the older chart cards. It walks the projection month-by-month from today and samples per integer age over `[min(55, retirement_age), life_expectancy]`, with a vertical line at the retirement age. Two stacked-area charts: monthly net income by source (RA annuity / RA savings-pot / Dutch pension / user capital drawdown) and available capital by pool (discretionary / TFSA / crypto / RA lump + one-offs / annuitised RA pot). A user-entered `ret_scenario_monthly_drawdown` (persisted, private) replaces the automatic PMT: from the retirement age it is drawn **proportionally** across the liquid pools, capped so capital never goes negative. RA annuitises at `max(retirement_age, 55)` (full commutation below the R360k de minimis; sub-R150k residual commutes to liquid capital mid-retirement). All ticked optional-scenario boxes (fund inclusion, max TFSA, extra RA, savings-pot, house, inheritance, bond, Dutch) fold into the projection. Respects the real-terms toggle (R26) and re-renders on the same triggers as Card 0 (R28). |
 | R40 | The Budget tab lists debts, provisions and future costs in one **Commitments** ledger (Type chip · Description · Amount · Due · delete). Every row carries `data-id` (the item id). Debt rows have no editable due date. Filter chips (All / Debts / Provisions / Future costs, with counts, `aria-pressed`) narrow the table; the chosen filter is remembered per browser in `localStorage` only, not in config. The footer shows the total for the current filter, plus per-kind subtotals on All. A quick-add field parses one line with `parseQuickAdd` (kind keyword `debt`/`provision`, else future cost; `YYYY-MM-DD` or `<month> YYYY` date; first amount `parseAmount` accepts, a bare year only as a last resort; the rest is the description) and adds the row on Enter only when both a description and an amount were found. Enter on an empty quick-add field adds a blank Future cost row. There are no "+ Add" buttons. |
 | R39 | Sample data mode is announced by a header pill ("Sample data") and a full-width amber banner under the header with a **Switch to my data** button. File paths are not shown in tab toolbars; they appear only as a muted footnote inside the per-tab `⋯` overflow menu, next to **Import CSV…** (Investments, Debt, RA, Retirement; Budget has no import and no menu). Explanatory help text (e.g. the CGT note) lives in toggle popovers built on one shared helper (`src/lib/popover.js`): a real `<button>` with `aria-expanded`, closing on Escape and outside click. |
+| R41 | The Budget tab opens with the runway timeline (§1.6), full width above the Commitments ledger. The chart runs from today to a horizon = max(target date, latest dated future cost) + 3 months, at least 12 months, and is drawn even when no cost falls in range. `buildBudgetTimelineSeries` takes `horizonDate` separately from `futureDate`; with `horizonDate === futureDate` its output is unchanged (regression-tested). The target date is set by a range slider under the chart (an x-axis annotation marks it) or by the date input; both write `future-date`. Each dated future cost is a point on the planned line that links to its ledger row. "Lowest point ahead" = min(planned trajectory − floor) with its date, amber below the minimum buffer; "Save per month to stay above buffer" = the required-savings loop with floor + buffer over every cost up to the horizon and at the horizon. The buffer is the private config key `budget_min_buffer` (default 0; blank removes it). |
 
 ---
 

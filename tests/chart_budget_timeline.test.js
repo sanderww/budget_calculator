@@ -41,39 +41,34 @@ describe('buildBudgetTimelineSeries', () => {
         expect(past).toBeNull();
     });
 
-    it('returns null when no future cost falls within the [today, futureDate] window', () => {
-        const noCosts = buildBudgetTimelineSeries({
-            savings: 50000,
-            totalDebts: 0,
-            totalProvisions: 0,
-            futureCosts: [],
-            futureDate: new Date('2027-01-01T00:00:00Z'),
-            today: TODAY,
-        });
-        expect(noCosts).toBeNull();
-
-        const onlyPastOrUndated = buildBudgetTimelineSeries({
-            savings: 50000,
-            totalDebts: 0,
-            totalProvisions: 0,
-            futureCosts: [
+    it('draws a line with no events when no future cost falls within the window (UX-2.1, was null)', () => {
+        const cases = [
+            [],
+            [
                 { description: 'no date', amount: 1000, date: '' },
                 { description: 'past', amount: 2000, date: '2026-01-01' },
             ],
-            futureDate: new Date('2027-01-01T00:00:00Z'),
-            today: TODAY,
-        });
-        expect(onlyPastOrUndated).toBeNull();
-
-        const onlyAfterFutureDate = buildBudgetTimelineSeries({
-            savings: 50000,
-            totalDebts: 0,
-            totalProvisions: 0,
-            futureCosts: [{ description: 'after', amount: 1000, date: '2027-06-06' }],
-            futureDate: new Date('2027-01-01T00:00:00Z'),
-            today: TODAY,
-        });
-        expect(onlyAfterFutureDate).toBeNull();
+            [{ description: 'after', amount: 1000, date: '2027-06-06' }],
+        ];
+        for (const futureCosts of cases) {
+            const result = buildBudgetTimelineSeries({
+                savings: 50000,
+                totalDebts: 0,
+                totalProvisions: 0,
+                futureCosts,
+                futureDate: new Date('2027-01-01T00:00:00Z'),
+                today: TODAY,
+            });
+            expect(result).not.toBeNull();
+            expect(result.bars).toEqual([]);
+            expect(result.events).toEqual([]);
+            expect(result.totalFutureCosts).toBe(0);
+            expect(result.requiredMonthlySavings).toBe(0);
+            expect(result.savingsLine).toEqual([
+                { x: TODAY.getTime(), y: 50000 },
+                { x: day('2027-01-01'), y: 50000 },
+            ]);
+        }
     });
 
     it('floor equals debts + provisions', () => {

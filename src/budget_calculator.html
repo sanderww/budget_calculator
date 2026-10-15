@@ -107,6 +107,58 @@
         <!-- BUDGET TAB CONTENT -->
         <div id="budget-content">
 
+            <!-- Runway timeline (UX-2.1): first on the tab, full width -->
+            <div class="card" id="budget-timeline-card">
+                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <h2 class="text-xl font-semibold text-slate-800">Timeline Overview</h2>
+                    <p class="text-xs text-slate-500">Drag the slider under the chart to move the target date. Scroll or use the toolbar to zoom.</p>
+                </div>
+                <p id="budget-timeline-headline" class="text-sm text-slate-600 mb-3"></p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                    <div id="budget-lowest-point" class="timeline-readout" data-warn="false" aria-live="polite">
+                        <p class="text-xs font-medium text-slate-500">Lowest point ahead</p>
+                        <p class="text-lg font-bold tabular-nums"><span id="budget-lowest-value">—</span>
+                            <span class="text-sm font-normal text-slate-500">on <span id="budget-lowest-date">—</span></span></p>
+                        <p id="budget-lowest-warn" class="text-xs font-semibold" hidden>Below your minimum buffer</p>
+                        <p class="text-xs text-slate-500">Planned savings above the debts + provisions floor, at its lowest before the end of the chart.</p>
+                    </div>
+                    <div class="timeline-readout">
+                        <p class="text-xs font-medium text-slate-500">Save per month to stay above buffer</p>
+                        <p id="budget-buffer-savings" class="text-lg font-bold text-slate-800 tabular-nums">—</p>
+                        <p class="text-xs text-slate-500">Keeps the line at or above floor + minimum buffer at every cost and at the end of the chart.</p>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-end gap-3 mb-3">
+                    <div>
+                        <label for="budget-timeline-planned-savings" class="block text-xs font-medium text-slate-500 mb-1">Monthly savings (planned)</label>
+                        <div class="relative">
+                            <span class="currency-prefix">R</span>
+                            <input type="text" inputmode="decimal" id="budget-timeline-planned-savings" class="input-field amount-input text-sm" placeholder="0">
+                        </div>
+                    </div>
+                    <div>
+                        <label for="budget-min-buffer" class="block text-xs font-medium text-slate-500 mb-1">Minimum buffer (R)</label>
+                        <div class="relative">
+                            <span class="currency-prefix">R</span>
+                            <input type="text" inputmode="decimal" id="budget-min-buffer" class="input-field amount-input text-sm" placeholder="0">
+                        </div>
+                    </div>
+                    <button id="budget-timeline-reset-planned" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Use recommended</button>
+                    <p class="text-xs text-slate-500">The solid <span class="font-medium text-emerald-700">Planned</span> line uses this saved amount; the dashed <span class="font-medium text-amber-600">Recommended</span> line always shows the calculated target. Leave blank to follow the recommendation.</p>
+                </div>
+                <div id="budget-timeline-chart" class="min-h-[340px]"></div>
+                <div class="mt-2">
+                    <label for="budget-target-range" class="sr-only">Target date</label>
+                    <input type="range" id="budget-target-range" class="target-range w-full" min="1" max="365" step="1" value="365">
+                    <div class="flex justify-between text-xs text-slate-500">
+                        <span>Today</span>
+                        <span>Target <span id="budget-target-range-label" class="font-medium text-indigo-700">—</span></span>
+                        <span id="budget-horizon-label">—</span>
+                    </div>
+                </div>
+                <p id="budget-timeline-empty" class="text-sm text-slate-500 italic mt-2" hidden>No dated future costs before the end of the chart. The line shows your savings at the planned rate.</p>
+            </div>
+
             <!-- Main Grid -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <!-- Left Column: Inputs -->
@@ -223,26 +275,6 @@
                         </div>
             </div>
 
-            <!-- Timeline Overview Chart -->
-            <div class="card mt-6">
-                <div class="flex items-center justify-between mb-2">
-                    <h2 class="text-xl font-semibold text-slate-800">Timeline Overview</h2>
-                    <p class="text-xs text-slate-500">Drag to pan, scroll or use toolbar to zoom.</p>
-                </div>
-                <p id="budget-timeline-headline" class="text-sm text-slate-600 mb-3"></p>
-                <div class="flex flex-wrap items-end gap-3 mb-3">
-                    <div>
-                        <label for="budget-timeline-planned-savings" class="block text-xs font-medium text-slate-500 mb-1">Monthly savings (planned)</label>
-                        <div class="relative">
-                            <span class="currency-prefix">R</span>
-                            <input type="text" inputmode="decimal" id="budget-timeline-planned-savings" class="input-field amount-input text-sm" placeholder="0">
-                        </div>
-                    </div>
-                    <button id="budget-timeline-reset-planned" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Use recommended</button>
-                    <p class="text-xs text-slate-500">The solid <span class="font-medium text-emerald-700">Planned</span> line uses this saved amount; the dashed <span class="font-medium text-amber-600">Recommended</span> line always shows the calculated target. Leave blank to follow the recommendation.</p>
-                </div>
-                <div id="budget-timeline-chart" class="min-h-[340px]"></div>
-            </div>
         </div>
 
         <!-- INVESTMENT TAB CONTENT -->

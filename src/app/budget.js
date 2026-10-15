@@ -11,7 +11,9 @@ import {
     summariseCommitments,
     COMMITMENT_KINDS,
 } from '../calculations.js';
-import { renderBudgetTimeline as _renderBudgetTimeline } from '../charts/chart_budget_timeline.js';
+import {
+    renderBudgetTimeline as _renderBudgetTimeline, timelineHorizon, formatDayMonthYear,
+} from '../charts/chart_budget_timeline.js';
 import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
 import {
     sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo,
@@ -143,6 +145,80 @@ const revealKind = (kind) => {
     if (commitmentFilter !== 'all' && commitmentFilter !== kind) setFilter('all');
 };
 
+// ---- Runway timeline (UX-2.2 to UX-2.4) -------------------------------------
+const DAY_MS = 24 * 60 * 60 * 1000;
+const targetRange = document.getElementById('budget-target-range');
+const targetRangeLabel = document.getElementById('budget-target-range-label');
+const horizonLabel = document.getElementById('budget-horizon-label');
+const timelineEmpty = document.getElementById('budget-timeline-empty');
+let frozenHorizonMs = null; // set while the target slider is being dragged
+
+// Today as a UTC midnight, so day offsets line up with ISO dates.
+const todayUTC = () => {
+    const now = new Date();
+    return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+};
+const isoFromMs = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// The slider covers the same range as the chart: 1 day after today up to the
+// horizon. Its value is the target date's day offset from today.
+const syncTargetRange = (horizonMs) => {
+    if (!targetRange) return;
+    const base = todayUTC();
+    const max = Math.max(1, Math.round((horizonMs - base) / DAY_MS));
+    targetRange.max = String(max);
+    const targetMs = futureDateInput.value ? new Date(futureDateInput.value).getTime() : NaN;
+    const days = Number.isFinite(targetMs) ? Math.round((targetMs - base) / DAY_MS) : max;
+    targetRange.value = String(Math.min(max, Math.max(1, days)));
+    const label = Number.isFinite(targetMs) ? formatDayMonthYear(targetMs) : '—';
+    targetRange.setAttribute('aria-valuetext', label);
+    if (targetRangeLabel) targetRangeLabel.textContent = label;
+    if (horizonLabel) horizonLabel.textContent = formatDayMonthYear(horizonMs);
+};
+
+const renderRunwayReadouts = (result) => {
+    const box = document.getElementById('budget-lowest-point');
+    const value = document.getElementById('budget-lowest-value');
+    const date = document.getElementById('budget-lowest-date');
+    const perMonth = document.getElementById('budget-buffer-savings');
+    const warn = document.getElementById('budget-lowest-warn');
+    if (timelineEmpty) timelineEmpty.hidden = !(result && Array.isArray(result.events) && result.events.length === 0);
+    if (!box || !value || !date || !perMonth) return;
+    if (!result || !result.lowest) {
+        value.textContent = '—';
+        date.textContent = '—';
+        perMonth.textContent = '—';
+        box.dataset.warn = 'false';
+        if (warn) warn.hidden = true;
+        return;
+    }
+    value.textContent = formatCurrency(result.lowest.value);
+    date.textContent = formatDayMonthYear(result.lowest.x);
+    box.dataset.warn = String(Boolean(result.belowBuffer));
+    if (warn) warn.hidden = !result.belowBuffer;
+    perMonth.textContent = `${formatCurrency(result.bufferMonthlySavings)}/month`;
+};
+
+// Scroll to a ledger row and highlight it for 1.5 s (chart marker click).
+// If the current filter hides the row, switch to All first.
+const HIGHLIGHT_MS = 1500;
+const findRow = (id) => commitmentList.querySelector(`[data-id="${CSS.escape(id)}"]`);
+function revealCommitmentRow(id) {
+    if (!COMMITMENT_KINDS.some(k => listOf(k).some(i => i.id === id))) return;
+    let row = findRow(id);
+    if (!row && commitmentFilter !== 'all') {
+        setFilter('all');
+        renderCommitments();
+        row = findRow(id);
+    }
+    if (!row) return;
+    const reduce = typeof window.matchMedia === 'function'
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    row.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
+    row.classList.add('row-highlight');
+    setTimeout(() => row.classList.remove('row-highlight'), HIGHLIGHT_MS);
+}
+
 let currentMonthlySavingsTarget = 0;
 
 const calculateAndDisplaySummary = () => {
@@ -185,6 +261,10 @@ const calculateAndDisplaySummary = () => {
     try {
         const plannedInput = document.getElementById('budget-timeline-planned-savings');
         const planned = Number.isFinite(plannedSavings) && plannedSavings >= 0 ? plannedSavings : undefined;
+        const now = new Date();
+        // While the slider is held the horizon stays put, so the chart
+        // doesn't rescale under the pointer (UX-2.2).
+        const horizonMs = frozenHorizonMs ?? timelineHorizon({ futureDate, futureCosts: budgetData.futureCosts, today: now });
         const result = _renderBudgetTimeline({
             container: document.getElementById('budget-timeline-chart'),
             headline: document.getElementById('budget-timeline-headline'),
@@ -193,13 +273,19 @@ const calculateAndDisplaySummary = () => {
             totalProvisions: r.totalProvisions,
             futureCosts: budgetData.futureCosts,
             futureDate,
+            horizonDate: horizonMs,
+            today: now,
             plannedMonthlySavings: planned,
+            minBuffer: Number.isFinite(minBuffer) && minBuffer > 0 ? minBuffer : 0,
+            onEventClick: revealCommitmentRow,
         });
         // Show the recommended amount as the placeholder so the default is
         // visible when the input is blank (blank = follow the recommendation).
         if (plannedInput && result && Number.isFinite(result.requiredMonthlySavings)) {
             plannedInput.placeholder = String(Math.round(result.requiredMonthlySavings));
         }
+        syncTargetRange(horizonMs);
+        renderRunwayReadouts(result);
     } catch (err) {
         console.error('Timeline chart failed:', err);
     }
@@ -397,6 +483,24 @@ renderQuickAddPreview();
 
 futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 
+// Dragging the slider writes the same #future-date value the date input
+// holds, so the summary card and KPI strip follow. The horizon is frozen
+// until the slider is released.
+if (targetRange) {
+    targetRange.addEventListener('input', () => {
+        if (frozenHorizonMs === null) {
+            const futureDate = futureDateInput.value ? new Date(futureDateInput.value) : null;
+            frozenHorizonMs = timelineHorizon({ futureDate, futureCosts: budgetData.futureCosts, today: new Date() });
+        }
+        futureDateInput.value = isoFromMs(todayUTC() + Number(targetRange.value) * DAY_MS);
+        calculateAndDisplaySummary();
+    });
+    targetRange.addEventListener('change', () => {
+        frozenHorizonMs = null;
+        calculateAndDisplaySummary();
+    });
+}
+
 const plannedSavingsInput = document.getElementById('budget-timeline-planned-savings');
 const plannedSavingsReset = document.getElementById('budget-timeline-reset-planned');
 // Persist the planned monthly-savings override to config.private.json
@@ -432,14 +536,43 @@ if (plannedSavingsReset) {
         calculateAndDisplaySummary();
     });
 }
-// Prefill the planned-savings input from the saved override (config.private.json).
-// Must run after loadConfigFromServer and before the first chart render.
-const applyPlannedSavingsFromConfig = () => {
-    if (!plannedSavingsInput) return;
-    const saved = getConfigMap().budget_planned_monthly_savings;
+// Minimum buffer (UX-2.4): private config key budget_min_buffer, default 0.
+// Blank removes the key.
+const minBufferInput = document.getElementById('budget-min-buffer');
+let minBuffer; // undefined = blank = 0
+const refreshMinBuffer = minBufferInput
+    ? bindAmountInput(minBufferInput, {
+        get: () => minBuffer,
+        set: (v) => {
+            minBuffer = v === null ? undefined : v;
+            if (minBuffer !== undefined) {
+                setConfig('budget_min_buffer', minBuffer);
+            } else if ('budget_min_buffer' in getConfigMap()) {
+                unsetConfig('budget_min_buffer');
+            }
+            calculateAndDisplaySummary();
+        },
+    })
+    : () => {};
+
+const readConfigAmount = (key) => {
+    const saved = getConfigMap()[key];
     const v = (saved !== undefined && saved !== null && saved !== '') ? parseAmount(saved) : null;
-    plannedSavings = v === null ? undefined : v;
-    refreshPlannedSavings();
+    return v === null ? undefined : v;
+};
+
+// Prefill the planned-savings and minimum-buffer inputs from
+// config.private.json. Must run after loadConfigFromServer and before the
+// first chart render.
+const applyBudgetConfig = () => {
+    if (plannedSavingsInput) {
+        plannedSavings = readConfigAmount('budget_planned_monthly_savings');
+        refreshPlannedSavings();
+    }
+    if (minBufferInput) {
+        minBuffer = readConfigAmount('budget_min_buffer');
+        refreshMinBuffer();
+    }
 };
 
 calculateAllocationBtn.addEventListener('click', calculateMonthlyAllocation);
@@ -466,4 +599,4 @@ const loadBudgetCSVFromServer = async () => {
 
 
 
-export { renderBudget, calculateAndDisplaySummary, loadBudgetCSVFromServer, applyPlannedSavingsFromConfig };
+export { renderBudget, calculateAndDisplaySummary, loadBudgetCSVFromServer, applyBudgetConfig, revealCommitmentRow };

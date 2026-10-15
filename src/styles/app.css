@@ -402,3 +402,48 @@ input[type="number"].input-field {
 .commitment-footer:empty {
     display: none;
 }
+
+/* Runway timeline read-outs (UX-2.4). Amber when the lowest point falls
+   below the minimum buffer. */
+.timeline-readout {
+    padding: 0.75rem 1rem;
+    background-color: #f8fafc;
+    /* slate-50 */
+    border: 1px solid #e2e8f0;
+    /* slate-200 */
+    border-radius: 0.75rem;
+    color: #1e293b;
+    /* slate-800 */
+}
+
+.timeline-readout[data-warn="true"] {
+    background-color: #fffbeb;
+    /* amber-50 */
+    border-color: #fcd34d;
+    /* amber-300 */
+    color: #b45309;
+    /* amber-700 */
+}
+
+/* Target-date slider under the chart (UX-2.2). */
+.target-range {
+    accent-color: #4f46e5;
+    /* indigo-600 */
+    cursor: pointer;
+}
+
+.target-range:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+}
+
+/* Ledger row picked from a chart marker (UX-2.3), cleared after 1.5 s. */
+.commitment-row.row-highlight {
+    background-color: #eff6ff;
+    /* blue-50 */
+    box-shadow: 0 0 0 2px #93c5fd;
+    /* blue-300 */
+    border-radius: 0.5rem;
+    transition: background-color 0.3s, box-shadow 0.3s;
+}

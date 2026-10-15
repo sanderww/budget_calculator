@@ -6,7 +6,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from 'vite
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-vi.mock('../src/charts/chart_budget_timeline.js', () => ({
+vi.mock('../src/charts/chart_budget_timeline.js', async (importOriginal) => ({
+    ...(await importOriginal()),
     renderBudgetTimeline: () => ({ requiredMonthlySavings: 0 }),
 }));
 

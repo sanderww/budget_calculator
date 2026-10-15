@@ -2,7 +2,7 @@
 import { isTestMode, setTestMode, loadConfigFromServer, retryFailedSaves } from './persistence.js';
 import { initPopovers } from '../lib/popover.js';
 import { renderBudget, loadBudgetCSVFromServer,
-         applyPlannedSavingsFromConfig } from './budget.js';
+         applyBudgetConfig } from './budget.js';
 import { loadInvestmentCSVFromServer,
          setOnStateChanged as setInvestmentsChanged } from './investments.js';
 import { loadDebtCSVFromServer } from './debt.js';
@@ -79,7 +79,7 @@ const toggleSampleData = async () => {
     updateTestModeUI();
     try {
         await loadConfigFromServer();           // config first — tabs read it
-        applyPlannedSavingsFromConfig();        // prefill planned-savings input
+        applyBudgetConfig();                    // prefill planned savings + buffer
         await Promise.all([
             loadBudgetCSVFromServer(),
             loadInvestmentCSVFromServer(),
@@ -102,7 +102,7 @@ initPopovers();
 // --- INITIALIZATION ---
 (async () => {
     await loadConfigFromServer();          // must run before tabs that read the config
-    applyPlannedSavingsFromConfig();       // prefill planned-savings input
+    applyBudgetConfig();                   // prefill planned savings + buffer
     try {
         await loadBudgetCSVFromServer();
     } catch (err) {
