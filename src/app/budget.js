@@ -9,7 +9,6 @@ import {
     convertFutureCostToProvision,
     changeCommitmentType,
     parseQuickAdd,
-    summariseCommitments,
     COMMITMENT_KINDS,
 } from '../calculations.js';
 import {
@@ -17,9 +16,10 @@ import {
 } from '../charts/chart_budget_timeline.js';
 import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
 import {
-    sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo,
+    sortByDateThenIdAsc, generateId, bindAmountInput,
     createCommitmentRow, setCommitmentPastDue, COMMITMENT_KIND_LABELS,
 } from '../lib/rows.js';
+import { createLedger, strong } from '../lib/ledger.js';
 import { showUndoToast } from '../lib/undo-toast.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
@@ -31,11 +31,6 @@ let budgetData = {
 };
 
 const savingsInput = document.getElementById('savings');
-const commitmentList = document.getElementById('commitment-list');
-const commitmentFilters = document.getElementById('commitment-filters');
-const commitmentFooter = document.getElementById('commitment-footer');
-const quickAddInput = document.getElementById('commitment-quick-add');
-const quickAddPreview = document.getElementById('commitment-quick-add-preview');
 const futureDateInput = document.getElementById('future-date');
 
 // budgetData array holding each commitment kind.
@@ -77,83 +72,20 @@ const renderBudget = () => {
 };
 
 // ---- Commitments ledger ----------------------------------------------------
-// One table over budgetData.debts/provisions/futureCosts. Each row carries its
-// kind; the arrays (and so the CSV) keep their shape.
+// One table over budgetData.debts/provisions/futureCosts, built on the shared
+// ledger (src/lib/ledger.js). Each row carries its kind as its group; the
+// arrays (and so the CSV) keep their shape. The ledger is created further
+// down, once its handlers are defined.
 
-const FILTER_KEY = 'budget.commitmentFilter';
-const FILTERS = ['all', ...COMMITMENT_KINDS];
 const FILTER_LABELS = { all: 'All', debt: 'Debts', provision: 'Provisions', futureCost: 'Future costs' };
-const readFilter = () => {
-    try {
-        const v = localStorage.getItem(FILTER_KEY);
-        return FILTERS.includes(v) ? v : 'all';
-    } catch { return 'all'; }
-};
-let commitmentFilter = readFilter();
-const setFilter = (value) => {
-    commitmentFilter = value;
-    try { localStorage.setItem(FILTER_KEY, value); } catch { /* per-viewer convenience only */ }
-};
-
-const renderFilters = (summary) => {
-    commitmentFilters.replaceChildren(...FILTERS.map(f => {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'filter-chip';
-        btn.dataset.filter = f;
-        btn.setAttribute('aria-pressed', String(f === commitmentFilter));
-        btn.textContent = `${FILTER_LABELS[f]} (${summary.count[f]})`;
-        return btn;
-    }));
-};
-
-// Footer: total for the current filter; on All, the per-kind subtotals too.
-const renderCommitmentFooter = (summary = summariseCommitments(budgetData)) => {
-    if (summary.count.all === 0) {
-        commitmentFooter.replaceChildren();
-        return;
-    }
-    const total = document.createElement('span');
-    total.className = 'font-semibold text-slate-800';
-    total.textContent = `Total ${formatCurrency(summary.total[commitmentFilter])}`;
-    const parts = [total];
-    if (commitmentFilter === 'all') {
-        const sub = document.createElement('span');
-        sub.textContent = COMMITMENT_KINDS
-            .map(k => `${FILTER_LABELS[k]} ${formatCurrency(summary.total[k])}`).join(' · ');
-        parts.unshift(sub);
-    }
-    commitmentFooter.replaceChildren(...parts);
-};
-
-const renderCommitments = () => {
-    const summary = summariseCommitments(budgetData);
-    renderFilters(summary);
-    // Soonest-first, re-sorted on every render (load, add, delete, type
-    // change). Undated rows (all debts, fresh rows) sit at the top. Sorting
-    // view rows leaves the stored order alone; rows are addressed by id.
-    const kinds = commitmentFilter === 'all' ? COMMITMENT_KINDS : [commitmentFilter];
-    const rows = kinds.flatMap(kind => listOf(kind).map(item => ({ kind, item })))
-        .sort((a, b) => sortByDateThenIdAsc(a.item, b.item));
-
-    commitmentList.innerHTML = '';
-    if (summary.count.all === 0) {
-        commitmentList.innerHTML = emptyStateHTML('No commitments yet. Type one above, for example "school fees 45k 2027-01-15".');
-    } else if (rows.length === 0) {
-        commitmentList.innerHTML = emptyStateHTML(`No ${FILTER_LABELS[commitmentFilter].toLowerCase()} yet.`);
-    } else {
-        rows.forEach(({ kind, item }) => commitmentList.appendChild(
-            createCommitmentRow(item, kind, { pastDue: kind === 'futureCost' && isPastDue(item.date) })));
-    }
-    renderCommitmentFooter(summary);
-};
+const commitmentRows = () => COMMITMENT_KINDS.flatMap(kind => listOf(kind).map(item => ({ item, group: kind })));
+let ledger;
+const renderCommitments = () => ledger.render();
 
 const saveBudget = () => debouncedSave('transactions_budget', generateBudgetCSV);
 
 // Make sure a row of `kind` is visible after it is added or moved.
-const revealKind = (kind) => {
-    if (commitmentFilter !== 'all' && commitmentFilter !== kind) setFilter('all');
-};
+const revealKind = (kind) => ledger.ensureVisible({ group: kind });
 
 // ---- Runway timeline (UX-2.2 to UX-2.4) -------------------------------------
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -211,22 +143,8 @@ const renderRunwayReadouts = (result) => {
 
 // Scroll to a ledger row and highlight it for 1.5 s (chart marker click).
 // If the current filter hides the row, switch to All first.
-const HIGHLIGHT_MS = 1500;
-const findRow = (id) => commitmentList.querySelector(`[data-id="${CSS.escape(id)}"]`);
 function revealCommitmentRow(id) {
-    if (!COMMITMENT_KINDS.some(k => listOf(k).some(i => i.id === id))) return;
-    let row = findRow(id);
-    if (!row && commitmentFilter !== 'all') {
-        setFilter('all');
-        renderCommitments();
-        row = findRow(id);
-    }
-    if (!row) return;
-    const reduce = typeof window.matchMedia === 'function'
-        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    row.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', block: 'center' });
-    row.classList.add('row-highlight');
-    setTimeout(() => row.classList.remove('row-highlight'), HIGHLIGHT_MS);
+    ledger.reveal(id);
 }
 
 let currentMonthlySavingsTarget = 0;
@@ -375,42 +293,19 @@ eftPercentageInput.addEventListener('input', () => {
     renderAllocation();
 });
 
-// Row edits. The amount is already stored (as a number) by the row's amount
-// binding; description and date are copied here. Totals update live.
-commitmentList.addEventListener('input', (e) => {
-    const target = e.target;
-    const row = target.closest('[data-id]');
-    if (!row || target.classList.contains('kind-select')) return;
-    const item = listOf(row.dataset.kind).find(i => i.id === row.dataset.id);
-    if (!item) return;
-    if (target.classList.contains('description-input')) {
-        item.description = target.value;
-    } else if (target.classList.contains('date-input')) {
-        item.date = target.value;
-        if (row.dataset.kind === 'futureCost') setCommitmentPastDue(row, isPastDue(item.date));
-    }
-    renderCommitmentFooter();
-    calculateAndDisplaySummary();
-    saveBudget();
-});
-
 // Type change: move the row to the other array, keeping id/description/amount.
 // A debt has no due date, so moving a dated row to Debt drops the date and
 // offers Undo (which moves it back and restores the date).
-commitmentList.addEventListener('change', (e) => {
-    const sel = e.target.closest('.kind-select');
-    if (!sel) return;
-    const row = sel.closest('[data-id]');
-    const id = row.dataset.id;
-    const fromKind = row.dataset.kind;
+const changeKind = ({ item, group: fromKind }, e, sel) => {
+    const id = item.id;
     const newKind = sel.value;
-    const prevDate = listOf(fromKind).find(i => i.id === id)?.date || '';
+    const prevDate = item.date || '';
     const updated = changeCommitmentType(budgetData, id, newKind);
     if (updated === budgetData) return;
     budgetData = updated;
     revealKind(newKind);
     renderBudget();
-    commitmentList.querySelector(`[data-id="${CSS.escape(id)}"] .kind-select`)?.focus();
+    ledger.rowElement(id)?.querySelector('.kind-select')?.focus();
     saveBudget();
     if (newKind === 'debt' && prevDate) {
         showUndoToast({
@@ -419,48 +314,27 @@ commitmentList.addEventListener('change', (e) => {
                 // Only undo while the row is still a debt (not deleted or moved again).
                 if (!budgetData.debts.some(i => i.id === id)) return;
                 budgetData = changeCommitmentType(budgetData, id, fromKind);
-                const item = listOf(fromKind).find(i => i.id === id);
-                if (item) item.date = prevDate;
+                const moved = listOf(fromKind).find(i => i.id === id);
+                if (moved) moved.date = prevDate;
                 revealKind(fromKind);
                 renderBudget();
                 saveBudget();
             },
         });
     }
-});
+};
 
-commitmentList.addEventListener('click', (e) => {
-    const row = e.target.closest('[data-id]');
-    if (!row) return;
-    const id = row.dataset.id;
-    const kind = row.dataset.kind;
-    if (e.target.closest('.convert-btn')) {
-        // Manual by design: a past-due cost was either saved (move it) or
-        // spent (delete it); only the user knows which.
-        const updated = convertFutureCostToProvision(budgetData, id);
-        if (updated !== budgetData) {
-            budgetData = updated;
-            revealKind('provision');
-            renderBudget();
-            saveBudget();
-        }
-    } else if (e.target.closest('.remove-btn')) {
-        // getList reads the live array: budgetData can be replaced (convert,
-        // type change, reload) before Undo is clicked.
-        deleteWithUndo({
-            getList: () => listOf(kind), id,
-            onChange: () => { renderBudget(); saveBudget(); },
-        });
+// Manual by design: a past-due cost was either saved (move it) or spent
+// (delete it); only the user knows which.
+const moveToProvisions = ({ item }) => {
+    const updated = convertFutureCostToProvision(budgetData, item.id);
+    if (updated !== budgetData) {
+        budgetData = updated;
+        revealKind('provision');
+        renderBudget();
+        saveBudget();
     }
-});
-
-commitmentFilters.addEventListener('click', (e) => {
-    const btn = e.target.closest('.filter-chip');
-    if (!btn) return;
-    setFilter(btn.dataset.filter);
-    renderCommitments();
-    commitmentFilters.querySelector(`[data-filter="${btn.dataset.filter}"]`)?.focus();
-});
+};
 
 // ---- Quick-add ---------------------------------------------------------------
 const MISSING_TEXT = {
@@ -469,30 +343,15 @@ const MISSING_TEXT = {
     amount: 'Add an amount, e.g. 6.5k or 12000.',
 };
 
-const strong = (text) => {
-    const el = document.createElement('strong');
-    el.textContent = text;
-    return el;
-};
-
-const renderQuickAddPreview = () => {
-    const parsed = parseQuickAdd(quickAddInput.value);
+const quickAddPreviewFor = (parsed) => {
     if (parsed.error === 'empty') {
-        quickAddPreview.dataset.state = 'idle';
-        quickAddPreview.textContent = 'Press Enter on an empty field to add a blank row.';
-        return parsed;
+        return { state: 'idle', content: 'Press Enter on an empty field to add a blank row.' };
     }
-    if (parsed.error) {
-        quickAddPreview.dataset.state = 'error';
-        quickAddPreview.textContent = MISSING_TEXT[parsed.missing.join(',')];
-        return parsed;
-    }
-    quickAddPreview.dataset.state = 'ok';
+    if (parsed.error) return { state: 'error', content: MISSING_TEXT[parsed.missing.join(',')] };
     const parts = ['Will add ', strong(COMMITMENT_KIND_LABELS[parsed.kind]), ' · ',
         strong(parsed.description), ' · ', strong(formatCurrency(parsed.amount))];
     if (parsed.date) parts.push(' · due ', strong(parsed.date));
-    quickAddPreview.replaceChildren(...parts);
-    return parsed;
+    return { state: 'ok', content: parts };
 };
 
 const addCommitment = (kind, fields) => {
@@ -504,24 +363,65 @@ const addCommitment = (kind, fields) => {
     return item;
 };
 
-quickAddInput.addEventListener('input', renderQuickAddPreview);
-quickAddInput.addEventListener('keydown', (e) => {
-    if (e.key !== 'Enter' || e.isComposing) return;
-    e.preventDefault();
-    const parsed = renderQuickAddPreview();
+// Enter: add the parsed row and clear the field. On an empty field, add a
+// blank Future cost row (the user picks the type in the row) and focus it.
+const submitQuickAdd = (parsed) => {
     if (parsed.error === 'empty') {
-        // Blank row: a Future cost; the user picks the type in the row.
         const item = addCommitment('futureCost', { description: '', amount: '', date: '' });
-        commitmentList.querySelector(`[data-id="${CSS.escape(item.id)}"] .description-input`)?.focus();
-        return;
+        ledger.rowElement(item.id)?.querySelector('.description-input')?.focus();
+        return false;
     }
-    if (parsed.error) return;
+    if (parsed.error) return false;
     const { kind, description, amount, date } = parsed;
     addCommitment(kind, kind === 'debt' ? { description, amount } : { description, amount, date });
-    quickAddInput.value = '';
-    renderQuickAddPreview();
+    return true;
+};
+
+ledger = createLedger({
+    elements: {
+        list: document.getElementById('commitment-list'),
+        filters: document.getElementById('commitment-filters'),
+        footer: document.getElementById('commitment-footer'),
+        quickAdd: document.getElementById('commitment-quick-add'),
+        preview: document.getElementById('commitment-quick-add-preview'),
+    },
+    getRows: commitmentRows,
+    getList: (row) => listOf(row.group),
+    // Soonest-first; undated rows (all debts, fresh rows) sit at the top.
+    sort: sortByDateThenIdAsc,
+    renderRow: ({ item, group }) => createCommitmentRow(item, group, {
+        pastDue: group === 'futureCost' && isPastDue(item.date),
+    }),
+    filters: {
+        storageKey: 'budget.commitmentFilter',
+        options: ['all', ...COMMITMENT_KINDS].map(value => ({ value, label: FILTER_LABELS[value] })),
+    },
+    // Total for the current filter; on All, the per-kind subtotals too.
+    footer: ({ filter, stats }) => {
+        const total = document.createElement('span');
+        total.className = 'font-semibold text-slate-800';
+        total.textContent = `Total ${formatCurrency(stats[filter].total)}`;
+        if (filter !== 'all') return [total];
+        const sub = document.createElement('span');
+        sub.textContent = COMMITMENT_KINDS
+            .map(k => `${FILTER_LABELS[k]} ${formatCurrency(stats[k].total)}`).join(' · ');
+        return [sub, total];
+    },
+    empty: { none: 'No commitments yet. Type one above, for example "school fees 45k 2027-01-15".' },
+    quickAdd: { parse: parseQuickAdd, preview: quickAddPreviewFor, onSubmit: submitQuickAdd },
+    actions: [
+        { selector: '.kind-select', on: 'change', run: changeKind },
+        { selector: '.convert-btn', run: moveToProvisions },
+    ],
+    // Row edits: the item is already updated; totals update live.
+    onChange: ({ item, group, field, el }) => {
+        if (field === 'date' && group === 'futureCost') setCommitmentPastDue(el, isPastDue(item.date));
+        calculateAndDisplaySummary();
+        saveBudget();
+    },
+    // The ledger has re-rendered itself; refresh the rest as renderBudget would.
+    onRemove: () => { refreshSavings(); calculateAndDisplaySummary(); saveBudget(); },
 });
-renderQuickAddPreview();
 
 futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 

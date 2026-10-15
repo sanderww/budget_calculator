@@ -191,66 +191,134 @@ export function createRowElement(item, { gridTemplateColumns, fields, compact = 
 // Budget commitments ledger. Kinds match COMMITMENT_KINDS in calc/budget.js.
 export const COMMITMENT_KIND_LABELS = { debt: 'Debt', provision: 'Provision', futureCost: 'Future cost' };
 
-// One ledger row: Type chip (select) · Description · Amount · Due · delete.
-// The row carries data-id (the item id) and data-kind. Debts have no due date,
-// so their Due cell is left empty. Future costs also get a full-width
-// "Past due" strip with a text "Move to provisions" button; it is hidden
-// unless `pastDue`, and setCommitmentPastDue() toggles it without a
-// re-render (so editing a date does not steal focus).
-export function createCommitmentRow(item, kind, { pastDue = false } = {}) {
-    const row = document.createElement('div');
-    row.className = 'commitment-row';
-    row.dataset.id = item.id;
-    row.dataset.kind = kind;
+// ---- Column-driven ledger rows (src/lib/ledger.js) -------------------------
+// A column is { key, label, type, ... }:
+//   type       'text' | 'date' | 'number' | 'amount' | 'select' | 'custom'
+//   key        the item field the cell edits (also data-col / data-field)
+//   label      header text; also the input's aria-label unless ariaLabel is set
+//   ariaLabel, placeholder (text/number; defaults to label)
+//   options    select only: strings or { value, label }
+//   inputClass the input's own class (default `${kebab(key)}-input`)
+//   className  extra class: on the input, or on the wrapper when there is one
+//   wrap       true to put the input in a <div class=className> (amount always wraps)
+//   when(item, ctx) → false renders the cell as an empty <div class=className>
+//                  (a conditional column, e.g. BTC only on Crypto rows)
+//   render(item, ctx) → Node, for type 'custom'
+// Every cell root carries data-col=key; every input carries data-field=key and
+// writes its value back to item[key] as it is edited (amounts as numbers via
+// bindAmountInput, selects on change, the rest on input). ctx is { group }.
+const kebab = (key) => key.replace(/[A-Z]/g, c => `-${c.toLowerCase()}`);
 
+export function createLedgerCell(item, col, ctx = {}) {
+    let cell;
+    if (col.when && !col.when(item, ctx)) {
+        cell = document.createElement('div');
+        if (col.className) cell.className = col.className;
+        cell.dataset.on = 'false';
+    } else if (col.type === 'custom') {
+        cell = col.render(item, ctx);
+    } else {
+        let input;
+        if (col.type === 'select') {
+            input = document.createElement('select');
+            for (const opt of col.options || []) {
+                const { value, label } = typeof opt === 'string' ? { value: opt, label: opt } : opt;
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = label;
+                if (String(item[col.key] ?? '') === String(value)) option.selected = true;
+                input.appendChild(option);
+            }
+            input.addEventListener('change', () => { item[col.key] = input.value; });
+        } else {
+            input = document.createElement('input');
+            if (col.type !== 'amount') {
+                input.type = col.type === 'date' || col.type === 'number' ? col.type : 'text';
+                input.value = item[col.key] ?? '';
+                if (col.type !== 'date') input.placeholder = col.placeholder ?? col.label;
+                input.addEventListener('input', () => { item[col.key] = input.value; });
+            }
+        }
+        input.dataset.field = col.key;
+        input.setAttribute('aria-label', col.ariaLabel ?? col.label);
+        const own = `input-field ${col.inputClass ?? `${kebab(col.key)}-input`}`;
+        if (col.type === 'amount') {
+            input.placeholder = col.placeholder ?? '0.00';
+            input.className = own;
+            bindAmountInput(input, {
+                get: () => item[col.key],
+                set: (v) => { item[col.key] = v === null ? '' : v; },
+            });
+            cell = document.createElement('div');
+            cell.className = col.className ? `relative ${col.className}` : 'relative';
+            const prefix = document.createElement('span');
+            prefix.className = 'currency-prefix';
+            prefix.textContent = 'R';
+            cell.append(prefix, input);
+        } else if (col.wrap) {
+            input.className = own;
+            cell = document.createElement('div');
+            if (col.className) cell.className = col.className;
+            cell.appendChild(input);
+        } else {
+            input.className = col.className ? `${own} ${col.className}` : own;
+            cell = input;
+        }
+        if (col.when) cell.dataset.on = 'true';
+    }
+    cell.dataset.col = col.key;
+    return cell;
+}
+
+// One ledger row: a cell per column, then the delete button. The row carries
+// data-id (the item id) plus any extra `dataset` entries.
+export function createLedgerRow(item, columns, { rowClass = 'ledger-row', group, dataset = {}, removeClass } = {}) {
+    const row = document.createElement('div');
+    row.className = rowClass;
+    row.dataset.id = item.id;
+    Object.assign(row.dataset, dataset);
+    for (const col of columns) row.appendChild(createLedgerCell(item, col, { group }));
+    const removeBtn = createRemoveButton();
+    if (removeClass) removeBtn.classList.add(removeClass);
+    row.appendChild(removeBtn);
+    return row;
+}
+
+const kindChip = (item, { group }) => {
     const kindSel = document.createElement('select');
     kindSel.className = 'kind-select kind-chip';
-    kindSel.dataset.kind = kind;
+    kindSel.dataset.kind = group;
     kindSel.setAttribute('aria-label', 'Type');
     for (const [value, label] of Object.entries(COMMITMENT_KIND_LABELS)) {
         const option = document.createElement('option');
         option.value = value;
         option.textContent = label;
-        if (value === kind) option.selected = true;
+        if (value === group) option.selected = true;
         kindSel.appendChild(option);
     }
+    return kindSel;
+};
 
-    const desc = document.createElement('input');
-    desc.type = 'text';
-    desc.value = item.description || '';
-    desc.placeholder = 'Description';
-    desc.setAttribute('aria-label', 'Description');
-    desc.className = 'input-field description-input commitment-desc';
+// Commitments columns: Type chip · Description · Amount · Due. The kind chip
+// is custom (it changes the row's kind, handled by the Budget controller, so
+// it has no data-field). Debts have no due date: their Due cell stays empty.
+export const COMMITMENT_COLUMNS = [
+    { key: 'kind', type: 'custom', label: 'Type', render: kindChip },
+    { key: 'description', type: 'text', label: 'Description', className: 'commitment-desc' },
+    { key: 'amount', type: 'amount', label: 'Amount', className: 'commitment-amount' },
+    { key: 'date', type: 'date', label: 'Due', ariaLabel: 'Due date', wrap: true, className: 'commitment-due',
+        when: (item, { group }) => group !== 'debt' },
+];
 
-    const amtWrap = document.createElement('div');
-    amtWrap.className = 'relative commitment-amount';
-    const prefix = document.createElement('span');
-    prefix.className = 'currency-prefix';
-    prefix.textContent = 'R';
-    const amt = document.createElement('input');
-    amt.placeholder = '0.00';
-    amt.setAttribute('aria-label', 'Amount');
-    amt.className = 'input-field amount-input';
-    bindAmountInput(amt, {
-        get: () => item.amount,
-        set: (v) => { item.amount = v === null ? '' : v; },
+// One commitments row (COMMITMENT_COLUMNS + delete). The row carries data-id
+// (the item id) and data-kind. Future costs also get a full-width
+// "Past due" strip with a text "Move to provisions" button; it is hidden
+// unless `pastDue`, and setCommitmentPastDue() toggles it without a
+// re-render (so editing a date does not steal focus).
+export function createCommitmentRow(item, kind, { pastDue = false } = {}) {
+    const row = createLedgerRow(item, COMMITMENT_COLUMNS, {
+        rowClass: 'commitment-row', group: kind, dataset: { kind }, removeClass: 'commitment-remove',
     });
-    amtWrap.append(prefix, amt);
-
-    const due = document.createElement('div');
-    due.className = 'commitment-due';
-    if (kind !== 'debt') {
-        const date = document.createElement('input');
-        date.type = 'date';
-        date.value = item.date || '';
-        date.setAttribute('aria-label', 'Due date');
-        date.className = 'input-field date-input';
-        due.appendChild(date);
-    }
-
-    const removeBtn = createRemoveButton();
-    removeBtn.classList.add('commitment-remove');
-    row.append(kindSel, desc, amtWrap, due, removeBtn);
 
     if (kind === 'futureCost') {
         const strip = document.createElement('div');

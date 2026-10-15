@@ -1,7 +1,7 @@
 // Budget tab: summary, monthly allocation, and budget CSV parse/generate.
 
 import { generateRecordId as _generateId } from './util.js';
-import { parseAmount } from '../lib/format.js';
+import { parseQuickAddTokens } from '../lib/quick-add.js';
 
 export function getUpcoming25th(today = new Date()) {
     let year = today.getFullYear();
@@ -161,26 +161,8 @@ export function summariseCommitments(data) {
     return { count, total };
 }
 
-const MONTHS = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-const FULL_MONTHS = ['january', 'february', 'march', 'april', 'may', 'june', 'july',
-    'august', 'september', 'october', 'november', 'december'];
-const monthIndex = (token) => {
-    const t = token.toLowerCase();
-    const i = MONTHS.indexOf(t);
-    return i >= 0 ? i : FULL_MONTHS.indexOf(t);
-};
-const isIsoDate = (token) => {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(token);
-    if (!m) return false;
-    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
-    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
-};
-// A bare 4-digit year ("2027") is only taken as the amount when nothing else
-// in the text parses as one, so "2027 budget review 5k" means R 5,000.
-const looksLikeYear = (token) => /^(19|20)\d{2}$/.test(token);
-
 // Parses one line of the Budget quick-add field, e.g. "car service 6.5k mar 2027"
-// or "credit card 12000 debt". Rules, applied in order:
+// or "credit card 12000 debt", on top of parseQuickAddTokens (src/lib/quick-add.js):
 //   1. kind: the word "debt" or "provision" anywhere (case-insensitive);
 //      otherwise a future cost.
 //   2. date: YYYY-MM-DD, or "<month name or 3-letter abbr> YYYY" (the 1st of
@@ -190,59 +172,16 @@ const looksLikeYear = (token) => /^(19|20)\d{2}$/.test(token);
 //   4. description: what remains, whitespace collapsed, first letter capitalised.
 // Returns { kind, description, amount, date } (date '' when none), or
 // { error: 'empty' | 'missing', missing: [...] } naming the missing parts.
+const COMMITMENT_KEYWORDS = { debt: 'debt', provision: 'provision' };
 export function parseQuickAdd(text) {
-    let tokens = typeof text === 'string' ? text.trim().split(/\s+/).filter(Boolean) : [];
-    if (tokens.length === 0) return { error: 'empty', missing: ['description', 'amount'] };
-
-    let kind = 'futureCost';
-    const kindAt = tokens.findIndex(t => /^(debt|provision)$/i.test(t));
-    if (kindAt >= 0) {
-        kind = tokens[kindAt].toLowerCase();
-        tokens.splice(kindAt, 1);
-    }
-
-    let date = '';
-    for (let i = 0; i < tokens.length; i++) {
-        if (isIsoDate(tokens[i])) {
-            date = tokens[i];
-            tokens.splice(i, 1);
-            break;
-        }
-        const month = monthIndex(tokens[i]);
-        if (month >= 0 && /^\d{4}$/.test(tokens[i + 1] || '')) {
-            date = `${tokens[i + 1]}-${String(month + 1).padStart(2, '0')}-01`;
-            tokens.splice(i, 2);
-            break;
-        }
-    }
-    if (kind === 'debt') date = '';
-
-    // Candidates: [start index, token count, value]. A lone "R" joins the
-    // number after it, so "R 20,000" reads as one amount.
-    const candidates = [];
-    for (let i = 0; i < tokens.length; i++) {
-        if (/^-?r$/i.test(tokens[i]) && i + 1 < tokens.length) {
-            const v = parseAmount(tokens[i] + tokens[i + 1]);
-            if (v !== null) { candidates.push([i, 2, v, false]); continue; }
-        }
-        const v = parseAmount(tokens[i]);
-        if (v !== null) candidates.push([i, 1, v, looksLikeYear(tokens[i])]);
-    }
-    const pick = candidates.find(c => !c[3]) || candidates[0];
-    let amount = null;
-    if (pick) {
-        amount = pick[2];
-        tokens.splice(pick[0], pick[1]);
-    }
-
-    const rest = tokens.join(' ');
-    const description = rest ? rest.charAt(0).toUpperCase() + rest.slice(1) : '';
-
+    const t = parseQuickAddTokens(text, { keywords: COMMITMENT_KEYWORDS });
+    if (t.empty) return { error: 'empty', missing: ['description', 'amount'] };
+    const kind = t.keyword || 'futureCost';
     const missing = [];
-    if (!description) missing.push('description');
-    if (amount === null) missing.push('amount');
+    if (!t.description) missing.push('description');
+    if (t.amount === null) missing.push('amount');
     if (missing.length) return { error: 'missing', missing };
-    return { kind, description, amount, date };
+    return { kind, description: t.description, amount: t.amount, date: kind === 'debt' ? '' : t.date };
 }
 
 export function parseBudgetCSV(text) {
