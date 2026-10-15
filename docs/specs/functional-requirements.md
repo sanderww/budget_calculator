@@ -41,21 +41,27 @@ Tab bar labels: **Budget**, **Investments**, **Debt**, **RA**, **Retirement**, *
 
 The Investments, Debt, and RA tabs each open with a right-aligned overflow menu button (`⋯`) instead of a database toolbar. Its popover holds **Import CSV…** (the file-picker import; ids `load-inv-csv`, `load-debt-csv`, `load-ra-csv`; an imported dataset is then auto-saved like any edit) and a muted footnote with the backing file path (e.g. `db/transactions/investments.csv`). The Budget tab has no import and therefore no menu and no path text. The Retirement tab's sidebar carries the same `⋯` menu with **Import CSV…** (`ret-load-csv`) and no path footnote. File paths appear nowhere else in the UI. There are no Save buttons: persistence is automatic (§7). The menu is built on the shared popover helper (`src/lib/popover.js`): the trigger has `aria-expanded`, Escape and outside click close it, and choosing an item closes it. The main content of these tabs spans the full page width.
 
+### 0.5 Undo and amount fields
+
+**Undo for deletes.** Deleting a row in any editable list (Budget debts, provisions and future costs; investment transactions; debt extra repayments; RA contributions) removes it and auto-saves immediately, then shows a toast at the bottom-centre of the viewport: `Deleted "School fees" (R 45,000.00)` with an **Undo** button. The toast (`src/lib/undo-toast.js`, `showUndoToast({ message, onUndo })`) is a single `role="status"` / `aria-live="polite"` element on `<body>`; the Undo button is keyboard-focusable but never takes focus automatically. It disappears after 8 seconds or when the next delete replaces it. **Undo** puts the same row object (same `id`) back at its original index, re-renders and saves as a normal edit. The shared `deleteWithUndo` in `src/lib/rows.js` does this for every list. The trash button is a neutral grey icon button (`aria-label` "Delete") that turns red on hover and focus.
+
+**Formatted amount fields.** All rand amount inputs (list-row amounts, Current Savings, Available money, planned monthly savings, the three investment current values, the four mortgage rand fields, RA current value) are `type="text" inputmode="decimal"` and wired by `bindAmountInput(el, { get, set })` in `src/lib/rows.js`. When idle they show a grouped value (`400,000`, `45,000.50`); while focused they show the raw value. Accepted input: `45000`, `45,000`, `45000.5`, `R 45,000.50`, `45k`, `1.2m`, `-500`. Invalid text (for example `1,2` or `abc`) leaves the stored value unchanged and shows a red border with `aria-invalid="true"` until corrected; clearing the field clears the value. Stored state, config and CSV values remain plain numbers. Percent, age, BTC and the Retirement tab's inputs are unchanged `type="number"` fields.
+
 ---
 
 ## 1. Budget Calculator
 
 ### 1.1 Current Savings
 
-- Single numeric input representing total liquid savings (R).
+- Single amount input representing total liquid savings (R), a formatted amount field (see §0.5).
 - Changes trigger an immediate recalculation of the financial summary.
 
 ### 1.2 Debts
 
 - Dynamic list of debt line items, each with:
   - **Description** (text)
-  - **Amount** (R, numeric)
-- Users can add and remove items.
+  - **Amount** (R, formatted amount field, §0.5)
+- Users can add items and delete them (delete is undoable, §0.5).
 
 ### 1.3 Provisions
 

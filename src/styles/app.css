@@ -142,3 +142,75 @@ input[type="number"].input-field {
     display: none;
     /* Chrome / Safari */
 }
+
+/* Neutral trash button: grey until hovered or focused, then red. */
+.btn-icon-danger {
+    background-color: transparent;
+    color: #64748b;
+    /* slate-500 */
+    border: 1px solid transparent;
+}
+
+.btn-icon-danger:hover,
+.btn-icon-danger:focus-visible {
+    background-color: #fef2f2;
+    /* red-50 */
+    color: #dc2626;
+    /* red-600 */
+    border-color: #fecaca;
+    /* red-200 */
+}
+
+/* Amount fields: invalid text keeps the stored value and shows a red border. */
+.input-field[aria-invalid="true"],
+.input-field[aria-invalid="true"]:focus {
+    border-color: #dc2626;
+    box-shadow: 0 0 0 3px rgb(220 38 38 / 0.15);
+}
+
+.amount-input {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Undo toast, bottom-centre. Nothing else is fixed to the bottom edge. */
+.undo-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 1rem;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    max-width: calc(100vw - 2rem);
+    padding: 0.625rem 0.75rem 0.625rem 1rem;
+    background-color: #0f172a;
+    /* slate-900 */
+    color: white;
+    border-radius: 0.75rem;
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.3);
+    font-size: 0.875rem;
+}
+
+.undo-toast[hidden] {
+    display: none;
+}
+
+.undo-toast-btn {
+    flex-shrink: 0;
+    padding: 0.25rem 0.75rem;
+    border-radius: 0.375rem;
+    font-weight: 600;
+    color: #a5b4fc;
+    /* indigo-300 */
+    cursor: pointer;
+}
+
+.undo-toast-btn:hover {
+    background-color: rgb(255 255 255 / 0.1);
+}
+
+.undo-toast-btn:focus-visible {
+    outline: 2px solid #a5b4fc;
+    outline-offset: 2px;
+}

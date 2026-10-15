@@ -116,7 +116,7 @@
                                 <h2 class="text-xl font-semibold text-slate-800 mb-4">Current Savings</h2>
                                 <div class="relative">
                                     <span class="currency-prefix">R</span>
-                                    <input type="number" id="savings"
+                                    <input type="text" inputmode="decimal" id="savings"
                                         class="input-field amount-input text-2xl font-bold" placeholder="0.00">
                                 </div>
                             </div>
@@ -188,7 +188,7 @@
                                         <label class="block text-xs font-medium text-slate-500 mb-1">Available end-of-month money</label>
                                         <div class="relative">
                                             <span class="currency-prefix">R</span>
-                                            <input type="number" id="available-money" class="input-field amount-input text-sm" placeholder="0.00">
+                                            <input type="text" inputmode="decimal" id="available-money" class="input-field amount-input text-sm" placeholder="0.00">
                                         </div>
                                     </div>
                                     <div class="grid grid-cols-3 gap-2">
@@ -246,7 +246,7 @@
                         <label for="budget-timeline-planned-savings" class="block text-xs font-medium text-slate-500 mb-1">Monthly savings (planned)</label>
                         <div class="relative">
                             <span class="currency-prefix">R</span>
-                            <input type="number" id="budget-timeline-planned-savings" class="input-field amount-input text-sm" min="0" step="100" placeholder="0">
+                            <input type="text" inputmode="decimal" id="budget-timeline-planned-savings" class="input-field amount-input text-sm" placeholder="0">
                         </div>
                     </div>
                     <button id="budget-timeline-reset-planned" type="button" class="btn btn-secondary text-xs py-1.5 px-3">Use recommended</button>
@@ -284,7 +284,7 @@
                                         <label class="text-xs text-slate-500">Current Value</label>
                                         <div class="relative">
                                             <span class="currency-prefix text-xs">R</span>
-                                            <input type="number" id="val-discretionary"
+                                            <input type="text" inputmode="decimal" id="val-discretionary"
                                                 class="input-field amount-input text-sm font-bold" placeholder="0.00">
                                         </div>
                                     </div>
@@ -342,7 +342,7 @@
                                         <label class="text-xs text-slate-500">Current Value</label>
                                         <div class="relative">
                                             <span class="currency-prefix text-xs">R</span>
-                                            <input type="number" id="val-tfsa"
+                                            <input type="text" inputmode="decimal" id="val-tfsa"
                                                 class="input-field amount-input text-sm font-bold" placeholder="0.00">
                                         </div>
                                     </div>
@@ -399,7 +399,7 @@
                                         <label class="text-xs text-slate-500">Current Value</label>
                                         <div class="relative">
                                             <span class="currency-prefix text-xs">R</span>
-                                            <input type="number" id="val-crypto"
+                                            <input type="text" inputmode="decimal" id="val-crypto"
                                                 class="input-field amount-input text-sm font-bold" placeholder="0.00">
                                         </div>
                                     </div>
@@ -481,7 +481,7 @@
                                     <label class="block text-sm font-medium text-slate-700 mb-1">Total Loan Amount</label>
                                     <div class="relative">
                                         <span class="currency-prefix">R</span>
-                                        <input type="number" id="debt-amount" class="input-field amount-input"
+                                        <input type="text" inputmode="decimal" id="debt-amount" class="input-field amount-input"
                                             value="1709333.93">
                                     </div>
                                 </div>
@@ -489,7 +489,7 @@
                                     <label class="block text-sm font-medium text-slate-700 mb-1">Current Outstanding Balance</label>
                                     <div class="relative">
                                         <span class="currency-prefix">R</span>
-                                        <input type="number" id="debt-current-balance" class="input-field amount-input"
+                                        <input type="text" inputmode="decimal" id="debt-current-balance" class="input-field amount-input"
                                             value="1549467">
                                     </div>
                                 </div>
@@ -498,7 +498,7 @@
                                         Repayment</label>
                                     <div class="relative">
                                         <span class="currency-prefix">R</span>
-                                        <input type="number" id="debt-repayment" class="input-field amount-input"
+                                        <input type="text" inputmode="decimal" id="debt-repayment" class="input-field amount-input"
                                             value="17554.73">
                                     </div>
                                 </div>
@@ -507,7 +507,7 @@
                                         Fee</label>
                                     <div class="relative">
                                         <span class="currency-prefix">R</span>
-                                        <input type="number" id="debt-service-fee" class="input-field amount-input"
+                                        <input type="text" inputmode="decimal" id="debt-service-fee" class="input-field amount-input"
                                             value="69.00">
                                     </div>
                                 </div>
@@ -653,7 +653,7 @@
                                         <label class="text-xs text-slate-500">Current fund value (R)</label>
                                         <div class="relative">
                                             <span class="currency-prefix text-xs">R</span>
-                                            <input type="number" id="ra-current-value" class="input-field amount-input text-sm font-bold" placeholder="0.00" min="0" step="0.01">
+                                            <input type="text" inputmode="decimal" id="ra-current-value" class="input-field amount-input text-sm font-bold" placeholder="0.00">
                                         </div>
                                     </div>
                                     <div class="text-xs text-slate-500">Invested: <span id="ra-invested" class="font-medium text-slate-700">R 0.00</span></div>

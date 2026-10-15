@@ -8,8 +8,8 @@ import {
     convertFutureCostToProvision,
 } from '../calculations.js';
 import { renderBudgetTimeline as _renderBudgetTimeline } from '../charts/chart_budget_timeline.js';
-import { fmtZAR as formatCurrency } from '../lib/format.js';
-import { createRowElement, sortByDateThenIdAsc, emptyStateHTML, generateId } from '../lib/rows.js';
+import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
+import { createRowElement, sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
 let budgetData = {
@@ -31,14 +31,26 @@ const addFutureCostBtn = document.getElementById('add-future-cost');
 
 
 const availableMoneyInput = document.getElementById('available-money');
+let availableMoney = '';
+bindAmountInput(availableMoneyInput, { get: () => availableMoney, set: (v) => { availableMoney = v === null ? '' : v; } });
 const mortgagePercentageInput = document.getElementById('mortgage-percentage');
 const eftPercentageInput = document.getElementById('eft-percentage');
 const cryptoPercentageInput = document.getElementById('crypto-percentage');
 const calculateAllocationBtn = document.getElementById('calculate-allocation');
 const allocationResults = document.getElementById('allocation-results');
 
+// Current savings is a formatted amount field; the stored value stays a number.
+const refreshSavings = bindAmountInput(savingsInput, {
+    get: () => budgetData.savings,
+    set: (v) => {
+        budgetData.savings = v === null ? '' : v;
+        calculateAndDisplaySummary();
+        debouncedSave('transactions_budget', generateBudgetCSV);
+    },
+});
+
 const renderBudget = () => {
-    savingsInput.value = budgetData.savings || '';
+    refreshSavings();
     renderList(debtList, budgetData.debts, createDebtItem);
     renderList(provisionList, budgetData.provisions, createProvisionItem);
     // Future costs always display soonest-first, re-sorted on every render
@@ -108,8 +120,7 @@ const calculateAndDisplaySummary = () => {
 
     try {
         const plannedInput = document.getElementById('budget-timeline-planned-savings');
-        const plannedRaw = plannedInput && plannedInput.value !== '' ? parseFloat(plannedInput.value) : NaN;
-        const planned = Number.isFinite(plannedRaw) && plannedRaw >= 0 ? plannedRaw : undefined;
+        const planned = Number.isFinite(plannedSavings) && plannedSavings >= 0 ? plannedSavings : undefined;
         const result = _renderBudgetTimeline({
             container: document.getElementById('budget-timeline-chart'),
             headline: document.getElementById('budget-timeline-headline'),
@@ -138,7 +149,7 @@ const showAllocationError = (msg) => {
 };
 
 const calculateMonthlyAllocation = () => {
-    const availableMoney = parseFloat(availableMoneyInput.value) || 0;
+    const availableMoneyValue = parseAmount(availableMoneyInput.value) ?? 0;
     const mortgagePercentage = parseFloat(mortgagePercentageInput.value) || 0;
     const eftPercentage = parseFloat(eftPercentageInput.value) || 0;
     const cryptoPercentage = parseFloat(cryptoPercentageInput.value) || 0;
@@ -155,7 +166,7 @@ const calculateMonthlyAllocation = () => {
         return;
     }
 
-    const r = _calcMonthlyAllocation(availableMoney, monthlySavingsTarget, mortgagePercentage, eftPercentage, cryptoPercentage);
+    const r = _calcMonthlyAllocation(availableMoneyValue, monthlySavingsTarget, mortgagePercentage, eftPercentage, cryptoPercentage);
 
     if (r.remainingMoney < 0) {
         showAllocationError('Available money is less than required monthly savings. Increase your available money or reduce your financial commitments.');
@@ -172,25 +183,27 @@ const calculateMonthlyAllocation = () => {
     allocationResults.classList.remove('hidden');
 };
 
-const handleListChange = (e, list) => {
+// getList returns the live array (budgetData can be replaced by a convert or
+// reload, so Undo must not hold on to the array it was deleted from).
+const handleListChange = (e, getList) => {
     const target = e.target;
     const itemDiv = target.closest('[data-id]');
     if (!itemDiv) return;
 
     const id = itemDiv.dataset.id;
-    const item = list.find(i => i.id === id);
+    const item = getList().find(i => i.id === id);
     if (!item) return;
 
-    if (target.classList.contains('remove-btn')) {
-        const index = list.findIndex(i => i.id === id);
-        if (index > -1) {
-            list.splice(index, 1);
-            renderBudget();
-        }
+    if (target.closest('.remove-btn')) {
+        deleteWithUndo({
+            getList, id,
+            onChange: () => { renderBudget(); debouncedSave('transactions_budget', generateBudgetCSV); },
+        });
     } else if (target.classList.contains('description-input')) {
         item.description = target.value;
     } else if (target.classList.contains('amount-input')) {
-        item.amount = target.value;
+        // Already stored by the row's amount binding (a number, not the
+        // formatted text).
     } else if (target.classList.contains('date-input')) {
         item.date = target.value;
     }
@@ -215,12 +228,6 @@ addFutureCostBtn.addEventListener('click', () => {
     debouncedSave('transactions_budget', generateBudgetCSV);
 });
 
-savingsInput.addEventListener('input', (e) => {
-    budgetData.savings = e.target.value;
-    calculateAndDisplaySummary();
-    debouncedSave('transactions_budget', generateBudgetCSV);
-});
-
 futureDateInput.addEventListener('input', calculateAndDisplaySummary);
 
 const plannedSavingsInput = document.getElementById('budget-timeline-planned-savings');
@@ -228,25 +235,30 @@ const plannedSavingsReset = document.getElementById('budget-timeline-reset-plann
 // Persist the planned monthly-savings override to config.private.json
 // (auto-save, same mechanism as the rest of the page). Blank/invalid
 // removes the override so the chart follows the recommended amount.
-const persistPlannedSavings = () => {
+let plannedSavings; // undefined = blank = follow the recommendation
+const refreshPlannedSavings = plannedSavingsInput
+    ? bindAmountInput(plannedSavingsInput, {
+        get: () => plannedSavings,
+        set: (v) => {
+            plannedSavings = v === null ? undefined : v;
+            persistPlannedSavings();
+            calculateAndDisplaySummary();
+        },
+    })
+    : () => {};
+function persistPlannedSavings() {
     if (!plannedSavingsInput) return;
-    const raw = plannedSavingsInput.value;
-    const val = raw !== '' ? parseFloat(raw) : NaN;
+    const val = plannedSavings === undefined ? NaN : plannedSavings;
     if (Number.isFinite(val) && val >= 0) {
         setConfig('budget_planned_monthly_savings', val);
     } else if ('budget_planned_monthly_savings' in getConfigMap()) {
         unsetConfig('budget_planned_monthly_savings');
     }
-};
-if (plannedSavingsInput) {
-    plannedSavingsInput.addEventListener('input', () => {
-        persistPlannedSavings();
-        calculateAndDisplaySummary();
-    });
 }
 if (plannedSavingsReset) {
     plannedSavingsReset.addEventListener('click', () => {
-        if (plannedSavingsInput) plannedSavingsInput.value = '';
+        plannedSavings = undefined;
+        refreshPlannedSavings();
         if ('budget_planned_monthly_savings' in getConfigMap()) {
             unsetConfig('budget_planned_monthly_savings');
         }
@@ -258,15 +270,17 @@ if (plannedSavingsReset) {
 const applyPlannedSavingsFromConfig = () => {
     if (!plannedSavingsInput) return;
     const saved = getConfigMap().budget_planned_monthly_savings;
-    plannedSavingsInput.value = (saved !== undefined && saved !== null && saved !== '') ? saved : '';
+    const v = (saved !== undefined && saved !== null && saved !== '') ? parseAmount(saved) : null;
+    plannedSavings = v === null ? undefined : v;
+    refreshPlannedSavings();
 };
 
-debtList.addEventListener('input', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
-provisionList.addEventListener('input', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
-futureCostList.addEventListener('input', (e) => { handleListChange(e, budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV); });
+debtList.addEventListener('input', (e) => { handleListChange(e, () => budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
+provisionList.addEventListener('input', (e) => { handleListChange(e, () => budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
+futureCostList.addEventListener('input', (e) => { handleListChange(e, () => budgetData.futureCosts); debouncedSave('transactions_budget', generateBudgetCSV); });
 
-debtList.addEventListener('click', (e) => { handleListChange(e, budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
-provisionList.addEventListener('click', (e) => { handleListChange(e, budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
+debtList.addEventListener('click', (e) => { handleListChange(e, () => budgetData.debts); debouncedSave('transactions_budget', generateBudgetCSV); });
+provisionList.addEventListener('click', (e) => { handleListChange(e, () => budgetData.provisions); debouncedSave('transactions_budget', generateBudgetCSV); });
 // Convert is intercepted before the shared handler: it is the only action
 // that moves a row between two lists, so it owns the whole click.
 futureCostList.addEventListener('click', (e) => {
@@ -281,7 +295,7 @@ futureCostList.addEventListener('click', (e) => {
         }
         return;
     }
-    handleListChange(e, budgetData.futureCosts);
+    handleListChange(e, () => budgetData.futureCosts);
     debouncedSave('transactions_budget', generateBudgetCSV);
 });
 

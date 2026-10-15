@@ -6,7 +6,7 @@ import {
     generateRaTransactionsCSV as _generateRaTransactionsCSV,
 } from '../calculations.js';
 import { fmtZAR, fmtZARWhole } from '../lib/format.js';
-import { createRowElement } from '../lib/rows.js';
+import { createRowElement, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
@@ -44,9 +44,21 @@ function updateRaPerformanceDisplay() {
     }, { fmt: fmtZAR });
 }
 
+// RA value is a formatted amount input; undefined = not entered.
+const raCurrentValueInput = document.getElementById('ra-current-value');
+const refreshRaCurrentValue = bindAmountInput(raCurrentValueInput, {
+    get: () => raCurrentValue,
+    set: (v) => {
+        raCurrentValue = v === null ? undefined : v;
+        raPersist();
+        updateRaPerformanceDisplay();
+        onStateChanged();
+    },
+});
+
 function renderRa() {
     document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
-    document.getElementById('ra-current-value').value    = (raCurrentValue ?? '');
+    refreshRaCurrentValue();
 
     const total = raTransactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
     document.getElementById('ra-total-contributed').textContent = raFmtZARShort(total);
@@ -105,16 +117,20 @@ raList.addEventListener('change', (e) => {
     } else if (e.target.classList.contains('description-input')) {
         tx.description = e.target.value; raPersist();
     } else if (e.target.classList.contains('amount-input')) {
-        tx.amount = parseFloat(e.target.value) || 0; raPersist(); renderRa();
+        // Invalid text keeps the stored amount; leave it on screen for correction.
+        if (e.target.getAttribute('aria-invalid') === 'true') return;
+        tx.amount = Number(tx.amount) || 0; raPersist(); renderRa();
     }
 });
 raList.addEventListener('click', (e) => {
     if (!e.target.closest('.remove-btn')) return;
     const row = e.target.closest('[data-id]');
     if (!row) return;
-    raTransactions = raTransactions.filter(t => t.id !== row.dataset.id);
-    raPersist();
-    renderRa();
+    deleteWithUndo({
+        getList: () => raTransactions,
+        id: row.dataset.id,
+        onChange: () => { raPersist(); renderRa(); },
+    });
 });
 
 const raTodayIso = () => new Date().toISOString().slice(0, 10);
@@ -134,18 +150,6 @@ document.getElementById('ra-refund-rate').addEventListener('input', (e) => {
     raParams.tax_refund_rate_pct = parseFloat(e.target.value) || 0;
     setConfig('tax_refund_rate_pct', raParams.tax_refund_rate_pct);
     renderRa();
-});
-document.getElementById('ra-current-value').addEventListener('input', (e) => {
-    const raw = e.target.value;
-    if (raw === '') {
-        raCurrentValue = undefined;
-    } else {
-        const v = parseFloat(raw);
-        raCurrentValue = Number.isNaN(v) ? undefined : v;
-    }
-    raPersist();
-    updateRaPerformanceDisplay();
-    onStateChanged();
 });
 const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions, raCurrentValue);
 

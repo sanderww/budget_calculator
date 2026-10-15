@@ -22,6 +22,13 @@ Every displayed amount — summary cards, tables, tooltips, chart axes and chart
 - All formatting goes through `src/lib/format.js`, which pins `ZAR_LOCALE = 'en-US'`. No module may call `toLocaleString` directly.
 - Cent-precise amounts show exactly two decimals (`fmtZAR`); whole-rand amounts show none (`fmtZARWhole`, `fmtZARSigned`, `fmtZARAxis`); bare grouped numbers without the `R` prefix use `fmtNum`.
 
+### Amount entry and undo (hard requirements)
+
+- **Rand amount inputs** (list-row amounts, current savings, available money, planned monthly savings, investment current values, debt loan/balance/repayment/service fee, RA current value) are `type="text" inputmode="decimal"`. They show a grouped value when idle (`400,000`, `45,000.50`; `fmtAmountInput`) and the raw value while focused.
+- `parseAmount(text)` in `src/lib/format.js` is the single parser. It accepts `45000`, `45,000`, `45000.5`, `R 45,000.50`, `45k`, `1.2m` and a leading minus; commas are valid only as thousands groups (`1,2` is rejected); empty or unparseable text gives `null`. Invalid text never changes the stored value and marks the field `aria-invalid` until corrected.
+- Stored state, config and CSV values stay plain numbers. Code must never read an amount input's `.value` with `parseFloat` (a formatted `"400,000"` would read as 400). Percent, age and BTC inputs stay `type="number"`.
+- **Every delete of a list row is undoable** for 8 seconds: the row is removed and saved immediately, and an Undo toast restores the same object (same `id`) at its original index and saves that as a new edit.
+
 ---
 
 ## 1. Budget Module

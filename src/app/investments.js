@@ -6,7 +6,7 @@ import {
     tfsaLifetimeContributions as _tfsaLifetimeContributions,
 } from '../calculations.js';
 import { fmtZAR as formatCurrency, fmtZAR, fmtNum } from '../lib/format.js';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
+import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
@@ -35,6 +35,22 @@ const valDiscretionary = document.getElementById('val-discretionary');
 const valTfsa = document.getElementById('val-tfsa');
 const valCrypto = document.getElementById('val-crypto');
 const marginalRateInput = document.getElementById('marginal-rate-discretionary');
+
+// Current-value fields are formatted amount inputs; state keeps plain numbers.
+const refreshCurrentValues = [
+    ['Discretionary', valDiscretionary],
+    ['TFSA', valTfsa],
+    ['Crypto', valCrypto],
+].map(([key, input]) => bindAmountInput(input, {
+    get: () => investmentData.currentValues[key],
+    set: (v) => {
+        investmentData.currentValues[key] = v === null ? '' : v;
+        updatePerformanceDisplay();
+        // Retirement projection reads these current values live — keep it in sync.
+        onStateChanged();
+        debouncedSave('transactions_investments', generateInvestmentCSV);
+    },
+}));
 
 const updatePerformanceDisplay = () => {
     calculatePerformance('Discretionary', investmentData.currentValues.Discretionary, 'inv-discretionary', 'gain-discretionary', 'ann-discretionary', 'gain-money-discretionary');
@@ -97,9 +113,7 @@ const renderTransactions = () => {
 
 const renderFullInvestmentUI = () => {
     // Update Inputs from State
-    valDiscretionary.value = investmentData.currentValues.Discretionary || '';
-    valTfsa.value = investmentData.currentValues.TFSA || '';
-    valCrypto.value = investmentData.currentValues.Crypto || '';
+    refreshCurrentValues.forEach(refresh => refresh());
     marginalRateInput.value = (investmentData.marginalRate ?? 41);
 
     renderTransactions();
@@ -172,7 +186,7 @@ transactionList.addEventListener('input', (e) => {
     if (!item) return;
 
     if (target.classList.contains('description-input')) item.description = target.value;
-    else if (target.classList.contains('amount-input')) item.amount = target.value;
+    else if (target.classList.contains('amount-input')) { /* stored by the row's amount binding */ }
     else if (target.classList.contains('date-input')) item.date = target.value;
     else if (target.classList.contains('type-input')) {
         item.type = target.value;
@@ -195,28 +209,16 @@ transactionList.addEventListener('input', (e) => {
 transactionList.addEventListener('click', (e) => {
     if (e.target.closest('.remove-btn')) {
         const itemDiv = e.target.closest('[data-id]');
-        const id = itemDiv.dataset.id;
-        const index = investmentData.transactions.findIndex(i => i.id === id);
-        if (index > -1) {
-            investmentData.transactions.splice(index, 1);
-            renderTransactions();
-            updatePerformanceDisplay();
-            debouncedSave('transactions_investments', generateInvestmentCSV);
-        }
+        deleteWithUndo({
+            getList: () => investmentData.transactions,
+            id: itemDiv.dataset.id,
+            onChange: () => {
+                renderTransactions();
+                updatePerformanceDisplay();
+                debouncedSave('transactions_investments', generateInvestmentCSV);
+            },
+        });
     }
-});
-
-[valDiscretionary, valTfsa, valCrypto].forEach(input => {
-    input.addEventListener('input', (e) => {
-        const id = e.target.id;
-        if (id === 'val-discretionary') investmentData.currentValues.Discretionary = e.target.value;
-        if (id === 'val-tfsa') investmentData.currentValues.TFSA = e.target.value;
-        if (id === 'val-crypto') investmentData.currentValues.Crypto = e.target.value;
-        updatePerformanceDisplay();
-        // Retirement projection reads these current values live — keep it in sync.
-        onStateChanged();
-        debouncedSave('transactions_investments', generateInvestmentCSV);
-    });
 });
 
 marginalRateInput.addEventListener('input', (e) => {

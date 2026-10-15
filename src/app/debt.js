@@ -7,8 +7,8 @@ import {
     parseDebtCSV as _parseDebtCSV,
     generateDebtCSV as _generateDebtCSV,
 } from '../calculations.js';
-import { fmtZAR as formatCurrency } from '../lib/format.js';
-import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId } from '../lib/rows.js';
+import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
+import { createRowElement, sortByDateThenIdDesc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
 // --- DEBT CALCULATOR LOGIC ---
@@ -41,6 +41,25 @@ const DEBT_INPUT_BINDINGS = [
     ['original_term',   debtOriginalTermInput],
 ];
 
+// Rand fields are formatted amount inputs. The last valid number of each is
+// kept here (the text may read "400,000", or be invalid mid-edit); the config
+// stores plain numbers.
+const DEBT_AMOUNT_INPUTS = new Set([debtAmountInput, debtCurrentBalanceInput, debtRepaymentInput, debtServiceFeeInput]);
+const debtAmountValues = new Map();
+const debtAmountRefreshers = new Map();
+const amountValue = (el) => debtAmountValues.get(el) ?? 0;
+// Writes a loaded value into a binding input, formatting amount fields.
+const setDebtInputValue = (el, v) => {
+    if (DEBT_AMOUNT_INPUTS.has(el)) {
+        debtAmountValues.set(el, parseAmount(v));
+        debtAmountRefreshers.get(el)();
+    } else {
+        el.value = v;
+    }
+};
+// What to store in the config for a binding input: a number for amounts.
+const debtInputConfigValue = (el) => (DEBT_AMOUNT_INPUTS.has(el) ? (debtAmountValues.get(el) ?? '') : el.value);
+
 // Seed data shown only when db/transactions/debt.csv does not exist yet.
 const defaultDebtRepayments = () => [
     { id: generateId(), date: '2025-11-25', description: 'Extra Repayment', amount: 9500 },
@@ -61,9 +80,9 @@ const debtNewEndDateEl = document.getElementById('debt-new-end-date');
 const debtOriginalEndDateEl = document.getElementById('debt-original-end-date');
 
 const calculateDebtProjection = () => {
-    const currentPrincipal = parseFloat(debtCurrentBalanceInput.value) || parseFloat(debtAmountInput.value) || 0;
-    const totalRepayment = parseFloat(debtRepaymentInput.value) || 0;
-    const serviceFee = parseFloat(debtServiceFeeInput.value) || 0;
+    const currentPrincipal = amountValue(debtCurrentBalanceInput) || amountValue(debtAmountInput);
+    const totalRepayment = amountValue(debtRepaymentInput);
+    const serviceFee = amountValue(debtServiceFeeInput);
     const interestRate = parseFloat(debtInterestRateInput.value) || 0;
     const nextPaymentDateStr = debtNextPaymentInput.value;
 
@@ -195,7 +214,7 @@ repaymentList.addEventListener('input', (e) => {
     if (!item) return;
 
     if (target.classList.contains('description-input')) item.description = target.value;
-    else if (target.classList.contains('amount-input')) item.amount = target.value;
+    else if (target.classList.contains('amount-input')) { /* stored by the row's amount binding */ }
     else if (target.classList.contains('date-input')) item.date = target.value;
 
     calculateDebtProjection();
@@ -205,21 +224,34 @@ repaymentList.addEventListener('input', (e) => {
 repaymentList.addEventListener('click', (e) => {
     if (e.target.closest('.remove-btn')) {
         const itemDiv = e.target.closest('[data-id]');
-        const id = itemDiv.dataset.id;
-        const index = debtData.repayments.findIndex(i => i.id === id);
-        if (index > -1) {
-            debtData.repayments.splice(index, 1);
-            renderRepayments();
-            debouncedSave('transactions_debt', generateDebtCSV);
-        }
+        deleteWithUndo({
+            getList: () => debtData.repayments,
+            id: itemDiv.dataset.id,
+            onChange: () => {
+                renderRepayments();
+                debouncedSave('transactions_debt', generateDebtCSV);
+            },
+        });
     }
 });
 
 DEBT_INPUT_BINDINGS.forEach(([key, input]) => {
-    input.addEventListener('input', () => {
-        setConfig(key, input.value);
-        calculateDebtProjection();
-    });
+    if (DEBT_AMOUNT_INPUTS.has(input)) {
+        debtAmountValues.set(input, parseAmount(input.value)); // HTML default
+        debtAmountRefreshers.set(input, bindAmountInput(input, {
+            get: () => debtAmountValues.get(input),
+            set: (v) => {
+                debtAmountValues.set(input, v);
+                setConfig(key, v === null ? '' : v);
+                calculateDebtProjection();
+            },
+        }));
+    } else {
+        input.addEventListener('input', () => {
+            setConfig(key, input.value);
+            calculateDebtProjection();
+        });
+    }
 });
 
 // CSV Handling
@@ -236,7 +268,7 @@ const loadDebtCSVFromServer = async () => {
 
             DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
                 const v = getConfigMap()[k] ?? parsed.params[k];
-                if (v !== undefined && v !== '') el.value = v;
+                if (v !== undefined && v !== '') setDebtInputValue(el, v);
             });
 
             // Default to upcoming 25th only if no persisted value.
@@ -268,10 +300,10 @@ loadDebtCsvBtn.addEventListener('click', async () => {
 
         DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
             const v = parsed.params[k];
-            if (v !== undefined && v !== '') el.value = v;
+            if (v !== undefined && v !== '') setDebtInputValue(el, v);
         });
         DEBT_INPUT_BINDINGS.forEach(([k, el]) => {
-            if (el.value !== '') getConfigMap()[k] = el.value;
+            if (debtInputConfigValue(el) !== '') getConfigMap()[k] = debtInputConfigValue(el);
         });
         persistConfig();
 

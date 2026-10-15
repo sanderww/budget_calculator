@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from 'vitest';
-import { createRowElement, sortByDateThenIdDesc, sortByDateThenIdAsc, emptyStateHTML, generateId } from '../src/lib/rows.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { createRowElement, sortByDateThenIdDesc, sortByDateThenIdAsc, emptyStateHTML, generateId, bindAmountInput, deleteWithUndo, deletedMessage } from '../src/lib/rows.js';
 
 describe('sortByDateThenIdDesc', () => {
     it('sorts newest date first', () => {
@@ -140,5 +140,143 @@ describe('createRowElement', () => {
         });
         expect(row.querySelector('.crypto-value-input').parentElement.className).not.toContain('invisible');
         expect(row.querySelector('.crypto-value-input').value).toBe('0.5');
+    });
+});
+
+describe('bindAmountInput', () => {
+    const setup = (initial) => {
+        document.body.innerHTML = '<input id="a">';
+        const el = document.getElementById('a');
+        const state = { v: initial, calls: [] };
+        const refresh = bindAmountInput(el, {
+            get: () => state.v,
+            set: (v) => { state.v = v === null ? '' : v; state.calls.push(v); },
+        });
+        return { el, state, refresh };
+    };
+    const type = (el, text) => { el.value = text; el.dispatchEvent(new Event('input', { bubbles: true })); };
+
+    it('makes a text field with the decimal keypad and shows grouped value', () => {
+        const { el } = setup(400000);
+        expect(el.type).toBe('text');
+        expect(el.getAttribute('inputmode')).toBe('decimal');
+        expect(el.value).toBe('400,000');
+    });
+    it('shows the raw value on focus and groups again on blur', () => {
+        const { el } = setup(45000.5);
+        el.focus();
+        expect(el.value).toBe('45000.5');
+        el.blur();
+        expect(el.value).toBe('45,000.5');
+    });
+    it('parses typed text into a number', () => {
+        const { el, state } = setup('');
+        type(el, '45k');
+        expect(state.v).toBe(45000);
+        type(el, 'R 1,200.50');
+        expect(state.v).toBe(1200.5);
+        expect(el.hasAttribute('aria-invalid')).toBe(false);
+    });
+    it('keeps the stored value and flags invalid text until corrected', () => {
+        const { el, state } = setup(100);
+        type(el, '1,2');
+        expect(state.v).toBe(100);
+        expect(el.getAttribute('aria-invalid')).toBe('true');
+        el.dispatchEvent(new Event('blur'));
+        expect(el.value).toBe('1,2');
+        type(el, '12');
+        expect(state.v).toBe(12);
+        expect(el.hasAttribute('aria-invalid')).toBe(false);
+    });
+    it('treats a cleared field as null', () => {
+        const { el, state } = setup(5);
+        type(el, '');
+        expect(state.calls).toEqual([null]);
+        expect(state.v).toBe('');
+    });
+    it('refresh re-renders from the stored value', () => {
+        const { el, state, refresh } = setup(1);
+        state.v = 2500;
+        refresh();
+        expect(el.value).toBe('2,500');
+    });
+});
+
+describe('createRowElement amount field', () => {
+    it('shows a grouped amount and writes a number back to the item', () => {
+        const item = { id: 'r1', description: 'x', amount: 45000 };
+        const row = createRowElement(item, { gridTemplateColumns: '1fr 1fr auto', fields: ['description', 'amount'] });
+        const input = row.querySelector('.amount-input');
+        expect(input.type).toBe('text');
+        expect(input.value).toBe('45,000');
+        input.value = '50k';
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        expect(item.amount).toBe(50000);
+    });
+    it('renders a neutral, labelled trash button', () => {
+        const row = createRowElement({ id: 'r1', description: 'x', amount: 1 },
+            { gridTemplateColumns: '1fr 1fr auto', fields: ['description', 'amount'] });
+        const btn = row.querySelector('.remove-btn');
+        expect(btn.classList.contains('btn-danger')).toBe(false);
+        expect(btn.classList.contains('btn-icon-danger')).toBe(true);
+        expect(btn.getAttribute('aria-label')).toBe('Delete');
+    });
+});
+
+describe('deletedMessage', () => {
+    it('names the item and amount', () => {
+        expect(deletedMessage({ description: 'School fees', amount: 45000 })).toBe('Deleted "School fees" (R 45,000.00)');
+    });
+    it('falls back when blank', () => {
+        expect(deletedMessage({ description: '', amount: '' })).toBe('Deleted item');
+    });
+});
+
+describe('delete then undo (DOM)', () => {
+    let list, container;
+    const render = () => {
+        container.innerHTML = '';
+        list.forEach(i => container.appendChild(createRowElement(i,
+            { gridTemplateColumns: '1fr 1fr auto', fields: ['description', 'amount'] })));
+    };
+    beforeEach(() => {
+        vi.useFakeTimers();
+        document.body.innerHTML = '<div id="c"></div>';
+        container = document.getElementById('c');
+        list = [
+            { id: 'a', description: 'Rent', amount: 100 },
+            { id: 'b', description: 'School fees', amount: 45000 },
+            { id: 'c', description: 'Car', amount: 7 },
+        ];
+        render();
+        container.addEventListener('click', (e) => {
+            const btn = e.target.closest('.remove-btn');
+            if (!btn) return;
+            deleteWithUndo({ getList: () => list, id: btn.closest('[data-id]').dataset.id, onChange: render });
+        });
+    });
+    afterEach(() => { vi.useRealTimers(); });
+
+    it('removes the row, shows the toast, and Undo restores the same item at the same index', () => {
+        const original = list[1];
+        container.querySelector('[data-id="b"] .remove-btn').click();
+        expect(list.map(i => i.id)).toEqual(['a', 'c']);
+        expect(container.querySelector('[data-id="b"]')).toBeNull();
+        const toast = document.getElementById('undo-toast');
+        expect(toast.hidden).toBe(false);
+        expect(toast.textContent).toContain('Deleted "School fees" (R 45,000.00)');
+
+        toast.querySelector('button').click();
+        expect(list.map(i => i.id)).toEqual(['a', 'b', 'c']);
+        expect(list[1]).toBe(original);
+        expect([...container.children].map(r => r.dataset.id)).toEqual(['a', 'b', 'c']);
+        expect(toast.hidden).toBe(true);
+    });
+    it('does not duplicate when the item is already back', () => {
+        container.querySelector('[data-id="a"] .remove-btn').click();
+        const undo = document.getElementById('undo-toast').querySelector('button');
+        list.unshift({ id: 'a', description: 'Rent', amount: 100 });
+        undo.click();
+        expect(list.filter(i => i.id === 'a')).toHaveLength(1);
     });
 });
