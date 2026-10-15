@@ -688,22 +688,19 @@
                             </div>
                         </div>
 
-                        <!-- Transactions -->
-                        <div class="card">
-                            <div class="flex justify-between items-center mb-4">
-                                <h2 class="text-xl font-semibold text-slate-800">Contributions</h2>
-                                <button id="ra-add-contribution" class="btn btn-secondary text-sm">+ Add</button>
-                            </div>
-
-                            <div class="grid gap-2 mb-2 px-2 text-xs font-semibold text-slate-500 uppercase tracking-wider"
-                                style="grid-template-columns: 1fr 2fr 1fr auto;">
-                                <div>Date</div>
-                                <div>Description</div>
-                                <div>Amount</div>
-                                <div></div>
-                            </div>
-
+                        <!-- Contributions ledger (UX-4.4) -->
+                        <div class="card" id="ra-contributions-card">
+                            <h2 class="text-xl font-semibold text-slate-800 mb-4">Contributions</h2>
+                            <label for="ra-quick-add" class="sr-only">Add a contribution</label>
+                            <input type="text" id="ra-quick-add" class="input-field" autocomplete="off"
+                                placeholder="Add a contribution — e.g. &quot;monthly 5000&quot; or &quot;top-up 20k 2027-02-20&quot;"
+                                aria-describedby="ra-quick-add-preview">
+                            <p id="ra-quick-add-preview" class="quick-add-preview" aria-live="polite"></p>
+                            <div id="ra-filters" class="flex flex-wrap gap-2 mt-3 mb-3" role="group"
+                                aria-label="Filter contributions by tax year"></div>
+                            <div id="ra-head" class="ledger-head tx-ledger" aria-hidden="true"></div>
                             <div id="ra-list" class="space-y-2"></div>
+                            <div id="ra-footer" class="ledger-footer"></div>
                         </div>
 
             </div>

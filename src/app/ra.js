@@ -1,12 +1,14 @@
 // RA tab: contributions list, refund estimate, performance panel.
 import {
     calculateInvestmentPerformance as _calculateInvestmentPerformance,
-    taxYearLabel as _taxYearLabel,
+    saTaxYear,
     parseRaCSV as _parseRaCSV,
     generateRaTransactionsCSV as _generateRaTransactionsCSV,
 } from '../calculations.js';
 import { fmtZAR, fmtZARWhole } from '../lib/format.js';
-import { createRowElement, bindAmountInput, deleteWithUndo } from '../lib/rows.js';
+import { bindAmountInput } from '../lib/rows.js';
+import { createLedger, strong } from '../lib/ledger.js';
+import { parseTransactionQuickAdd, todayISO } from '../lib/quick-add.js';
 import { renderPerformancePanel } from '../lib/perf-panel.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, persistConfig } from './persistence.js';
 
@@ -56,10 +58,12 @@ const refreshRaCurrentValue = bindAmountInput(raCurrentValueInput, {
     },
 });
 
-function renderRa() {
-    document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
-    refreshRaCurrentValue();
+const RA_DEDUCTIBLE_CAP = 430000;
 
+// Summary card: totals, current-tax-year refund, cap warning, performance.
+// Contributions are bucketed by saTaxYear (1 March to end February), the
+// same grouping as the ledger's tax-year filters.
+function renderRaSummary() {
     const total = raTransactions.reduce((s, t) => s + (Number(t.amount) || 0), 0);
     document.getElementById('ra-total-contributed').textContent = raFmtZARShort(total);
     document.getElementById('ra-count').textContent = raTransactions.length;
@@ -72,86 +76,120 @@ function renderRa() {
         document.getElementById('ra-last-date').textContent  = '—';
     }
 
-    const today = new Date();
-    const currentYearLabel = _taxYearLabel(today);
+    const currentYearLabel = saTaxYear(todayISO());
     const currentYearTotal = raTransactions
-        .filter(t => _taxYearLabel(new Date(t.date + 'T00:00:00Z')) === currentYearLabel)
+        .filter(t => saTaxYear(t.date) === currentYearLabel)
         .reduce((s, t) => s + (Number(t.amount) || 0), 0);
     document.getElementById('ra-current-year-total').textContent = raFmtZARShort(currentYearTotal);
 
-    const RA_DEDUCTIBLE_CAP = 430000;
     const expectedCurrentYearRefund = Math.min(currentYearTotal, RA_DEDUCTIBLE_CAP) * (raParams.tax_refund_rate_pct / 100);
     document.getElementById('ra-current-year-refund').textContent = raFmtZARShort(expectedCurrentYearRefund);
     updateRaPerformanceDisplay();
 
     const yearTotals = new Map();
     raTransactions.forEach(t => {
-        const d = new Date(t.date + 'T00:00:00Z');
-        if (Number.isNaN(d.getTime())) return;
-        const label = _taxYearLabel(d);
+        const label = saTaxYear(t.date);
+        if (!label) return;
         yearTotals.set(label, (yearTotals.get(label) || 0) + (Number(t.amount) || 0));
     });
     const anyCapHit = [...yearTotals.values()].some(v => v > RA_DEDUCTIBLE_CAP);
     document.getElementById('ra-cap-warning').classList.toggle('hidden', !anyCapHit);
-
-    const list = document.getElementById('ra-list');
-    const sortedDesc = [...raTransactions].sort((a, b) => b.date.localeCompare(a.date));
-    list.innerHTML = '';
-    sortedDesc.forEach(t => {
-        list.appendChild(createRowElement(t, {
-            gridTemplateColumns: '1fr 2fr 1fr auto',
-            fields: ['date', 'description', 'amount'],
-            compact: true,
-        }));
-    });
 }
 
-const raList = document.getElementById('ra-list');
-raList.addEventListener('change', (e) => {
-    const row = e.target.closest('[data-id]');
-    if (!row) return;
-    const tx = raTransactions.find(t => t.id === row.dataset.id);
-    if (!tx) return;
-    if (e.target.classList.contains('date-input')) {
-        tx.date = e.target.value; raPersist(); renderRa();
-    } else if (e.target.classList.contains('description-input')) {
-        tx.description = e.target.value; raPersist();
-    } else if (e.target.classList.contains('amount-input')) {
-        // Invalid text keeps the stored amount; leave it on screen for correction.
-        if (e.target.getAttribute('aria-invalid') === 'true') return;
-        tx.amount = Number(tx.amount) || 0; raPersist(); renderRa();
+// ---- Contributions ledger (UX-4.4) ------------------------------------------
+// Built on the shared ledger (src/lib/ledger.js) over raTransactions,
+// newest-first, grouped by SA tax year ('2026/27').
+const MISSING_TEXT = {
+    'description,amount': 'Add a description and an amount.',
+    description: 'Add a description.',
+    amount: 'Add an amount, e.g. 5k or 5000.',
+};
+const quickAddPreviewFor = (parsed) => {
+    if (parsed.error === 'empty') {
+        return { state: 'idle', content: 'Press Enter on an empty field to add a blank row dated today.' };
     }
-});
-raList.addEventListener('click', (e) => {
-    if (!e.target.closest('.remove-btn')) return;
-    const row = e.target.closest('[data-id]');
-    if (!row) return;
-    deleteWithUndo({
-        getList: () => raTransactions,
-        id: row.dataset.id,
-        onChange: () => { raPersist(); renderRa(); },
-    });
-});
+    if (parsed.error) return { state: 'error', content: MISSING_TEXT[parsed.missing.join(',')] };
+    return { state: 'ok', content: ['Will add ', strong(parsed.description), ' · ',
+        strong(fmtZAR(parsed.amount)), ' on ', strong(parsed.date), ` (tax year ${saTaxYear(parsed.date)})`] };
+};
 
-const raTodayIso = () => new Date().toISOString().slice(0, 10);
-
-document.getElementById('ra-add-contribution').addEventListener('click', () => {
-    raTransactions.push({
-        id: raMakeId(),
-        date: raTodayIso(),
-        description: 'monthly repayment',
-        amount: 0,
-    });
+const addContribution = (fields) => {
+    const item = { id: raMakeId(), ...fields };
+    raTransactions.push(item);
+    ledger.ensureVisible({ item, group: saTaxYear(item.date) });
     raPersist();
     renderRa();
+    return item;
+};
+
+// Enter: add the parsed row and clear the field. On an empty field, add a
+// blank "monthly repayment" row dated today and focus its amount.
+const submitQuickAdd = (parsed) => {
+    if (parsed.error === 'empty') {
+        const item = addContribution({ date: todayISO(), description: 'monthly repayment', amount: '' });
+        ledger.rowElement(item.id)?.querySelector('.amount-input')?.focus();
+        return false;
+    }
+    if (parsed.error) return false;
+    addContribution({ date: parsed.date, description: parsed.description, amount: parsed.amount });
+    return true;
+};
+
+const ledger = createLedger({
+    elements: {
+        list: document.getElementById('ra-list'),
+        filters: document.getElementById('ra-filters'),
+        footer: document.getElementById('ra-footer'),
+        head: document.getElementById('ra-head'),
+        quickAdd: document.getElementById('ra-quick-add'),
+        preview: document.getElementById('ra-quick-add-preview'),
+    },
+    getRows: () => raTransactions.map(item => ({ item, group: saTaxYear(item.date) })),
+    getList: () => raTransactions,
+    columns: [
+        { key: 'date', type: 'date', label: 'Date' },
+        { key: 'description', type: 'text', label: 'Description' },
+        { key: 'amount', type: 'amount', label: 'Amount' },
+    ],
+    rowClass: 'ledger-row tx-ledger',
+    filters: {
+        storageKey: 'ra.taxYearFilter',
+        // All, then one chip per SA tax year present, newest first.
+        options: (rows) => [{ value: 'all', label: 'All' },
+            ...[...new Set(rows.map(r => r.group).filter(Boolean))].sort().reverse()
+                .map(label => ({ value: label, label }))],
+    },
+    footer: ({ filter, stats }) => {
+        const total = document.createElement('span');
+        total.className = 'font-semibold text-slate-800';
+        total.textContent = `${filter === 'all' ? 'Total' : `${filter} total`} ${fmtZAR(stats[filter].total)}`;
+        return [total];
+    },
+    empty: {
+        none: 'No contributions yet. Type one above, for example "monthly 5000".',
+        filtered: (opt) => `No contributions in tax year ${opt.label}.`,
+    },
+    quickAdd: { parse: (text) => parseTransactionQuickAdd(text), preview: quickAddPreviewFor, onSubmit: submitQuickAdd },
+    onChange: () => { renderRaSummary(); raPersist(); },
+    onRemove: () => { renderRaSummary(); raPersist(); },
 });
+
+function renderRa() {
+    document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
+    refreshRaCurrentValue();
+    renderRaSummary();
+    ledger.render();
+}
 
 document.getElementById('ra-refund-rate').addEventListener('input', (e) => {
     raParams.tax_refund_rate_pct = parseFloat(e.target.value) || 0;
     setConfig('tax_refund_rate_pct', raParams.tax_refund_rate_pct);
     renderRa();
 });
-const generateRaCSVFromState = () => _generateRaTransactionsCSV(raTransactions, raCurrentValue);
+// A cleared amount field leaves '' on the row; it is saved as 0 (the CSV
+// parser drops rows whose amount is not a number).
+const generateRaCSVFromState = () => _generateRaTransactionsCSV(
+    raTransactions.map(t => ({ ...t, amount: Number(t.amount) || 0 })), raCurrentValue);
 
 function raPersist() {
     debouncedSave('transactions_ra', generateRaCSVFromState);

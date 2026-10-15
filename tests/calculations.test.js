@@ -22,6 +22,7 @@ import {
     parseDebtCSV,
     generateDebtCSV,
     taxYearLabel,
+    saTaxYear,
     parseRaCSV,
     generateRaTransactionsCSV,
     deriveAssumedFutureMonthly,
@@ -674,6 +675,33 @@ describe('smoke', () => {
         expect(typeof getDefaultRetirementParams).toBe('function');
         expect(typeof calculateRetirementSnapshot).toBe('function');
     });
+});
+
+describe('saTaxYear', () => {
+    it.each([
+        ['2026-02-28', '2025/26'],
+        ['2027-02-28', '2026/27'],
+        ['2028-02-28', '2027/28'],
+        ['2028-02-29', '2027/28'],
+        ['2024-02-29', '2023/24'],
+        ['2026-03-01', '2026/27'],
+        ['2028-03-01', '2028/29'],
+        ['2026-01-01', '2025/26'],
+        ['2026-12-31', '2026/27'],
+        ['2099-12-01', '2099/00'],
+    ])('puts %s in tax year %s (1 March to end February)', (iso, label) => {
+        expect(saTaxYear(iso)).toBe(label);
+    });
+
+    it('reads the date string, not a time-zone shifted Date', () => {
+        expect(saTaxYear('2026-03-01')).toBe('2026/27');
+        expect(saTaxYear('2026-02-28')).toBe('2025/26');
+    });
+
+    it.each([[''], [undefined], [null], ['2026-13-01'], ['01-03-2026'], ['not a date'], ['2026-02-30']])(
+        'returns an empty string for %j', (bad) => {
+            expect(saTaxYear(bad)).toBe('');
+        });
 });
 
 describe('taxYearLabel', () => {

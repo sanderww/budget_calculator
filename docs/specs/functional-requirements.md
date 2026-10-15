@@ -315,7 +315,14 @@ The tab-level `⋯` menu (§0.4 — Import CSV…) above a full-width main area 
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
    - Editable **Tax refund rate (%)** input (default 41) and the **expected refund for the current tax year** computed as `min(current_year_contributions, R 430,000) × refund_rate`. Caption: "based on actual contributions to date; deductible capped at R 430,000". When any tax year's bucketed contributions exceed R 430,000, a "cap hit in some year" amber pill appears beneath the value.
    - **Performance** column (mirrors the Investments tab's per-fund layout): editable **Current fund value (R)** input (the actual statement balance — also the authoritative figure downstream consumers like the Retirement tab use as the projection starting point), then **Invested**, **Gain/Loss (R)**, **Gain/Loss %**, **Annualized %**, **6% savings would be**, and **Net vs savings** — all derived from `calculateInvestmentPerformance(raTransactions, raCurrentValue, today, marginalRate=0)` (CGT is not modelled for RA; pass `marginalRate=0` so no tax-adjusted rows are shown). When `totalInvested === 0`, all metrics render as muted zeros.
-2. **Contributions** — list of contribution rows (date, description, amount, delete button). Sorted by date descending. A `+ Add` button appends a new row defaulting to today's date and `"monthly repayment"` description.
+2. **Contributions ledger (UX-4.4)** — built on the shared `createLedger` (§1.2) over the RA contributions; the RA CSV layout (§4.2) is unchanged and parse → generate reproduces it byte-for-byte.
+   - **Columns:** **Date** · **Description** · **Amount** · delete, under a header row (`#ra-head`, shown from 640px). Newest first (`sortByDateThenIdDesc`).
+   - **Filters by SA tax year:** **All (n)** plus one chip per tax year present, newest first, labelled `2026/27` (from `saTaxYear(date)`, 1 March to end February); rows without a valid date appear only under All. Remembered per browser in `localStorage` (`ra.taxYearFilter`). When an edit moves the last row of the selected tax year into another one, that tax year stays selected (count 0) until the next full render, which falls back to All.
+   - **Footer:** *Total R x* on All, or *2026/27 total R x* for the selected tax year.
+   - **Edits** write straight to the contribution and update the summary (total, count, dates, current-tax-year total and refund, cap warning) and the performance column at once, then auto-save. A cleared amount is saved as `0`.
+   - **Quick-add:** *Add a contribution — e.g. "monthly 5000" or "top-up 20k 2027-02-20"*, with a live preview (*Will add **Monthly** · **R 5,000.00** on **2026-10-15** (tax year 2026/27)*). Parsing is `parseTransactionQuickAdd(text)` (as §3.2): **today** when no date is typed; description and amount required. **Enter** adds the row (switching to All if its tax year is hidden); **Enter on an empty field** adds a blank row dated today with the description `"monthly repayment"` and focuses its amount. There is no `+ Add` button.
+   - **Delete** uses the shared delete-with-undo (§0.5).
+   - **Empty states:** *No contributions yet. Type one above, for example "monthly 5000".*; under an empty tax year, *No contributions in tax year 2026/27.*
 
 ### 4.2 Persistence
 
@@ -604,7 +611,8 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `parseQuickAdd(text)` | Parses a Budget quick-add line into `{ kind, description, amount, date }` or `{ error, missing }` (§1.3); built on `parseQuickAddTokens` in `src/lib/quick-add.js` |
 | `parseInvestmentCSV(text)` / `generateInvestmentCSV(data)` | Investment CSV serialization |
 | `parseDebtCSV(text)` / `generateDebtCSV(repayments, params)` | Debt CSV serialization |
-| `taxYearLabel(date)` | Returns the SA tax-year bucket label `YYYY/YY` (e.g. `2026/27`) |
+| `taxYearLabel(date)` | Returns the SA tax-year bucket label `YYYY/YY` (e.g. `2026/27`) for a `Date` (local calendar fields); used by `calculateRaProjection` |
+| `saTaxYear(isoDate)` | SA tax year of an ISO date string, e.g. `'2026-03-01'` → `'2026/27'` (1 March to end February; `''` when invalid). Groups the RA contributions ledger and the RA summary's current-tax-year total and cap check |
 | `parseRaCSV(text)` / `generateRaCSV(data)` | RA CSV serialization (transactions + param rows) |
 | `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject}, today?)` | Per-tax-year refund buckets. The RA tab calls it with `assumedFutureMonthly: 0, futureYearsToProject: 0` and renders only the rows whose status is `actual`. Internal projection mechanics are retained for unit tests but no longer surfaced in the UI. |
 | `calculatePotValueToday(transactions, nominalReturnPct, today?)` | Monthly-compounded estimate of pot value as of today |

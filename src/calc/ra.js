@@ -14,6 +14,22 @@ export function taxYearLabel(date) {
     return `${startYear}/${endYY}`;
 }
 
+// SA tax year of an ISO date (YYYY-MM-DD), e.g. '2026-03-01' → '2026/27'.
+// The tax year runs 1 March to the end of February. Reads the string itself,
+// so the result never shifts with the time zone. '' for a missing or invalid
+// date. Groups the RA contributions ledger (UX-4.4).
+export function saTaxYear(isoDate) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof isoDate === 'string' ? isoDate : '');
+    if (!m) return '';
+    const y = +m[1];
+    const month = +m[2];
+    const day = +m[3];
+    const d = new Date(Date.UTC(y, month - 1, day));
+    if (d.getUTCFullYear() !== y || d.getUTCMonth() !== month - 1 || d.getUTCDate() !== day) return '';
+    const startYear = month >= 3 ? y : y - 1;
+    return `${startYear}/${String((startYear + 1) % 100).padStart(2, '0')}`;
+}
+
 export function parseRaCSV(text) {
     const rows = (text || '').split('\n').map(r => r.trim()).filter(r => r !== '');
     const transactions = [];

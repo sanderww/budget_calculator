@@ -427,7 +427,8 @@ Track contributions to a South African Retirement Annuity, hold the actual curre
 |---|---|
 | **Contribution** | A single deposit into the RA. Has a date, description (default: "monthly repayment"), and ZAR amount. |
 | **Current fund value** | The actual ZAR balance of the RA pot, taken from the user's latest RA statement. Stored as a `current_value,RA,<amount>,` row in `db/transactions/ra.csv` (mirroring the Investments tab pattern). Optional — when absent, downstream consumers fall back to the contributions-based estimate. |
-| **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. |
+| **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. The pure `saTaxYear(isoDate) → '2026/27'` (`src/calc/ra.js`) reads the ISO date string itself (no time-zone shift): 28 Feb 2027 → `2026/27`, 29 Feb 2028 → `2027/28`, 1 Mar 2028 → `2028/29`; a missing or invalid date → `''`. Every RA grouping by tax year uses it: the contributions ledger filters, the current-tax-year total and the cap-hit check. |
+| **Contributions ledger** | The RA contributions are shown newest first in a ledger (see **Ledger**, §1.1) filtered by **SA tax year** (one chip per tax year present, labelled `2026/27`), because the refund applies per tax year; the footer shows the total for the selected tax year. Quick-add (`monthly 5000`) dates a line without a date today. The RA CSV layout is unchanged. |
 | **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
 | **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 430,000**. |
@@ -436,7 +437,7 @@ Track contributions to a South African Retirement Annuity, hold the actual curre
 
 ```
 Total Contributed = sum of all contribution amounts
-Current Year Total = sum of contributions whose date falls in the current SA tax year
+Current Year Total = sum of contributions where saTaxYear(date) = saTaxYear(today)
 Expected Refund (current tax year) = MIN(Current Year Total, R 430,000) × (Refund Rate / 100)
 ```
 
