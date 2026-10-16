@@ -347,6 +347,22 @@ Between the **RA** and **History** tabs. The tab header is "Retirement"; it re-r
 
 The settings sidebar is a non-sticky card (it is taller than the viewport, so it scrolls with the page). Each section below is a collapsible `<details>` element with its title as the `<summary>`; **Core is open by default, all other sections start collapsed**. Sections are separated by dividers:
 
+**Sliders.** Each numeric assumption below that people try out most has a range slider directly under its input (`attachSlider`, `src/lib/slider.js`; class `param-range`, `aria-label` = the field name, `data-slider-for` = the input id). The input stays the source of truth: dragging writes the input and fires its `input` event, so the value is saved and the tab re-renders live exactly as when typing; typing moves the slider. The input accepts values outside the slider's range (the slider then sits at its end). Values set from code (Apply scenario, Undo, Import CSV, config load) move the sliders too. Slider ranges (min–max, step):
+
+| Input | Range | Step |
+|---|---|---|
+| Retirement age | 50–75 | 1 |
+| Life expectancy | 70–110 | 1 |
+| Lump-sum drawdown return % | 0–15 | 0.1 |
+| Withdrawal rate % | 2–8 | 0.1 |
+| Effective tax rate % | 0–45 | 0.5 |
+| CPI assumption % | 0–12 | 0.1 |
+| Discretionary / TFSA / RA return % | 0–20 | 0.1 |
+| Crypto return % | 0–30 | 0.1 |
+| Discretionary / TFSA offshore % | 0–100 | 1 |
+| ZAR depreciation %/yr | −5–10 | 0.1 |
+| Extra RA monthly (R/mo, formatted amount input) | 0–50,000 | 500 |
+
 **Core**
 - Date of birth (date input). The current age is shown beneath as a read-only label.
 - Retirement age (number input). Years to retirement shown beneath.

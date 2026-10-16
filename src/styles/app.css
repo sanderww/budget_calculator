@@ -565,3 +565,17 @@ input[type="number"].input-field {
     --account-tint: #fffbeb;
     --account-text: #b45309;
 }
+
+/* Assumption sliders on the Retirement sidebar, paired with their inputs. */
+.param-range {
+    display: block;
+    accent-color: #4f46e5;
+    /* indigo-600 */
+    cursor: pointer;
+}
+
+.param-range:focus-visible {
+    outline: 2px solid #6366f1;
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+}

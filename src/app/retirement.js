@@ -12,8 +12,9 @@ import {
     defaultScenarioLabel as _defaultScenarioLabel,
 } from '../calculations.js';
 import { renderRetirementScenarioCharts as _renderRetirementScenarioCharts } from '../charts/chart_retirement.js';
-import { fmtZARWhole, fmtZARSigned, fmtNum, parseAmount } from '../lib/format.js';
+import { fmtZARWhole, fmtZARSigned, fmtNum, parseAmount, fmtAmountInput } from '../lib/format.js';
 import { bindAmountInput, generateId } from '../lib/rows.js';
+import { attachSlider } from '../lib/slider.js';
 import { showUndoToast, hideUndoToast } from '../lib/undo-toast.js';
 import { getConfigMap, persistConfig } from './persistence.js';
 import { getInvestmentData } from './investments.js';
@@ -115,6 +116,38 @@ function retBindAmount(el, key) {
     return retAmountRefreshers.get(el);
 }
 
+// Sliders next to the assumptions people try out most: [input id, min, max,
+// step, aria-label]. The number input keeps the exact value and accepts values
+// outside the slider's range.
+const RET_SLIDERS = [
+    ['ret-retirement-age',           50,  75,   1,   'Retirement age'],
+    ['ret-life-expectancy',          70,  110,  1,   'Life expectancy'],
+    ['ret-lump-sum-drawdown-return', 0,   15,   0.1, 'Lump-sum drawdown return (%)'],
+    ['ret-wd-rate',                  2,   8,    0.1, 'Withdrawal rate (%)'],
+    ['ret-tax-rate',                 0,   45,   0.5, 'Effective tax rate (%)'],
+    ['ret-cpi',                      0,   12,   0.1, 'CPI assumption (%)'],
+    ['ret-return-discretionary',     0,   20,   0.1, 'Discretionary return (%)'],
+    ['ret-return-tfsa',              0,   20,   0.1, 'TFSA return (%)'],
+    ['ret-return-crypto',            0,   30,   0.1, 'Crypto return (%)'],
+    ['ret-return-ra',                0,   20,   0.1, 'RA return (%)'],
+    ['ret-offshore-discretionary',   0,   100,  1,   'Discretionary offshore (%)'],
+    ['ret-offshore-tfsa',            0,   100,  1,   'TFSA offshore (%)'],
+    ['ret-zar-depre',                -5,  10,   0.1, 'ZAR depreciation (% per year)'],
+    ['ret-opt-ra-monthly-amount',    0,   50000, 500, 'Extra RA per month (R)'],
+];
+const retSliderSyncs = [];
+
+function retAttachSliders() {
+    RET_SLIDERS.forEach(([id, min, max, step, label]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const amount = retInputBindings.some(([bid, , type]) => bid === id && type === 'amount');
+        retSliderSyncs.push(attachSlider(el, amount
+            ? { min, max, step, label, parse: parseAmount, format: fmtAmountInput }
+            : { min, max, step, label }));
+    });
+}
+
 function retApplyParamsToInputs() {
     retInputBindings.forEach(([id, key, type]) => {
         const el = document.getElementById(id);
@@ -123,6 +156,7 @@ function retApplyParamsToInputs() {
         else if (type === 'amount') retBindAmount(el, key)();
         else el.value = retirementParams[key] ?? '';
     });
+    retSliderSyncs.forEach(sync => sync());
 }
 
 function retReadInput(el, type) {
@@ -174,6 +208,8 @@ function retWireInputs() {
             renderRetirement();
         });
     });
+
+    retAttachSliders();
 
     document.getElementById('ret-pin-scenario').addEventListener('click', retPinScenario);
 
