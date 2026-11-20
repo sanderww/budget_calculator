@@ -33,13 +33,19 @@ export function valueAgeDays(asOfIso, todayIso) {
 // ---- Net worth ---------------------------------------------------------------
 
 // Every balance the app knows, as holdings (assets) and liabilities.
-// input: { cash, cashDate, discretionary, tfsa, crypto, investmentDates,
-//          ra, raDate, raIsEstimate, raVested, offshoreDiscretionaryPct,
-//          offshoreTfsaPct, homeValue, bondBalance, bondDate, budgetDebts }
+// Budget's savings balance and Budget debts are left out: they are the
+// day-to-day pot the Budget tab plans. Budget provisions (money set aside)
+// count as an asset only when includeProvisions is set; they carry no
+// "as of" date (undated: true), so they are never flagged as stale.
+// input: { provisions, includeProvisions, discretionary, tfsa, crypto,
+//          investmentDates, ra, raDate, raIsEstimate, homeValue,
+//          bondBalance, bondDate }
 export function buildBalanceSheet(input = {}) {
     const dates = input.investmentDates || {};
     const holdings = [
-        { key: 'cash', label: 'Cash savings', value: num(input.cash), asOf: input.cashDate, tab: 'budget' },
+        ...(input.includeProvisions && num(input.provisions) > 0
+            ? [{ key: 'provisions', label: 'Provisions', value: num(input.provisions), tab: 'budget', undated: true }]
+            : []),
         { key: 'discretionary', label: 'Discretionary', value: num(input.discretionary), asOf: dates.Discretionary, tab: 'investment' },
         { key: 'tfsa', label: 'TFSA', value: num(input.tfsa), asOf: dates.TFSA, tab: 'investment' },
         { key: 'crypto', label: 'Crypto', value: num(input.crypto), asOf: dates.Crypto, tab: 'investment' },
@@ -50,7 +56,6 @@ export function buildBalanceSheet(input = {}) {
     }
     const liabilities = [
         { key: 'bond', label: 'Bond', value: num(input.bondBalance), asOf: input.bondDate, tab: 'debt' },
-        { key: 'debts', label: 'Budget debts', value: num(input.budgetDebts), tab: 'budget' },
     ].filter(l => l.value > 0);
     const assets = holdings.reduce((s, h) => s + h.value, 0);
     const owed = liabilities.reduce((s, l) => s + l.value, 0);
@@ -63,7 +68,7 @@ export const MIX_LENSES = {
         label: 'Asset type',
         question: 'How much risk am I carrying?',
         groups: {
-            cash: 'Cash',
+            cash: 'Provisions (cash)',
             funds: 'Funds (Discretionary + TFSA)',
             ra: 'Retirement annuity',
             crypto: 'Crypto',
@@ -74,7 +79,7 @@ export const MIX_LENSES = {
         label: 'Access',
         question: 'How quickly could I get to it?',
         groups: {
-            days: 'Within days (cash, Discretionary, crypto)',
+            days: 'Within days (provisions, Discretionary, crypto)',
             tfsa: 'Within days, but TFSA allowance is lost',
             pot: 'RA savings pot (one withdrawal a tax year, taxed)',
             age55: 'RA from age 55',
@@ -85,7 +90,7 @@ export const MIX_LENSES = {
         label: 'Tax treatment',
         question: 'How will it be taxed?',
         groups: {
-            taxable: 'Taxable growth (cash, Discretionary, crypto)',
+            taxable: 'Taxable growth (provisions, Discretionary, crypto)',
             taxfree: 'Tax-free (TFSA)',
             deferred: 'Tax-deferred (RA)',
             home: 'Home (primary-residence exclusion)',
@@ -109,7 +114,7 @@ function splitHolding(h, lens, ctx) {
     if (h.key === 'home') return [['home', ctx.homeEquity]];
     switch (lens) {
     case 'type':
-        return [[{ cash: 'cash', discretionary: 'funds', tfsa: 'funds', crypto: 'crypto', ra: 'ra' }[h.key], v]];
+        return [[{ provisions: 'cash', discretionary: 'funds', tfsa: 'funds', crypto: 'crypto', ra: 'ra' }[h.key], v]];
     case 'access': {
         if (h.key === 'tfsa') return [['tfsa', v]];
         if (h.key !== 'ra') return [['days', v]];
@@ -118,7 +123,7 @@ function splitHolding(h, lens, ctx) {
         return [['pot', pot], ['age55', v - pot]];
     }
     case 'tax':
-        return [[{ cash: 'taxable', discretionary: 'taxable', crypto: 'taxable', tfsa: 'taxfree', ra: 'deferred' }[h.key], v]];
+        return [[{ provisions: 'taxable', discretionary: 'taxable', crypto: 'taxable', tfsa: 'taxfree', ra: 'deferred' }[h.key], v]];
     case 'currency': {
         if (h.key === 'crypto') return [['usd', v]];
         const off = h.key === 'discretionary' ? ctx.offDisc : h.key === 'tfsa' ? ctx.offTfsa : 0;
@@ -311,7 +316,7 @@ export function buildNextSteps(input = {}, opts = {}) {
 
     // 6. Balances that are old or undated.
     const stale = (input.values || [])
-        .filter(v => num(v.value) > 0)
+        .filter(v => num(v.value) > 0 && !v.undated)
         .map(v => ({ ...v, age: valueAgeDays(v.asOf, today) }))
         .filter(v => v.age === null || v.age > staleDays);
     if (stale.length) {

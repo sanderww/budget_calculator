@@ -33,6 +33,7 @@ const FILES = {
     'transactions/budget.csv': 'type,description,amount,date\n'
         + `savings,,85000,${TODAY}\n`
         + 'debt,Card,12000,\n'
+        + 'provision,Car fund,40000,2027-06-01\n'
         + `costfuturecost,Car service,4800,${daysAgo(18)}\n`,
     'transactions/investments.csv': 'Date,Description,amount,account type,crypto_value\n'
         + `${ddmmyyyy(daysAgo(800))},ETF,250000,Discretionary,\n`
@@ -105,9 +106,22 @@ describe('App shell', () => {
 });
 
 describe('Net worth and mix', () => {
-    it('adds every balance and subtracts the bond and budget debts', () => {
-        expect($('ov-networth').textContent).toBe('R 2,188,000');
-        expect($('ov-networth-sum').textContent).toBe('Assets R 3,350,000 − bond R 1,150,000 − budget debts R 12,000');
+    it('adds provisions and every other balance, subtracts the bond, and leaves Budget savings and debts out', () => {
+        expect($('ov-include-provisions-wrap').classList.contains('hidden')).toBe(false);
+        expect($('ov-include-provisions').checked).toBe(true);
+        expect($('ov-networth').textContent).toBe('R 2,155,000');
+        expect($('ov-networth-sum').textContent).toBe('Assets R 3,305,000 (incl. provisions R 40,000) − bond R 1,150,000');
+    });
+
+    it('drops the provisions when the box is unticked and remembers it', () => {
+        const box = $('ov-include-provisions');
+        box.checked = false;
+        box.dispatchEvent(new Event('change', { bubbles: true }));
+        expect($('ov-networth').textContent).toBe('R 2,115,000');
+        expect($('ov-networth-sum').textContent).toBe('Assets R 3,265,000 − bond R 1,150,000');
+        expect(groups()).toEqual(['funds', 'ra', 'crypto', 'home']);
+        expect(localStorage.getItem('overview.includeProvisions')).toBe('false');
+        expect(saves).toEqual([]);
     });
 
     it('groups by asset type with home equity, and switches lens', () => {
@@ -127,21 +141,23 @@ describe('Net worth and mix', () => {
         expect(groups()).toEqual(['cash', 'funds', 'ra', 'crypto']);
         expect($('ov-target-crypto').value).toBe('5');
         const driftCell = $('ov-mix-table').querySelector('tr[data-group="crypto"] td:last-child');
-        expect(driftCell.textContent).toBe('+2.0');
+        expect(driftCell.textContent).toBe('+2.3');
         expect($('ov-mix-insights').textContent).toContain('over your 5% target');
     });
 
-    it('flags balances that are old or undated', () => {
+    it('flags balances that are old or undated, but not the provisions', () => {
         const chips = [...$('ov-sources').children].map(li => li.textContent);
         expect(chips).toContain('Crypto R 95,000 · date unknown');
-        expect(chips).toContain('Cash savings R 85,000 · today');
+        expect(chips).toContain('Provisions R 40,000 · from Budget');
+        expect(chips.some(c => c.startsWith('Cash savings'))).toBe(false);
+        expect($('ov-steps').querySelector('[data-step="stale-values"]').textContent).not.toContain('Provisions');
     });
 
     it('saves the home value to the sample config only', () => {
         const input = $('ov-home-value');
         input.value = '2.2m';
         input.dispatchEvent(new Event('input', { bubbles: true }));
-        expect($('ov-networth').textContent).toBe('R 2,388,000');
+        expect($('ov-networth').textContent).toBe('R 2,355,000');
         vi.runOnlyPendingTimers();
         expect(saves.length).toBeGreaterThan(0);
         saves.forEach(s => expect(s.url).toMatch(/\/api\/save\/test_/));

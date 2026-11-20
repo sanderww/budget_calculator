@@ -8,11 +8,11 @@ import {
 } from '../src/calculations.js';
 
 const SHEET_INPUT = {
-    cash: 85_000, cashDate: '2026-11-18',
+    provisions: 85_000, includeProvisions: true,
     discretionary: 310_000, tfsa: 240_000, crypto: 95_000,
     investmentDates: { Discretionary: '2026-11-01', TFSA: '2026-11-01', Crypto: '2026-09-07' },
     ra: 620_000, raDate: '2026-11-01',
-    homeValue: 2_000_000, bondBalance: 1_150_000, budgetDebts: 12_000,
+    homeValue: 2_000_000, bondBalance: 1_150_000,
 };
 
 describe('tax-year helpers', () => {
@@ -42,14 +42,21 @@ describe('buildBalanceSheet', () => {
     it('sums assets and liabilities into net worth', () => {
         const s = buildBalanceSheet(SHEET_INPUT);
         expect(s.assets).toBe(3_350_000);
-        expect(s.owed).toBe(1_162_000);
-        expect(s.netWorth).toBe(2_188_000);
-        expect(s.holdings.map(h => h.key)).toEqual(['cash', 'discretionary', 'tfsa', 'crypto', 'ra', 'home']);
+        expect(s.owed).toBe(1_150_000);
+        expect(s.netWorth).toBe(2_200_000);
+        expect(s.holdings.map(h => h.key)).toEqual(['provisions', 'discretionary', 'tfsa', 'crypto', 'ra', 'home']);
+    });
+    it('counts provisions only when asked and never Budget savings or debts', () => {
+        const s = buildBalanceSheet({ ...SHEET_INPUT, includeProvisions: false, cash: 50_000, budgetDebts: 12_000 });
+        expect(s.holdings.some(h => h.key === 'provisions' || h.key === 'cash')).toBe(false);
+        expect(s.liabilities.map(l => l.key)).toEqual(['bond']);
+        expect(s.netWorth).toBe(2_200_000 - 85_000);
+        expect(buildBalanceSheet(SHEET_INPUT).holdings[0]).toMatchObject({ label: 'Provisions', undated: true });
     });
     it('leaves the home out without a home value and still subtracts the bond', () => {
         const s = buildBalanceSheet({ ...SHEET_INPUT, homeValue: 0 });
         expect(s.holdings.some(h => h.key === 'home')).toBe(false);
-        expect(s.netWorth).toBe(1_350_000 - 1_162_000);
+        expect(s.netWorth).toBe(1_350_000 - 1_150_000);
     });
 });
 
@@ -143,9 +150,10 @@ describe('buildNextSteps', () => {
         expect(ids).not.toContain('tfsa-room');
         expect(ids).not.toContain('cgt-harvest');
     });
-    it('treats an undated balance as stale and skips empty ones', () => {
+    it('treats an undated balance as stale, skips empty ones and provisions', () => {
         const steps = buildNextSteps({ todayIso: '2026-11-20', values: [
             { label: 'RA', value: 1, tab: 'ra' }, { label: 'Crypto', value: 0, tab: 'investment' },
+            { label: 'Provisions', value: 40_000, tab: 'budget', undated: true },
         ] });
         expect(steps).toHaveLength(1);
         expect(steps[0].body).toContain('RA (date unknown)');

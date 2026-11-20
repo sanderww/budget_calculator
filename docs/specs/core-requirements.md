@@ -684,14 +684,15 @@ Answer the three questions no single tab answers: *where do I stand in total*, *
 ### 6a.2 Net worth
 
 ```
-assets    = cash savings (Budget) + Discretionary + TFSA + Crypto (Investments current values)
+assets    = total Budget provisions (only when "Include provisions" is on)
+            + Discretionary + TFSA + Crypto (Investments current values)
             + RA (actual value, else the contributions estimate) + home value (optional)
-owed      = bond balance (Debt current_balance) + total Budget debts
+owed      = bond balance (Debt current_balance)
 net worth = assets − owed
 ```
-Provisions and future costs are not liabilities: they are plans for money already counted in savings. The home value is the Overview's own input (`networth_home_value`); without it the home is left out but the bond is still owed.
+Budget's savings balance and Budget debts are left out entirely: they are the day-to-day pot the Budget tab plans, not wealth. Provisions are money set aside that the user owns, so they can be counted as an asset; the per-browser "Include provisions" checkbox (on by default, shown only when provisions exist) decides. Future costs are never counted. The home value is the Overview's own input (`networth_home_value`); without it the home is left out but the bond is still owed.
 
-Every balance carries the date it was last entered (`savingsDate`, `currentValueDates`, RA `currentValueDate`, `current_balance_asof`). A balance older than 45 days, or without a date, is **stale**.
+Every balance carries the date it was last entered (`currentValueDates`, RA `currentValueDate`, `current_balance_asof`). A balance older than 45 days, or without a date, is **stale**. Provisions are a sum of Budget rows with no "as of" date (`undated`), so they are never stale.
 
 ### 6a.3 Mix lenses
 
@@ -699,14 +700,14 @@ Every balance carries the date it was last entered (`savingsDate`, `currentValue
 
 | Lens | Groups |
 |---|---|
-| Asset type | Cash · Funds (Discretionary + TFSA) · Retirement annuity · Crypto · Home equity |
-| Access | Within days (cash, Discretionary, crypto) · Within days but TFSA allowance lost (TFSA) · RA savings pot · RA from 55 · Home |
-| Tax treatment | Taxable growth (cash, Discretionary, crypto) · Tax-free (TFSA) · Tax-deferred (RA) · Home |
+| Asset type | Provisions (cash) · Funds (Discretionary + TFSA) · Retirement annuity · Crypto · Home equity |
+| Access | Within days (provisions, Discretionary, crypto) · Within days but TFSA allowance lost (TFSA) · RA savings pot · RA from 55 · Home |
+| Tax treatment | Taxable growth (provisions, Discretionary, crypto) · Tax-free (TFSA) · Tax-deferred (RA) · Home |
 | Currency | Rand · Offshore funds · Crypto (dollar-priced) · Home |
 
 - RA savings pot = (RA − min(vested balance, RA)) × 33% (the two-pot split used by the Retirement module); the rest is "from 55".
 - Offshore funds = Discretionary × `offshore_discretionary_pct` + TFSA × `offshore_tfsa_pct`. The RA's offshore share is not tracked and counts as rand.
-- **Targets** (optional, Asset type lens, investable assets only): `mix_target_<cash|funds|ra|crypto>` in %. Drift = share − target in points; a drift of ≥ 2 points is called out with the rand gap (`|drift| × investable total`).
+- **Targets** (optional, Asset type lens, investable assets only): `mix_target_<cash|funds|ra|crypto>` in % (`cash` is the Provisions group). Drift = share − target in points; a drift of ≥ 2 points is called out with the rand gap (`|drift| × investable total`).
 
 ### 6a.4 Next steps
 
@@ -719,7 +720,7 @@ Every balance carries the date it was last entered (`savingsDate`, `currentValue
 | TFSA allowance unused | Deadline | ≤ 120 days to tax-year end and room ≥ R 1,000 | room = min(R 46,000 − this tax year, R 500,000 − lifetime); unused room does not carry over |
 | CGT harvesting | Tax idea | ≤ 120 days to tax-year end, Discretionary gain ≥ R 1,000, marginal rate > 0 | realise min(gain, R 50,000) tax-free; tax avoided later = that × 40% × marginal |
 | Past-due future costs | Tidy-up | any future cost is past due (§1.1a) | up to three names and dates; move to provisions or delete |
-| Stale balances | Tidy-up | any non-zero balance is stale (§6a.2); RA estimates are skipped | each balance with its age or "date unknown" |
+| Stale balances | Tidy-up | any non-zero balance is stale (§6a.2); RA estimates and provisions are skipped | each balance with its age or "date unknown" |
 
 Every priced step carries its working (the formula lines) and the tab that fixes it.
 
@@ -788,7 +789,7 @@ savings rate          = saved / ra_annual_remuneration × 100      (none without
 | R41 | The Budget tab opens with the runway timeline (§1.6), full width above the Commitments ledger. The chart runs from today to a horizon = max(target date, latest dated future cost) + 3 months, at least 12 months, and is drawn even when no cost falls in range. `buildBudgetTimelineSeries` takes `horizonDate` separately from `futureDate`; with `horizonDate === futureDate` its output is unchanged (regression-tested). The target date is set by a range slider under the chart (an x-axis annotation marks it) or by the date input; both write `future-date`. Each dated future cost is a point on the planned line that links to its ledger row. "Lowest point ahead" = min(planned trajectory − floor) with its date, amber below the minimum buffer; "Save per month to stay above buffer" = the required-savings loop with floor + buffer over every cost up to the horizon and at the horizon. The buffer is the private config key `budget_min_buffer` (default 0; blank removes it). |
 | R42 | The Retirement tab has a **Pin scenario** button above the results that saves the current params as a scenario (max 3) in the private config key `ret_scenarios` (array of `{ id, label, params }`, `params` = only the keys that differ from the defaults; not in `PUBLIC_PARAMS`). A Current card and one card per scenario show net monthly income at 55 and at the Dutch-pension age and capital at retirement, recalculated live from `calculateRetirementSnapshot` and following the real-terms toggle. Each scenario card has an editable label, **Apply** (loads the params into the sidebar, undoable via the undo toast) and **Remove** (undoable). |
 | R43 | Retirement sidebar assumptions people vary most (retirement age, life expectancy, lump-sum drawdown return, withdrawal rate, tax rate, CPI, per-fund returns, offshore %, ZAR depreciation, extra RA monthly amount) each have a range slider under the input, paired by `attachSlider` (`src/lib/slider.js`). The input remains the source of truth: dragging writes it and fires its `input` event (same save and re-render path as typing); typing and programmatic sets (Apply, Undo, Import, config load) move the slider. Values outside the slider's range stay valid in the input. Ranges are listed in functional §5.2. |
-| R44 | The **Overview** tab is first and selected on load; there is no header KPI strip. It shows net worth (§6a.2) with a "Balances used" list giving each balance's age (amber when older than 45 days or undated), the mix under four lenses with optional targets and drift (§6a.3), ranked next steps with their working and a link to the fixing tab (§6a.4), retirement income vs a target with three levers (§6a.5), and the savings rate (§6a.6). It never repeats a figure another tab shows. Its own keys are `networth_home_value`, `overview_target_monthly_income` and `mix_target_*` (private); lens and include-home are per-browser `localStorage` conveniences. |
+| R44 | The **Overview** tab is first and selected on load; there is no header KPI strip. It shows net worth (§6a.2: investments, RA, optional home and optional Budget provisions, less the bond; never Budget savings or debts) with a "Balances used" list giving each balance's age (amber when older than 45 days or undated), the mix under four lenses with optional targets and drift (§6a.3), ranked next steps with their working and a link to the fixing tab (§6a.4), retirement income vs a target with three levers (§6a.5), and the savings rate (§6a.6). It never repeats a figure another tab shows. Its own keys are `networth_home_value`, `overview_target_monthly_income` and `mix_target_*` (private); lens, include-home and include-provisions are per-browser `localStorage` conveniences. |
 | R45 | The Budget allocation card has a **Compare where money goes** disclosure (§1.5a) that ranks bond / RA / TFSA / ETF / crypto by after-tax value for an amount (default: the allocation remainder, else R 10,000) and a 1–30 year horizon, reading every assumption live from the tab that owns it and naming each source. It adds no assumption inputs, saves nothing and states it is not advice. |
 | R46 | Balances record when they were entered: the 4th column of the Investments and RA `current_value` rows and of the Budget `savings` row, and the private key `current_balance_asof` for the bond. Editing a value sets today's date. Files without dates load unchanged and round-trip byte-for-byte. |
 | R47 | The CGT annual exclusion (R 50,000 from 2026/27), the 40% inclusion rate and the TFSA annual (R 46,000) and lifetime (R 500,000) caps are defined once in `src/calc/sa-tax.js`; the Investments CGT estimate, bar and help text, the Retirement constants, the Overview and the comparison all use them. |

@@ -36,7 +36,8 @@ const GROUP_COLOR = {
 };
 const TARGET_KEYS = ['cash', 'funds', 'ra', 'crypto'];
 
-// Per-viewer view settings (lens, include home) are browser conveniences.
+// Per-viewer view settings (lens, include home, include provisions) are
+// browser conveniences.
 const store = {
     get(key, fallback) {
         try { const v = localStorage.getItem(`overview.${key}`); return v === null ? fallback : v; } catch { return fallback; }
@@ -86,8 +87,10 @@ function gather() {
     const { data, runway } = getBudgetState();
     const inv = getInvestmentData();
     const ra = raValue();
+    const provisionsTotal = (data.provisions || []).reduce((s, p) => s + num(p.amount), 0);
+    const includeProvisions = store.get('includeProvisions', 'true') === 'true';
     const sheet = buildBalanceSheet({
-        cash: data.savings, cashDate: data.savingsDate,
+        provisions: provisionsTotal, includeProvisions,
         discretionary: inv.currentValues.Discretionary,
         tfsa: inv.currentValues.TFSA,
         crypto: inv.currentValues.Crypto,
@@ -95,14 +98,13 @@ function gather() {
         ra: ra.value, raDate: ra.asOf, raIsEstimate: ra.estimate,
         homeValue: configAmount('networth_home_value'),
         bondBalance: cfg.current_balance, bondDate: cfg.current_balance_asof || undefined,
-        budgetDebts: (data.debts || []).reduce((s, d) => s + num(d.amount), 0),
     });
-    return { cfg, data, runway, inv, sheet };
+    return { cfg, data, runway, inv, sheet, provisionsTotal, includeProvisions };
 }
 
 // ---- Net worth + mix ----------------------------------------------------------
 function renderNetWorth(state) {
-    const { sheet, cfg } = state;
+    const { sheet, cfg, provisionsTotal, includeProvisions } = state;
     const today = todayISO();
     const nw = $('ov-networth');
     nw.textContent = fmtZARSigned(sheet.netWorth);
@@ -110,10 +112,14 @@ function renderNetWorth(state) {
     nw.classList.toggle('text-slate-900', sheet.netWorth >= 0);
     const hasHome = sheet.holdings.some(h => h.key === 'home');
     const owesBond = sheet.liabilities.some(l => l.key === 'bond');
-    $('ov-networth-sum').textContent = [`Assets ${R(sheet.assets)}`]
+    const provHolding = sheet.holdings.find(h => h.key === 'provisions');
+    $('ov-networth-sum').textContent = [`Assets ${R(sheet.assets)}${provHolding ? ` (incl. provisions ${R(provHolding.value)})` : ''}`]
         .concat(sheet.liabilities.map(l => `${l.label.toLowerCase()} ${R(l.value)}`))
         .join(' − ')
         + (owesBond && !hasHome ? '. The bond is subtracted but the home is not counted yet: add its value.' : '');
+
+    $('ov-include-provisions-wrap').classList.toggle('hidden', !(provisionsTotal > 0));
+    $('ov-include-provisions').checked = includeProvisions;
 
     const includeBox = $('ov-include-home');
     $('ov-include-home-wrap').classList.toggle('hidden', !hasHome);
@@ -137,7 +143,7 @@ function renderNetWorth(state) {
 
     $('ov-lens-question').textContent = grouped.total > 0
         ? `${def.question} ${R(grouped.total)} ${includeHome ? 'including home equity' : 'in investable assets'}.`
-        : 'Enter balances on the Budget, Investments and RA tabs to see what you own.';
+        : 'Enter balances on the Investments and RA tabs to see what you own.';
 
     const bar = $('ov-mix-bar');
     bar.replaceChildren(...rows.map(r => {
@@ -225,9 +231,9 @@ function renderNetWorth(state) {
     $('ov-sources').replaceChildren(...sources.map(h => {
         const li = document.createElement('li');
         const age = valueAgeDays(h.asOf, today);
-        const stale = age === null || age > NEXT_STEP_DEFAULTS.staleDays;
+        const stale = !h.undated && (age === null || age > NEXT_STEP_DEFAULTS.staleDays);
         li.className = `px-2 py-1 rounded-full border tabular-nums ${stale ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 text-slate-600'}`;
-        const when = h.estimate ? 'estimate' : age === null ? 'date unknown' : age === 0 ? 'today' : `${age}d ago`;
+        const when = h.undated ? 'from Budget' : h.estimate ? 'estimate' : age === null ? 'date unknown' : age === 0 ? 'today' : `${age}d ago`;
         li.textContent = `${h.label} ${R(h.value)} · ${when}`;
         return li;
     }));
@@ -263,7 +269,7 @@ function renderSteps(state) {
         pastDue: (data.futureCosts || []).filter(c => isPastDue(c.date)),
         values: sheet.holdings.filter(h => h.key !== 'home' && !h.estimate)
             .concat(sheet.liabilities.filter(l => l.key === 'bond'))
-            .map(h => ({ label: h.label, value: h.value, asOf: h.asOf, tab: h.tab })),
+            .map(h => ({ label: h.label, value: h.value, asOf: h.asOf, tab: h.tab, undated: !!h.undated })),
     });
 
     $('ov-steps-count').textContent = steps.length ? `${steps.length} item${steps.length === 1 ? '' : 's'}` : '';
@@ -447,6 +453,12 @@ document.querySelectorAll('#ov-lens .ov-lens-btn').forEach(b => b.addEventListen
     store.set('lens', lens);
     renderNetWorth(gather());
 }));
+$('ov-include-provisions')?.addEventListener('change', (e) => {
+    store.set('includeProvisions', e.target.checked);
+    const state = gather();
+    renderNetWorth(state);
+    renderSteps(state);
+});
 $('ov-include-home')?.addEventListener('change', (e) => {
     store.set('includeHome', e.target.checked);
     renderNetWorth(gather());
