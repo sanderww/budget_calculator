@@ -174,11 +174,10 @@ describe('Debt extra-repayments ledger', () => {
 });
 
 describe('Debt projection without enough inputs', () => {
-    it('clears the debt-free KPI and the results instead of keeping stale values', () => {
-        expect($('kpi-debt-free').textContent).not.toBe('—');
+    it('clears the results instead of keeping stale values', () => {
+        expect($('debt-new-end-date').textContent).not.toBe('—');
         expect($('debt-saved-amount').textContent).toMatch(/^R /);
         typeInto($('debt-repayment'), '');
-        expect($('kpi-debt-free').textContent).toBe('—');
         ['debt-saved-amount', 'debt-total-extra', 'debt-net-return', 'debt-yield',
          'debt-time-reduced', 'debt-new-end-date', 'debt-original-end-date']
             .forEach(id => expect($(id).textContent, id).toBe('—'));

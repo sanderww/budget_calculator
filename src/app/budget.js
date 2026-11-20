@@ -10,17 +10,26 @@ import {
     changeCommitmentType,
     parseQuickAdd,
     COMMITMENT_KINDS,
+    compareDestinations,
+    calculateRaTaxSummary,
+    tfsaUsage,
+    getDefaultRetirementParams,
+    TFSA_ANNUAL_CAP,
+    TFSA_LIFETIME_CAP,
 } from '../calculations.js';
+import { getInvestmentData } from './investments.js';
+import { getRaState } from './ra.js';
 import {
     renderBudgetTimeline as _renderBudgetTimeline, timelineHorizon, formatDayMonthYear,
 } from '../charts/chart_budget_timeline.js';
-import { fmtZAR as formatCurrency, parseAmount } from '../lib/format.js';
+import { fmtZAR as formatCurrency, fmtZARWhole, parseAmount } from '../lib/format.js';
 import {
     sortByDateThenIdAsc, generateId, bindAmountInput,
     createCommitmentRow, setCommitmentPastDue, COMMITMENT_KIND_LABELS,
 } from '../lib/rows.js';
 import { createLedger, strong } from '../lib/ledger.js';
 import { showUndoToast } from '../lib/undo-toast.js';
+import { todayISO } from '../lib/quick-add.js';
 import { dbPath, debouncedSave, getConfigMap, setConfig, unsetConfig } from './persistence.js';
 
 let budgetData = {
@@ -60,6 +69,7 @@ const refreshSavings = bindAmountInput(savingsInput, {
     get: () => budgetData.savings,
     set: (v) => {
         budgetData.savings = v === null ? '' : v;
+        budgetData.savingsDate = v === null ? undefined : todayISO();
         calculateAndDisplaySummary();
         saveBudget();
     },
@@ -148,6 +158,7 @@ function revealCommitmentRow(id) {
 }
 
 let currentMonthlySavingsTarget = 0;
+let lastRunway = null; // the runway chart's last result (lowest point, buffer rate, …)
 
 const calculateAndDisplaySummary = () => {
     const savings = parseFloat(budgetData.savings) || 0;
@@ -170,19 +181,6 @@ const calculateAndDisplaySummary = () => {
     document.getElementById('future-net-amount').textContent = formatCurrency(r.futureNetAmount);
     document.getElementById('future-net-amount').style.color = r.futureNetAmount >= 0 ? '#4f46e5' : '#ef4444';
 
-    // Mirror into the header KPI strip.
-    const kpiNetNow = document.getElementById('kpi-net-now');
-    if (kpiNetNow) {
-        kpiNetNow.textContent = formatCurrency(r.currentNetAmount);
-        kpiNetNow.style.color = r.currentNetAmount >= 0 ? '#16a34a' : '#ef4444';
-    }
-    const kpiNetFuture = document.getElementById('kpi-net-future');
-    if (kpiNetFuture) {
-        kpiNetFuture.textContent = formatCurrency(r.futureNetAmount);
-        kpiNetFuture.style.color = r.futureNetAmount >= 0 ? '#0f172a' : '#ef4444';
-    }
-    const kpiNetDate = document.getElementById('kpi-net-date');
-    if (kpiNetDate) kpiNetDate.textContent = futureDateInput.value || '—';
 
     currentMonthlySavingsTarget = r.monthlySavingsTarget;
     renderAllocation();
@@ -215,6 +213,13 @@ const calculateAndDisplaySummary = () => {
         }
         syncTargetRange(horizonMs);
         renderRunwayReadouts(result);
+        lastRunway = result ? {
+            lowest: result.lowest,
+            belowBuffer: Boolean(result.belowBuffer),
+            bufferMonthlySavings: result.bufferMonthlySavings,
+            plannedMonthly: result.plannedMonthlySavings,
+            buffer: Number.isFinite(minBuffer) && minBuffer > 0 ? minBuffer : 0,
+        } : null;
     } catch (err) {
         console.error('Timeline chart failed:', err);
     }
@@ -255,7 +260,124 @@ const renderAllocation = () => {
     note.textContent = short
         ? `Available money is ${formatCurrency(savingsTarget - available)} short of the required savings.`
         : '';
+    allocationRemainder = short ? 0 : Math.max(0, available - savingsTarget);
+    renderCompare();
 };
+
+// ---- Compare where money goes ------------------------------------------------
+// Ranks bond / RA / TFSA / ETF / crypto for one amount after tax, using the
+// assumptions the other tabs already hold (read live, never duplicated as
+// inputs here). The amount defaults to this month's allocation remainder.
+let allocationRemainder = 0;
+let compareAmount; // undefined = follow the remainder
+const compareAmountInput = document.getElementById('compare-amount');
+const compareYearsInput = document.getElementById('compare-years');
+const refreshCompareAmount = compareAmountInput
+    ? bindAmountInput(compareAmountInput, {
+        get: () => compareAmount,
+        set: (v) => { compareAmount = v === null ? undefined : v; renderCompare(); },
+    })
+    : () => {};
+
+const FLAG_TONE = {
+    good: 'bg-emerald-50 text-emerald-700',
+    warn: 'bg-amber-50 text-amber-700',
+    info: 'bg-indigo-50 text-indigo-700',
+    muted: 'bg-slate-100 text-slate-600',
+};
+const DEST_COLOR = { bond: 'bg-cyan-600', ra: 'bg-violet-500', tfsa: 'bg-emerald-500', discretionary: 'bg-indigo-500', crypto: 'bg-amber-500' };
+
+// The assumptions compareDestinations needs, each from the tab that owns it.
+function compareAssumptions(todayIso) {
+    const cfg = getConfigMap();
+    const defaults = getDefaultRetirementParams();
+    const pick = (key) => {
+        const n = parseFloat(cfg[key]);
+        return Number.isFinite(n) ? n : defaults[key];
+    };
+    const inv = getInvestmentData();
+    const tfsa = tfsaUsage((inv.transactions || []).filter(t => t.type === 'TFSA'), todayIso);
+    const ra = getRaState();
+    const raTax = calculateRaTaxSummary({
+        transactions: ra.transactions,
+        remuneration: Number(cfg.ra_annual_remuneration) || 0,
+        refundRatePct: Number(cfg.tax_refund_rate_pct ?? ra.params?.tax_refund_rate_pct ?? 41) || 0,
+    }, todayIso);
+    const bondRate = parseFloat(cfg.interest_rate);
+    const hasBond = (Number(cfg.current_balance) || 0) > 0 && Number.isFinite(bondRate) && bondRate > 0;
+    return {
+        bondRatePct: hasBond ? bondRate : null,
+        discretionaryReturnPct: pick('return_discretionary_pct'),
+        tfsaReturnPct: pick('return_tfsa_pct'),
+        raReturnPct: pick('return_ra_pct'),
+        cryptoReturnPct: pick('return_crypto_pct'),
+        marginalRatePct: Number(inv.marginalRate) || 0,
+        retirementTaxPct: pick('effective_tax_rate_pct'),
+        tfsaRoom: Math.max(0, Math.min(TFSA_ANNUAL_CAP - tfsa.thisYear, TFSA_LIFETIME_CAP - tfsa.lifetime)),
+        raHeadroom: raTax.headroom,
+        raRefundRatePct: raTax.headroom > 0 ? raTax.headroomRefund / raTax.headroom * 100 : 0,
+    };
+}
+
+function renderCompare() {
+    const list = document.getElementById('compare-list');
+    if (!list || !compareYearsInput) return;
+    const years = Number(compareYearsInput.value) || 10;
+    document.getElementById('compare-years-label').textContent = `${years} year${years === 1 ? '' : 's'}`;
+    const fallback = allocationRemainder > 0 ? Math.round(allocationRemainder) : 10_000;
+    if (compareAmountInput) compareAmountInput.placeholder = fmtZARWhole(fallback).replace('R ', '');
+    const amount = Number.isFinite(compareAmount) && compareAmount > 0 ? compareAmount : fallback;
+    const a = compareAssumptions(todayISO());
+    const rows = compareDestinations({ amount, years, ...a });
+    const headline = document.getElementById('compare-headline');
+    list.replaceChildren();
+    if (!rows.length) { headline.textContent = ''; return; }
+    const [first, second] = rows;
+    headline.textContent = `After ${years} year${years === 1 ? '' : 's'}, ${fmtZARWhole(amount)} is worth most in ${first.label}: ${fmtZARWhole(first.value)}.`
+        + (second ? ` That is ${fmtZARWhole(first.value - second.value)} more than ${second.label}.` : '');
+    const top = first.value;
+    rows.forEach(r => {
+        const li = document.createElement('li');
+        li.className = 'compare-row';
+        li.dataset.key = r.key;
+        const head = document.createElement('div');
+        head.className = 'flex items-baseline justify-between gap-2 text-xs';
+        const name = document.createElement('span');
+        name.className = 'font-semibold text-slate-700';
+        name.textContent = r.label;
+        const val = document.createElement('span');
+        val.className = 'tabular-nums text-right';
+        val.innerHTML = `<span class="font-semibold text-slate-800"></span> <span class="text-slate-500"></span>`;
+        val.children[0].textContent = fmtZARWhole(r.value);
+        val.children[1].textContent = `${r.annualPct.toFixed(1)}%/yr`;
+        head.append(name, val);
+        const track = document.createElement('div');
+        track.className = 'relative h-2.5 mt-1 rounded-full bg-slate-100 overflow-hidden';
+        const fill = document.createElement('div');
+        fill.className = `h-full rounded-full ${DEST_COLOR[r.key] || 'bg-slate-400'}`;
+        fill.style.width = `${Math.max(1, r.value / top * 100).toFixed(1)}%`;
+        // Tick at the amount put in, so growth reads as the bar beyond it.
+        const start = document.createElement('div');
+        start.className = 'absolute inset-y-0 w-0.5 bg-slate-900/70';
+        start.style.left = `calc(${Math.min(100, amount / top * 100).toFixed(1)}% - 1px)`;
+        start.title = 'Amount put in';
+        track.append(fill, start);
+        const flags = document.createElement('div');
+        flags.className = 'flex flex-wrap gap-1 mt-1';
+        r.flags.forEach(f => {
+            const tag = document.createElement('span');
+            tag.className = `px-1.5 py-0.5 rounded text-[10px] font-medium ${FLAG_TONE[f.tone] || FLAG_TONE.muted}`;
+            tag.textContent = f.text;
+            flags.appendChild(tag);
+        });
+        li.append(head, track, flags);
+        list.appendChild(li);
+    });
+    const bond = a.bondRatePct === null ? 'no bond on the Debt tab' : `bond ${a.bondRatePct}% (Debt)`;
+    document.getElementById('compare-assumptions').textContent =
+        `After tax, in future rand; the dark tick marks the amount put in. Uses ${bond}; returns ETF ${a.discretionaryReturnPct}%, TFSA ${a.tfsaReturnPct}%, RA ${a.raReturnPct}%, crypto ${a.cryptoReturnPct}% and retirement tax ${a.retirementTaxPct}% (Retirement); marginal rate ${a.marginalRatePct}% (Investments); RA refund room ${fmtZARWhole(a.raHeadroom)} (RA). The TFSA part above this year's room and all ETF/crypto gains pay CGT on sale, assuming this year's exclusion is already used. It compares your own assumptions; it is not advice.`;
+}
+if (compareYearsInput) compareYearsInput.addEventListener('input', renderCompare);
 
 const allocationHint = document.getElementById('allocation-hint');
 const persistAllocation = () => {
@@ -552,4 +674,7 @@ const loadBudgetCSVFromServer = async () => {
 
 
 
-export { renderBudget, calculateAndDisplaySummary, loadBudgetCSVFromServer, applyBudgetConfig, revealCommitmentRow };
+// Read-only view for the Overview tab.
+const getBudgetState = () => ({ data: budgetData, runway: lastRunway });
+
+export { renderBudget, calculateAndDisplaySummary, loadBudgetCSVFromServer, applyBudgetConfig, revealCommitmentRow, getBudgetState, renderCompare };

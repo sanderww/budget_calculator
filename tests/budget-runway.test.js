@@ -94,13 +94,12 @@ describe('Runway timeline', () => {
         expect(range.getAttribute('aria-valuetext')).toBe($('budget-target-range-label').textContent);
     });
 
-    it('dragging the slider sets #future-date, the KPI date and the summary', () => {
+    it('dragging the slider sets #future-date and the summary', () => {
         const range = $('budget-target-range');
         range.value = '42';
         range.dispatchEvent(new Event('input', { bubbles: true }));
         const expected = iso(todayUTC() + 42 * DAY);
         expect($('future-date').value).toBe(expected);
-        expect($('kpi-net-date').textContent).toBe(expected);
         expect(iso(lastRender().futureDate.getTime())).toBe(expected);
     });
 

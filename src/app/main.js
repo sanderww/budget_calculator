@@ -1,9 +1,10 @@
 // App bootstrap: tab navigation, sample-data mode, and the load sequence.
-import { isTestMode, loadConfigFromServer, retryFailedSaves } from './persistence.js';
+import { isTestMode, setTestMode, loadConfigFromServer, retryFailedSaves } from './persistence.js';
 import { switchDataMode } from './data-mode.js';
 import { initPopovers } from '../lib/popover.js';
 import { renderBudget, loadBudgetCSVFromServer,
-         applyBudgetConfig } from './budget.js';
+         applyBudgetConfig, renderCompare } from './budget.js';
+import { renderOverview, setOpenTab } from './overview.js';
 import { loadInvestmentCSVFromServer,
          setOnStateChanged as setInvestmentsChanged } from './investments.js';
 import { loadDebtCSVFromServer } from './debt.js';
@@ -17,6 +18,8 @@ setInvestmentsChanged(() => renderRetirement());
 setRaChanged(() => renderRetirement());
 
 // --- TAB NAVIGATION ---
+const tabOverview = document.getElementById('tab-overview');
+const contentOverview = document.getElementById('overview-content');
 const tabBudget = document.getElementById('tab-budget');
 const tabInvestment = document.getElementById('tab-investment');
 const tabDebt = document.getElementById('tab-debt');
@@ -32,7 +35,8 @@ const contentRetirement = document.getElementById('retirement-content');
 
 // onShow thunks re-render tabs whose content depends on other tabs' state.
 const TABS = {
-    budget:     { tab: tabBudget,     content: contentBudget },
+    overview:   { tab: tabOverview,   content: contentOverview,   onShow: () => renderOverview() },
+    budget:     { tab: tabBudget,     content: contentBudget,     onShow: () => renderCompare() },
     investment: { tab: tabInvestment, content: contentInvestment },
     debt:       { tab: tabDebt,       content: contentDebt },
     ra:         { tab: tabRa,         content: contentRa,         onShow: () => renderRa() },
@@ -55,6 +59,8 @@ const switchTab = (name) => {
 
 Object.entries(TABS).forEach(([name, { tab }]) =>
     tab.addEventListener('click', () => switchTab(name)));
+// A next step on the Overview opens the tab that fixes it.
+setOpenTab((name) => { if (TABS[name]) { switchTab(name); window.scrollTo({ top: 0 }); } });
 
 const updateTestModeUI = () => {
     const btn = document.getElementById('test-mode-btn');
@@ -94,6 +100,7 @@ const loadAll = async () => {
     ]);
     results.forEach(r => { if (r.status === 'rejected') failures.push(r.reason); });
     loadRetirementFromConfig();             // synchronous — uses getConfigMap()
+    renderOverview();                       // reads every other tab's state
     if (failures.length) throw new AggregateError(failures, 'Some data failed to load');
 };
 
@@ -105,6 +112,12 @@ document.getElementById('save-status').addEventListener('click', () => retryFail
 initPopovers();
 
 // --- INITIALIZATION ---
+// ?sample opens the app straight in sample-data mode (functional §8), so
+// nothing from the real files is loaded or written in that session.
+if (new URLSearchParams(window.location.search).has('sample')) {
+    setTestMode(true);
+    updateTestModeUI();
+}
 (async () => {
     try {
         await loadAll();

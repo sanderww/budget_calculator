@@ -1,6 +1,9 @@
 // Investments tab: performance metrics and investment CSV parse/generate.
 
 import { generateRecordId as _generateId, xirr, csvText } from './util.js';
+import { CGT_ANNUAL_EXCLUSION, CGT_INCLUSION_RATE } from './sa-tax.js';
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function calculateInvestmentPerformance(transactions, currentValue, today = new Date(), marginalRate = 0) {
     const totalInvested = transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
@@ -32,11 +35,9 @@ export function calculateInvestmentPerformance(transactions, currentValue, today
 
     const netVsSavings = absoluteReturn - savingsGain;
 
-    const ANNUAL_EXCLUSION = 40000;
-    const INCLUSION_RATE = 0.40;
     const rate = parseFloat(marginalRate) || 0;
-    const taxableGain = (absoluteReturn > 0 && rate > 0) ? Math.max(0, absoluteReturn - ANNUAL_EXCLUSION) : 0;
-    const estimatedTax = taxableGain * INCLUSION_RATE * (rate / 100);
+    const taxableGain = (absoluteReturn > 0 && rate > 0) ? Math.max(0, absoluteReturn - CGT_ANNUAL_EXCLUSION) : 0;
+    const estimatedTax = taxableGain * CGT_INCLUSION_RATE * (rate / 100);
     const netVsSavingsAfterTax = netVsSavings - estimatedTax;
 
     if (validTxCount === 0 || weightedAgeSum === 0) {
@@ -94,6 +95,9 @@ export function parseInvestmentCSV(text) {
     const contentRows = rows.slice(1);
     const transactions = [];
     const currentValues = { Discretionary: 0, TFSA: 0, Crypto: 0 };
+    // ISO date each current value was last entered (4th column); older files
+    // leave it blank, which reads as "date unknown".
+    const currentValueDates = {};
     let marginalRate = 41;
 
     contentRows.forEach(row => {
@@ -103,6 +107,7 @@ export function parseInvestmentCSV(text) {
             const amount = parseFloat(cols[2]) || 0;
             if (Object.prototype.hasOwnProperty.call(currentValues, type)) {
                 currentValues[type] = amount;
+                if (ISO_DATE.test(cols[3] || '')) currentValueDates[type] = cols[3];
             }
         } else if (cols[0] === 'param') {
             if (cols[1] === 'marginal_rate') {
@@ -125,7 +130,7 @@ export function parseInvestmentCSV(text) {
             });
         }
     });
-    return { transactions, currentValues, marginalRate };
+    return { transactions, currentValues, currentValueDates, marginalRate };
 }
 
 export function generateInvestmentCSV(data) {
@@ -138,8 +143,9 @@ export function generateInvestmentCSV(data) {
         }
         csv += `${dateStr},${csvText(t.description)},${t.amount},${t.type},${t.cryptoValue || ''}\n`;
     });
+    const dates = data.currentValueDates || {};
     Object.keys(data.currentValues).forEach(type => {
-        csv += `current_value,${type},${data.currentValues[type]},\n`;
+        csv += `current_value,${type},${data.currentValues[type]},${dates[type] || ''}\n`;
     });
     return csv;
 }

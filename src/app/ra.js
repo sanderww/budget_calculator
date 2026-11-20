@@ -4,6 +4,9 @@ import {
     saTaxYear,
     parseRaCSV as _parseRaCSV,
     generateRaTransactionsCSV as _generateRaTransactionsCSV,
+    calculateRaTaxSummary,
+    RA_DEDUCTION_CAP,
+    RA_DEDUCTION_PCT,
 } from '../calculations.js';
 import { fmtZAR, fmtZARWhole } from '../lib/format.js';
 import { bindAmountInput } from '../lib/rows.js';
@@ -24,9 +27,23 @@ let raTransactions = [];
 // Actual current fund value reported by the user (from RA statement).
 // `undefined` means not entered → fall back to the contributions-based estimate.
 let raCurrentValue;
+let raCurrentValueDate; // ISO date the value was last entered; undefined = unknown
 let raParams = {
     tax_refund_rate_pct: 41,
     nominal_return_pct: 10,
+    ra_annual_remuneration: 0,
+};
+
+// Tax figures for the summary and performance panel (calc/ra.js).
+const raTaxSummary = () => calculateRaTaxSummary({
+    transactions: raTransactions,
+    remuneration: raParams.ra_annual_remuneration,
+    refundRatePct: raParams.tax_refund_rate_pct,
+}, todayISO());
+
+const setSigned = (el, v) => {
+    el.textContent = `${v >= 0 ? '+' : ''}${fmtZAR(v)}`;
+    el.className = `font-bold ${v >= 0 ? 'text-green-600' : 'text-red-500'}`;
 };
 
 const raMakeId = () => 'ra_' + Math.random().toString(36).slice(2, 9);
@@ -45,7 +62,26 @@ function updateRaPerformanceDisplay() {
         savingsGain:  document.getElementById('ra-savings-gain'),
         netVsSavings: document.getElementById('ra-net-savings'),
     }, { fmt: fmtZAR });
+
+    // Real position: the market result plus the tax refund the contributions
+    // earn — the 6% comparison above leaves the refund out.
+    const tax = raTaxSummary();
+    const hasData = r.totalInvested !== 0;
+    document.getElementById('ra-refund-earned').textContent = `+${fmtZAR(tax.refundAllYears)}`;
+    setSigned(document.getElementById('ra-real-position'), hasData ? r.absoluteReturn + tax.refundAllYears : 0);
+    setSigned(document.getElementById('ra-real-vs-savings'), hasData ? r.netVsSavings + tax.refundAllYears : 0);
 }
+
+// Annual gross remuneration: drives the 27.5% limit and the bracket refund.
+const raRemunerationInput = document.getElementById('ra-remuneration');
+const refreshRaRemuneration = bindAmountInput(raRemunerationInput, {
+    get: () => raParams.ra_annual_remuneration || undefined,
+    set: (v) => {
+        raParams.ra_annual_remuneration = v === null ? 0 : v;
+        setConfig('ra_annual_remuneration', raParams.ra_annual_remuneration);
+        renderRaSummary();
+    },
+});
 
 // RA value is a formatted amount input; undefined = not entered.
 const raCurrentValueInput = document.getElementById('ra-current-value');
@@ -53,13 +89,12 @@ const refreshRaCurrentValue = bindAmountInput(raCurrentValueInput, {
     get: () => raCurrentValue,
     set: (v) => {
         raCurrentValue = v === null ? undefined : v;
+        raCurrentValueDate = v === null ? undefined : todayISO();
         raPersist();
         updateRaPerformanceDisplay();
         onStateChanged();
     },
 });
-
-const RA_DEDUCTIBLE_CAP = 430000;
 
 // Summary card: totals, current-tax-year refund, cap warning, performance.
 // Contributions are bucketed by saTaxYear (1 March to end February), the
@@ -77,24 +112,31 @@ function renderRaSummary() {
         document.getElementById('ra-last-date').textContent  = '—';
     }
 
-    const currentYearLabel = saTaxYear(todayISO());
-    const currentYearTotal = raTransactions
-        .filter(t => saTaxYear(t.date) === currentYearLabel)
-        .reduce((s, t) => s + (Number(t.amount) || 0), 0);
-    document.getElementById('ra-current-year-total').textContent = raFmtZARShort(currentYearTotal);
-
-    const expectedCurrentYearRefund = Math.min(currentYearTotal, RA_DEDUCTIBLE_CAP) * (raParams.tax_refund_rate_pct / 100);
-    document.getElementById('ra-current-year-refund').textContent = raFmtZARShort(expectedCurrentYearRefund);
+    const tax = raTaxSummary();
+    const $ = (id) => document.getElementById(id);
+    $('ra-current-year-total').textContent = raFmtZARShort(tax.actual);
+    $('ra-tax-year').textContent = tax.taxYear || '—';
+    $('ra-deduction-limit').textContent = raFmtZARShort(tax.limit);
+    $('ra-limit-note').textContent = tax.usesBrackets
+        ? (tax.limitSource === 'percentage'
+            ? `${RA_DEDUCTION_PCT}% of remuneration (below the ${raFmtZARShort(RA_DEDUCTION_CAP)} cap)`
+            : `${raFmtZARShort(RA_DEDUCTION_CAP)} cap (below ${RA_DEDUCTION_PCT}% of remuneration)`)
+        : `${raFmtZARShort(RA_DEDUCTION_CAP)} cap only — enter remuneration to apply the ${RA_DEDUCTION_PCT}% limit`;
+    $('ra-current-year-refund').textContent = raFmtZARShort(tax.refundToDate);
+    $('ra-projected-refund').textContent = raFmtZARShort(tax.refundProjected);
+    $('ra-projected-note').textContent = tax.monthsRemaining > 0
+        ? `on ${raFmtZARShort(tax.projected)}: ${raFmtZARShort(tax.actual)} to date + ${tax.monthsRemaining} × ${raFmtZARShort(tax.monthly)} to come`
+        : `on ${raFmtZARShort(tax.projected)} contributed this tax year`;
+    $('ra-headroom').textContent = tax.excessProjected > 0
+        ? `${raFmtZARShort(tax.excessProjected)} over the limit — carries forward to later years`
+        : (tax.headroom > 0
+            ? `Room for ${raFmtZARShort(tax.headroom)} more this tax year (≈ ${raFmtZARShort(tax.headroomRefund)} extra refund)`
+            : 'At the deduction limit');
+    $('ra-rate-note').textContent = tax.usesBrackets
+        ? `SARS ${tax.taxYear} tax brackets on your remuneration`
+        : `flat ${raParams.tax_refund_rate_pct}% of the deductible amount`;
+    $('ra-cap-warning').classList.toggle('hidden', tax.overLimitYears.length === 0);
     updateRaPerformanceDisplay();
-
-    const yearTotals = new Map();
-    raTransactions.forEach(t => {
-        const label = saTaxYear(t.date);
-        if (!label) return;
-        yearTotals.set(label, (yearTotals.get(label) || 0) + (Number(t.amount) || 0));
-    });
-    const anyCapHit = [...yearTotals.values()].some(v => v > RA_DEDUCTIBLE_CAP);
-    document.getElementById('ra-cap-warning').classList.toggle('hidden', !anyCapHit);
 }
 
 // ---- Contributions ledger (UX-4.4) ------------------------------------------
@@ -178,6 +220,7 @@ const ledger = createLedger({
 function renderRa() {
     document.getElementById('ra-refund-rate').value      = raParams.tax_refund_rate_pct;
     refreshRaCurrentValue();
+    refreshRaRemuneration();
     renderRaSummary();
     ledger.render();
 }
@@ -190,7 +233,7 @@ document.getElementById('ra-refund-rate').addEventListener('input', (e) => {
 // A cleared amount field leaves '' on the row; it is saved as 0 (the CSV
 // parser drops rows whose amount is not a number).
 const generateRaCSVFromState = () => _generateRaTransactionsCSV(
-    raTransactions.map(t => ({ ...t, amount: Number(t.amount) || 0 })), raCurrentValue);
+    raTransactions.map(t => ({ ...t, amount: Number(t.amount) || 0 })), raCurrentValue, raCurrentValueDate);
 
 function raPersist() {
     debouncedSave('transactions_ra', generateRaCSVFromState);
@@ -209,9 +252,11 @@ document.getElementById('load-ra-csv').addEventListener('click', () => {
             hideUndoToast(); // an Undo would put a row back into replaced data
             raTransactions = parsed.transactions;
             raCurrentValue = parsed.currentValue;
+            raCurrentValueDate = parsed.currentValueDate;
             raParams = {
                 tax_refund_rate_pct: getConfigMap().tax_refund_rate_pct ?? parsed.params.tax_refund_rate_pct ?? 41,
                 nominal_return_pct:  getConfigMap().nominal_return_pct  ?? parsed.params.nominal_return_pct  ?? 10,
+                ra_annual_remuneration: Number(getConfigMap().ra_annual_remuneration) || 0,
             };
             let dirty = false;
             if (getConfigMap().tax_refund_rate_pct === undefined && parsed.params.tax_refund_rate_pct !== undefined) {
@@ -243,20 +288,25 @@ const loadRaCSVFromServer = async () => {
             const parsed = _parseRaCSV(text);
             raTransactions = parsed.transactions;
             raCurrentValue = parsed.currentValue;
+            raCurrentValueDate = parsed.currentValueDate;
         } else {
             raTransactions = [];
             raCurrentValue = undefined;
+            raCurrentValueDate = undefined;
+        raCurrentValueDate = undefined;
         }
     } catch (err) {
         // Cleared and rendered, then rethrown so a data-mode switch can
         // revert (functional §8).
         raTransactions = [];
         raCurrentValue = undefined;
+        raCurrentValueDate = undefined;
         failure = err;
     }
     raParams = {
         tax_refund_rate_pct: getConfigMap().tax_refund_rate_pct ?? 41,
         nominal_return_pct:  getConfigMap().nominal_return_pct  ?? 10,
+        ra_annual_remuneration: Number(getConfigMap().ra_annual_remuneration) || 0,
     };
     renderRa();
     if (failure) throw failure;
@@ -264,5 +314,5 @@ const loadRaCSVFromServer = async () => {
 // Note: do NOT call loadRaCSVFromServer() here. It depends on
 // the config being loaded first; the init IIFE invokes it.
 
-export const getRaState = () => ({ transactions: raTransactions, currentValue: raCurrentValue, params: raParams });
+export const getRaState = () => ({ transactions: raTransactions, currentValue: raCurrentValue, currentValueDate: raCurrentValueDate, params: raParams });
 export { renderRa, loadRaCSVFromServer };

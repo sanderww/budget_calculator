@@ -196,6 +196,8 @@ export function parseBudgetCSV(text) {
         switch (type) {
             case 'savings':
                 newData.savings = parseFloat(amount) || 0;
+                // The date column holds when the balance was entered (blank in older files).
+                if (/^\d{4}-\d{2}-\d{2}$/.test(date || '')) newData.savingsDate = date;
                 break;
             case 'debt':
                 newData.debts.push(item);
@@ -213,7 +215,7 @@ export function parseBudgetCSV(text) {
 
 export function generateBudgetCSV(data) {
     let csv = 'type,description,amount,date\n';
-    csv += `savings,,${data.savings || 0},\n`;
+    csv += `savings,,${data.savings || 0},${data.savingsDate || ''}\n`;
     data.debts.forEach(d => { csv += `debt,${csvText(d.description || '')},${d.amount || 0},\n`; });
     data.provisions.forEach(p => { csv += `provision,${csvText(p.description || '')},${p.amount || 0},${p.date || ''}\n`; });
     data.futureCosts.forEach(c => { csv += `costfuturecost,${csvText(c.description || '')},${c.amount || 0},${c.date || ''}\n`; });

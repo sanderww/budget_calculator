@@ -302,13 +302,13 @@ describe('calculateInvestmentPerformance', () => {
         expect(r.netVsSavingsAfterTax).toBe(r.netVsSavings);
     });
 
-    it('calculates estimatedTax using 40% inclusion rate above the R40k exclusion', () => {
+    it('calculates estimatedTax using 40% inclusion rate above the R50k exclusion', () => {
         const txs = [{ amount: 100000, date: '2024-01-01', type: 'Discretionary' }];
         const r = calculateInvestmentPerformance(txs, 200000, new Date('2026-04-25'), 41);
-        // gain = 100,000; taxable = 60,000; included = 24,000; tax = 24,000 * 0.41 = 9,840
-        expect(r.taxableGain).toBe(60000);
-        expect(r.estimatedTax).toBeCloseTo(9840, 6);
-        expect(r.netVsSavingsAfterTax).toBeCloseTo(r.netVsSavings - 9840, 6);
+        // gain = 100,000; taxable = 50,000; included = 20,000; tax = 20,000 * 0.41 = 8,200
+        expect(r.taxableGain).toBe(50000);
+        expect(r.estimatedTax).toBeCloseTo(8200, 6);
+        expect(r.netVsSavingsAfterTax).toBeCloseTo(r.netVsSavings - 8200, 6);
     });
 
     it('returns zero estimatedTax when there is a loss', () => {

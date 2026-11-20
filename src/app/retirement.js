@@ -716,4 +716,10 @@ const loadRetirementFromConfig = () => {
 // Note: do NOT call loadRetirementFromConfig() here. It depends
 // on the config being loaded; the init IIFE invokes it.
 
-export { renderRetirement, loadRetirementFromConfig };
+// The projection for the current params with some keys changed (Overview:
+// income in today's money and the one-change levers).
+const retirementSnapshotWith = (overrides = {}) =>
+    retSnapshotFor({ ...retirementParams, ...overrides });
+const getRetirementParams = () => ({ ...retirementParams });
+
+export { renderRetirement, loadRetirementFromConfig, retirementSnapshotWith, getRetirementParams };

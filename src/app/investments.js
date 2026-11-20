@@ -4,6 +4,7 @@ import {
     parseInvestmentCSV as _parseInvestmentCSV,
     generateInvestmentCSV as _generateInvestmentCSV,
     tfsaLifetimeContributions as _tfsaLifetimeContributions,
+    CGT_ANNUAL_EXCLUSION,
 } from '../calculations.js';
 import { fmtZAR as formatCurrency, fmtZAR, fmtZARWhole, fmtNum } from '../lib/format.js';
 import { generateId, bindAmountInput } from '../lib/rows.js';
@@ -26,6 +27,7 @@ const emptyInvestmentData = () => ({
         TFSA: 0,
         Crypto: 0
     },
+    currentValueDates: {}, // account -> ISO date the value was last entered
     marginalRate: 41
 });
 let investmentData = emptyInvestmentData();
@@ -47,6 +49,8 @@ const refreshCurrentValues = [
     get: () => investmentData.currentValues[key],
     set: (v) => {
         investmentData.currentValues[key] = v === null ? '' : v;
+        if (v === null) delete investmentData.currentValueDates[key];
+        else investmentData.currentValueDates[key] = todayISO();
         updatePerformanceDisplay();
         // Retirement projection reads these current values live — keep it in sync.
         onStateChanged();
@@ -60,13 +64,6 @@ const updatePerformanceDisplay = () => {
     calculatePerformance('Crypto', investmentData.currentValues.Crypto, 'inv-crypto', 'gain-crypto', 'ann-crypto', 'gain-money-crypto');
     updateTfsaCapDisplay();
 
-    // Mirror the combined current value into the header KPI strip.
-    const kpiPortfolio = document.getElementById('kpi-portfolio');
-    if (kpiPortfolio) {
-        const total = ['Discretionary', 'TFSA', 'Crypto']
-            .reduce((s, k) => s + (parseFloat(investmentData.currentValues[k]) || 0), 0);
-        kpiPortfolio.textContent = formatCurrency(total);
-    }
 };
 
 const updateTfsaCapDisplay = () => {
@@ -85,9 +82,9 @@ const updateTfsaCapDisplay = () => {
     if (remEl) remEl.textContent = fmtNum(Math.round(cap.remaining));
 };
 
-// Progress toward the annual CGT exclusion (gain vs R40,000) for Discretionary.
+// Progress toward the annual CGT exclusion (gain vs CGT_ANNUAL_EXCLUSION) for Discretionary.
 const updateCgtExclusionDisplay = (gain) => {
-    const exclusion = 40000;
+    const exclusion = CGT_ANNUAL_EXCLUSION;
     const g = Math.max(0, gain || 0);
     const pct = (g / exclusion) * 100;
     const remaining = Math.max(0, exclusion - g);
@@ -229,7 +226,7 @@ const calculatePerformance = (type, currentValueStr, invId, gainId, annId, money
     if (invEl) invEl.textContent = fmtZAR(r.totalInvested);
 
     const typeKey = type.toLowerCase();
-    // CGT exclusion bar tracks the gain vs the R40,000 threshold (Discretionary only).
+    // CGT exclusion bar tracks the gain vs the annual exclusion (Discretionary only).
     // Reset to 0 when nothing is invested, matching the performance panel's empty state.
     if (type === 'Discretionary') updateCgtExclusionDisplay(r.totalInvested === 0 ? 0 : r.absoluteReturn);
     const gainEl = document.getElementById(gainId);
@@ -268,11 +265,13 @@ const loadInvestmentCSVFromServer = async () => {
         const parsed = parseInvestmentCSV(text);
         investmentData.transactions = parsed.transactions;
         investmentData.currentValues = parsed.currentValues;
+        investmentData.currentValueDates = parsed.currentValueDates || {};
         investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
     } else {
         const empty = emptyInvestmentData();
         investmentData.transactions = empty.transactions;
         investmentData.currentValues = empty.currentValues;
+        investmentData.currentValueDates = empty.currentValueDates;
         investmentData.marginalRate = getConfigMap().marginal_rate ?? empty.marginalRate;
     }
     renderFullInvestmentUI();
@@ -292,6 +291,7 @@ loadInvCsvBtn.addEventListener('click', async () => {
         hideUndoToast(); // an Undo would put a row back into replaced data
         investmentData.transactions = parsed.transactions;
         investmentData.currentValues = parsed.currentValues;
+        investmentData.currentValueDates = parsed.currentValueDates || {};
         investmentData.marginalRate = (getConfigMap().marginal_rate ?? parsed.marginalRate ?? 41);
         if (getConfigMap().marginal_rate === undefined && parsed.marginalRate !== undefined) {
             getConfigMap().marginal_rate = parsed.marginalRate;

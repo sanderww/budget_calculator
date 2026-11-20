@@ -1,6 +1,7 @@
 // RA (Retirement Annuity) tab: tax-year projections, pot value, and RA CSV parse/generate.
 
 import { generateRecordId as _generateId, csvText } from './util.js';
+import { RA_DEDUCTION_CAP, raDeductionLimit, raRefund } from './sa-tax.js';
 
 // ============================================================================
 // RA (Retirement Annuity) Tab
@@ -35,6 +36,7 @@ export function parseRaCSV(text) {
     const transactions = [];
     const params = {};
     let currentValue;
+    let currentValueDate;
     rows.forEach(row => {
         const cols = row.split(',').map(s => s.trim());
         if (cols[0] === 'param') {
@@ -45,6 +47,8 @@ export function parseRaCSV(text) {
         if (cols[0] === 'current_value' && cols[1] === 'RA') {
             const v = parseFloat(cols[2]);
             if (!Number.isNaN(v)) currentValue = v;
+            // 4th column: ISO date the value was entered (blank in older files).
+            currentValueDate = /^\d{4}-\d{2}-\d{2}$/.test(cols[3] || '') ? cols[3] : undefined;
             return;
         }
         if (!/^\d{4}-\d{2}-\d{2}$/.test(cols[0])) return;
@@ -57,17 +61,17 @@ export function parseRaCSV(text) {
             amount,
         });
     });
-    return { transactions, params, currentValue };
+    return { transactions, params, currentValue, currentValueDate };
 }
 
-export function generateRaTransactionsCSV(transactions, currentValue) {
+export function generateRaTransactionsCSV(transactions, currentValue, currentValueDate) {
     let csv = '';
     (transactions || []).forEach(t => {
         csv += `${t.date},${csvText(t.description)},${t.amount}\n`;
     });
     if (currentValue !== undefined && currentValue !== null && currentValue !== '') {
         const v = Number(currentValue);
-        if (!Number.isNaN(v)) csv += `current_value,RA,${v},\n`;
+        if (!Number.isNaN(v)) csv += `current_value,RA,${v},${currentValueDate || ''}\n`;
     }
     return csv;
 }
@@ -79,8 +83,6 @@ export function deriveAssumedFutureMonthly(transactions) {
     const sum = recent.reduce((s, t) => s + (Number(t.amount) || 0), 0);
     return sum / recent.length;
 }
-
-const RA_ANNUAL_CAP = 430000;
 
 function _isLeapYear(y) {
     return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
@@ -103,8 +105,11 @@ export function calculateRaProjection({
     taxRefundRatePct,
     assumedFutureMonthly,
     futureYearsToProject,
+    remuneration = 0,
 }, today = new Date()) {
-    const rate = (Number(taxRefundRatePct) || 0) / 100;
+    const limit = raDeductionLimit(remuneration);
+    const refundOf = (deductible, taxYear) =>
+        raRefund({ deductible, remuneration, flatRatePct: taxRefundRatePct, taxYear });
     const future = Math.max(0, Math.floor(Number(futureYearsToProject) || 0));
     const monthly = Math.max(0, Number(assumedFutureMonthly) || 0);
 
@@ -142,14 +147,14 @@ export function calculateRaProjection({
                 return; // skip empty current-year row
             }
         }
-        const deductible = Math.min(contributions, RA_ANNUAL_CAP);
+        const deductible = Math.min(contributions, limit);
         rows.push({
             taxYear: label,
             status,
             contributions,
             deductible,
-            refund: deductible * rate,
-            capHit: contributions > RA_ANNUAL_CAP,
+            refund: refundOf(deductible, label),
+            capHit: contributions > limit,
         });
     });
 
@@ -158,14 +163,14 @@ export function calculateRaProjection({
         const startYear = currentStartYear + i;
         const label = `${startYear}/${String((startYear + 1) % 100).padStart(2, '0')}`;
         const contributions = monthly * 12;
-        const deductible = Math.min(contributions, RA_ANNUAL_CAP);
+        const deductible = Math.min(contributions, limit);
         rows.push({
             taxYear: label,
             status: 'projected',
             contributions,
             deductible,
-            refund: deductible * rate,
-            capHit: contributions > RA_ANNUAL_CAP,
+            refund: refundOf(deductible, label),
+            capHit: contributions > limit,
         });
     }
 
@@ -191,4 +196,103 @@ export function calculatePotValueToday(transactions, nominalReturnPct, today = n
         const months = Math.max(0, (todayY - d.getUTCFullYear()) * 12 + (todayM - d.getUTCMonth()));
         return sum + (Number(t.amount) || 0) * Math.pow(1 + r_m, months);
     }, 0);
+}
+
+// Typical monthly contribution: the median of the three most recent
+// contributions, so a one-off lump sum among them does not skew it.
+export function typicalMonthlyContribution(transactions) {
+    const amounts = [...(transactions || [])]
+        .filter(t => /^\d{4}-\d{2}-\d{2}$/.test(t.date))
+        .sort((a, b) => a.date.localeCompare(b.date))
+        .slice(-3)
+        .map(t => Number(t.amount) || 0)
+        .sort((a, b) => a - b);
+    if (amounts.length === 0) return 0;
+    const mid = Math.floor(amounts.length / 2);
+    return amounts.length % 2 ? amounts[mid] : (amounts[mid - 1] + amounts[mid]) / 2;
+}
+
+// Monthly contributions still to come in the tax year of `todayIso`: the
+// months after this one up to February, plus this month when no contribution
+// is dated in it yet.
+export function remainingContributionMonths(transactions, todayIso) {
+    const label = saTaxYear(todayIso);
+    if (!label) return 0;
+    const [y, m] = todayIso.split('-').map(Number);
+    const endYear = parseInt(label.split('/')[0], 10) + 1;
+    const after = (endYear * 12 + 2) - (y * 12 + m);
+    const thisMonth = todayIso.slice(0, 7);
+    const paidThisMonth = (transactions || []).some(t => String(t.date).startsWith(thisMonth));
+    return Math.max(0, after) + (paidThisMonth ? 0 : 1);
+}
+
+// Everything the RA Summary shows about tax: the deduction limit, the refund
+// on contributions to date, the projected full-year refund (assuming the
+// typical monthly contribution continues to the end of February), headroom
+// left under the limit, and the refund earned across all tax years so far.
+// remuneration: annual gross remuneration; 0 = unknown (rand cap and the flat
+// refund rate only).
+export function calculateRaTaxSummary({ transactions, remuneration = 0, refundRatePct = 0 }, todayIso) {
+    const list = transactions || [];
+    const currentYear = saTaxYear(todayIso);
+    const rem = Number(remuneration) || 0;
+    const limit = raDeductionLimit(rem);
+    const limitSource = rem > 0 && limit < RA_DEDUCTION_CAP ? 'percentage' : 'cap';
+    const refundOf = (deductible, taxYear) =>
+        raRefund({ deductible, remuneration: rem, flatRatePct: refundRatePct, taxYear });
+
+    const yearTotals = new Map();
+    list.forEach(t => {
+        const label = saTaxYear(t.date);
+        if (!label) return;
+        yearTotals.set(label, (yearTotals.get(label) || 0) + (Number(t.amount) || 0));
+    });
+
+    const actual = yearTotals.get(currentYear) || 0;
+    // Project only a regular debit order: at least three contributions, the
+    // latest within the last two months. A one-off lump sum is not repeated.
+    const dated = list.filter(t => /^\d{4}-\d{2}-\d{2}$/.test(t.date) && t.date <= todayIso)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    const last = dated.at(-1);
+    const daysSinceLast = last
+        ? (Date.parse(todayIso + 'T00:00:00Z') - Date.parse(last.date + 'T00:00:00Z')) / 86_400_000
+        : Infinity;
+    const regular = actual > 0 && dated.length >= 3 && daysSinceLast <= 62;
+    const monthly = regular ? typicalMonthlyContribution(dated) : 0;
+    const monthsRemaining = monthly > 0 ? remainingContributionMonths(list, todayIso) : 0;
+    const projected = actual + monthly * monthsRemaining;
+
+    const deductibleToDate = Math.min(actual, limit);
+    const deductibleProjected = Math.min(projected, limit);
+    const refundToDate = refundOf(deductibleToDate, currentYear);
+    const refundProjected = refundOf(deductibleProjected, currentYear);
+    const headroom = Math.max(0, limit - projected);
+    const headroomRefund = refundOf(deductibleProjected + headroom, currentYear) - refundProjected;
+
+    let refundAllYears = 0;
+    const overLimitYears = [];
+    [...yearTotals.entries()].sort().forEach(([label, total]) => {
+        refundAllYears += refundOf(Math.min(total, limit), label);
+        if (total > limit) overLimitYears.push(label);
+    });
+
+    return {
+        taxYear: currentYear,
+        limit,
+        limitSource,
+        usesBrackets: rem > 0,
+        actual,
+        monthly,
+        monthsRemaining,
+        projected,
+        deductibleToDate,
+        deductibleProjected,
+        refundToDate,
+        refundProjected,
+        excessProjected: Math.max(0, projected - limit),
+        headroom,
+        headroomRefund,
+        refundAllYears,
+        overLimitYears,
+    };
 }

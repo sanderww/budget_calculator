@@ -2,13 +2,13 @@
 
 ## Overview
 
-A single-page web application for personal financial management with six modules: Budget Calculator, Investment Tracker, Debt Calculator, RA, Retirement, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
+A single-page web application for personal financial management with seven modules: Overview, Budget Calculator, Investment Tracker, Debt Calculator, RA, Retirement, and History. All data is persisted as CSV files via a lightweight HTTP server. Currency is South African Rand (R).
 
 **Currency notation.** Every amount rendered anywhere in the UI uses comma thousands separators and a dot decimal separator — `R 3,000.50` is three thousand rand and fifty cents. `src/lib/format.js` is the single source of truth: it exports `fmtZAR` (two decimals), `fmtZARWhole` / `fmtZARSigned` (whole rand), `fmtZARAxis` (chart axes and tooltips) and `fmtNum` (grouped number without the `R` prefix), all pinned to `ZAR_LOCALE = 'en-US'`. Modules must not call `toLocaleString` directly, and the `en-ZA` locale (which renders `3 000,50`) must not be used for display. Static placeholders in `budget_calculator.html` follow the same notation.
 
 Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, generated via `npm run build:css` / `make css`) plus custom styles in `src/styles/app.css`; no CSS CDN dependency at runtime.
 
-**Implementation layout.** `src/budget_calculator.html` is markup-only and loads `src/app/main.js` as an ES-module bootstrap. Per-tab controllers live in `src/app/` (budget, investments, debt, ra, history, retirement, plus the persistence/config layer). Shared front-end helpers live in `src/lib/` (`format.js` currency formatters, `rows.js` row and column-cell builders, `ledger.js` shared ledger component, `quick-add.js` quick-add token parser, `perf-panel.js` performance renderer) and chart modules in `src/charts/`. All calculation and CSV-parsing logic is split into domain modules under `src/calc/` (budget, investments, debt, ra, retirement) and re-exported through the `src/calculations.js` barrel — that barrel is the only import path consumers use and deliberately stays at the `src/` root.
+**Implementation layout.** `src/budget_calculator.html` is markup-only and loads `src/app/main.js` as an ES-module bootstrap. Per-tab controllers live in `src/app/` (overview, budget, investments, debt, ra, history, retirement, plus the persistence/config layer). Shared front-end helpers live in `src/lib/` (`format.js` currency formatters, `rows.js` row and column-cell builders, `ledger.js` shared ledger component, `quick-add.js` quick-add token parser, `perf-panel.js` performance renderer) and chart modules in `src/charts/`. All calculation and CSV-parsing logic is split into domain modules under `src/calc/` (budget, investments, debt, ra, retirement, sa-tax, overview, compare) and re-exported through the `src/calculations.js` barrel — that barrel is the only import path consumers use and deliberately stays at the `src/` root.
 
 ---
 
@@ -22,20 +22,32 @@ Styling is a committed static Tailwind CSS v3 build (`src/styles/tailwind.css`, 
   - **Sample data toggle** (`#test-mode-btn`, see §8).
 - **Sample-data banner** (`#sample-banner`): directly under the header, full-width amber, shown only while sample data is on (see §8).
 
-### 0.2 KPI Strip
+### 0.2 Overview tab
 
-A row of four read-only cards between the header and the tab bar, giving at-a-glance oversight without opening a tab (2 columns on mobile, 4 on desktop). Values are mirrored from where the tabs already compute them — the strip performs no calculations of its own:
+The first tab, shown on page load (`#overview-content`, controller `src/app/overview.js`, maths in `src/calc/overview.js`). It replaces the former header KPI strip: Net savings now / on a date stay on the Budget tab's Financial Summary, "Debt-free by" stays on the Debt tab's Projection Results, and the Investments portfolio total is now part of net worth. The tab shows only figures no other tab shows. Layout: a two-column **Net worth** card on the left; **Next steps**, **Retirement income** and **Savings rate** cards stacked on the right (one column on mobile). Rendered on every visit to the tab and at the end of every `loadAll()`.
 
-| KPI | Source |
-|---|---|
-| Net savings now (green ≥ 0, red < 0) | Budget summary (`calculateAndDisplaySummary`) |
-| Net savings on [selected date] | Budget summary; label shows the §1.5 future-date picker value |
-| Portfolio value | Sum of the three Investments current-value inputs |
-| Debt-free by (month + year; `Never` when the loan never amortises; `—` while the balance, repayment or next payment date is missing, and the Debt results card shows `—` too) | Debt projection's new end date |
+**Net worth card**
+- Big figure: `buildBalanceSheet(...)` net worth = cash savings (Budget) + Discretionary + TFSA + Crypto current values (Investments) + RA value (RA actual value, else the contributions estimate) + home value − bond balance (`current_balance`, Debt) − total Budget debts. Red when negative. Under it, `Assets R … − bond R … − budget debts R …` (zero liabilities are omitted).
+- **Home value today (optional)** — formatted amount input saved as private config key `networth_home_value`; blank removes the key and leaves the home out. It is independent of the Retirement tab's "house sale" scenario value.
+- **Lens buttons** (`.ov-lens-btn`, `aria-pressed`): Asset type · Access · Tax treatment · Currency. The chosen lens and the "Include home equity" checkbox are per-browser conveniences in `localStorage` (`overview.lens`, `overview.includeHome`), not data. The checkbox appears only when a home value is set; home equity = max(0, home value − bond).
+- Each lens regroups the same rands (`groupHoldings`, core §6a): a one-line question with the total, a stacked bar (`#ov-mix-bar`, one coloured segment per group), and a table (Group · Amount · Share).
+- **Targets**: on the Asset type lens with the home left out, the table adds **Target %** (number inputs `#ov-target-<group>`, saved on change as private config keys `mix_target_cash`, `mix_target_funds`, `mix_target_ra`, `mix_target_crypto`; blank removes the key) and **Drift** (share − target in points; amber and bold at |drift| ≥ 2; `—` without a target).
+- **Insights** (`#ov-mix-insights`): one to three sentences per lens from `mixInsights` — home share, largest investable part and any drift ≥ 2 points with its rand amount (Asset type); money reachable within days and money that unlocks at 55 with the year (Access); tax-free, taxable and tax-deferred amounts (Tax treatment); offshore + dollar-priced share, and a note that the RA's offshore share is not tracked (Currency).
+- **Balances used** (`#ov-sources`): one chip per non-zero balance and the bond, `<label> R <amount> · <age>` where age is `today`, `<n>d ago`, `date unknown` or `estimate` (RA without an actual value). Chips older than 45 days or undated are amber.
+
+**Next steps card** (`#ov-steps`) — `buildNextSteps` (core §6a) as a ranked list. Each item: a severity stripe (red Act now · amber deadline · indigo tax idea · slate tidy-up), a title, one sentence, a tag (`Act now`, `<n> days left`, `Tax idea`, `Tidy up`), an optional **Show the working** disclosure with the formula lines, and an **Open <Tab> →** button that switches to the tab that fixes it and scrolls to the top. Empty state: "Nothing needs your attention right now."
+
+**Retirement income card**
+- **Target net income per month, in today's money** — formatted amount input saved as private config key `overview_target_monthly_income` (blank removes it).
+- The projected figure is `retirementIncome(snapshot)` = net RA drawdown at the retirement age + the lump-sum drawdown, always in today's money (the snapshot is run with `show_real_terms: 1` whatever the Retirement tab's toggle). With a target: `<n>%` of target, a sentence with both amounts and a progress bar (emerald at ≥ 100%). Without one: the projected amount and a prompt to set a target. When the Dutch pension is on, a note says it comes on top.
+- **Levers** (`#ov-levers`): `retirementLevers(params)` — retire 2 years later (when that stays below life expectancy), +R 3,000/month extra RA, and full TFSA top-ups (only when not already on). Each shows the change in projected monthly income from re-running the snapshot with that one change. Heading: "Levers on the R <gap> gap, one at a time:" when below target, else "What one change would add:".
+- Without a date of birth the card asks for it on the Retirement tab.
+
+**Savings rate card** — `savingsRate(...)` over the last 365 days: investment transactions + RA contributions + Debt extra repayments, divided by `ra_annual_remuneration` (RA tab). Shows the percentage and the three parts; without a remuneration figure it shows the rand total and asks for the remuneration.
 
 ### 0.3 Tabs
 
-Tab bar labels: **Budget**, **Investments**, **Debt**, **RA**, **Retirement**, **History**. Each tab button only switches tabs.
+Tab bar labels: **Overview** (selected on load), **Budget**, **Investments**, **Debt**, **RA**, **Retirement**, **History**. Each tab button only switches tabs; showing Overview, Budget (the comparison panel), RA, Retirement or History re-renders it from the other tabs' current state.
 
 ### 0.4 Database Toolbars
 
@@ -129,6 +141,14 @@ Compact subsection inside the right-column Financial Summary card (no longer a s
   - **Leftover** row appears only when it is not zero.
 - **Shortfall**: if available money is below the savings target, the remainder amounts show as zero and `#allocation-note` states how much the available money is short.
 
+**Compare where money goes** (`#compare-panel`, a `<details>` disclosure under the allocation, closed by default) ranks five destinations for one amount with `compareDestinations` (core §1.5a):
+- **Amount** (`#compare-amount`, formatted amount input, not saved): blank follows this month's allocation remainder (available money − required savings), or R 10,000 when there is none; the placeholder shows that default.
+- **Horizon** (`#compare-years`, range 1–30 years, default 10, not saved; label `#compare-years-label`).
+- **Headline** (`#compare-headline`): "After N years, R X grows most as <first>: R V, R D ahead of <second>."
+- **List** (`#compare-list`): one row per destination, highest after-tax value first — name, value, after-tax return per year, a bar scaled to the top value with a dashed mark at the amount put in, and flags (e.g. `Guaranteed 11.25%`, `Locked until 55`, `Refund R 4,100`, `Only R 21,000 fits this tax year`, `CGT on sale`, `Assumed 0%`, `Most volatile`). The bond row is left out when the Debt tab has no balance or rate.
+- **Assumptions line** (`#compare-assumptions`) names every figure used and the tab it comes from; the panel has no assumption inputs of its own. It ends: "It compares your own assumptions; it is not advice."
+- Re-rendered on every allocation change, amount or horizon input, and each time the Budget tab is shown.
+
 ### 1.7 Timeline Overview Chart (runway)
 
 Full-width card at the **top** of the budget tab (`#budget-timeline-card`), above the Current Savings / Commitments column and the Financial Summary column. Rendered with ApexCharts loaded from CDN. Refreshes whenever the budget summary recalculates (savings input, commitment edits, target-date change from the date input or the slider, planned-savings or buffer edits, data load).
@@ -157,7 +177,7 @@ Full-width card at the **top** of the budget tab (`#budget-timeline-card`), abov
 
 Legend at bottom centre. Headline above the chart in plain language: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.` When no cost falls before the target date the "through … in future costs" part is left out.
 
-**Target-date slider:** a native `<input type="range">` (`#budget-target-range`, label "Target date", `aria-valuetext` = the formatted date) under the chart, over the same range (1 day after today → horizon, one step per day). Dragging it writes the ISO date into `#future-date`, so the Financial Summary card and the KPI strip's "Net savings on [date]" update live. Typing in `#future-date` moves the slider and the marker. The date input stays as the keyboard fallback; the slider also responds to arrow keys.
+**Target-date slider:** a native `<input type="range">` (`#budget-target-range`, label "Target date", `aria-valuetext` = the formatted date) under the chart, over the same range (1 day after today → horizon, one step per day). Dragging it writes the ISO date into `#future-date`, so the Financial Summary card's "Net savings on [date]" updates live. Typing in `#future-date` moves the slider and the marker. The date input stays as the keyboard fallback; the slider also responds to arrow keys.
 
 **Interaction**:
 - Pan and zoom via the chart toolbar (zoom in/out, pan, reset). Selection and image download are disabled.
@@ -195,8 +215,8 @@ Each account displays:
 For the **Discretionary** account specifically (only):
 
 - **Marginal tax rate (%)** — editable numeric input below Current Value. Default `41`. Range `0..100`, step `1`. Persisted in `db/config.private.json` as the key `marginal_rate`.
-- **Estimated tax (CGT)** — `taxable = max(0, gain − R 40,000)`, then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown. An info icon button beside the label (`aria-expanded`, keyboard and touch accessible; Escape or an outside click closes it) toggles a help popover explaining that the figure is the worst-case (sell-everything-at-once) estimate, that the R 40,000 exclusion resets each tax year and applies to the gain (not the amount sold), and how **tax-gain harvesting** (staggering disposals under R 40,000/year, selling and rebuying to reset base cost) can reduce or avoid CGT — closing with a "not tax advice" disclaimer.
-- **CGT exclusion progress bar** — directly below the Estimated tax (CGT) line, a bar fills with `min(100, gain / R 40,000 × 100)%`. Below the bar: `<pct>% of CGT exclusion` on the left and `R <remaining> before CGT` on the right, where `remaining = max(0, R 40,000 − gain)`. Bar is emerald below 80%, amber from 80% up to 100%, red at or above 100% (gain has crossed the exclusion). Driven by the gain vs the R 40,000 threshold only — independent of the marginal rate. Resets to 0% when `totalInvested === 0`.
+- **Estimated tax (CGT)** — `taxable = max(0, gain − CGT_ANNUAL_EXCLUSION)` (R 50,000 from 2026/27, `src/calc/sa-tax.js`), then `tax = taxable × 0.40 × (marginal_rate / 100)`. Rendered as a negative red amount when > 0, otherwise `R 0.00`. Always shown. An info icon button beside the label (`aria-expanded`, keyboard and touch accessible; Escape or an outside click closes it) toggles a help popover explaining that the figure is the worst-case (sell-everything-at-once) estimate, that the R 50,000 exclusion resets each tax year and applies to the gain (not the amount sold), and how **tax-gain harvesting** (staggering disposals under R 50,000/year, selling and rebuying to reset base cost) can reduce or avoid CGT — closing with a "not tax advice" disclaimer.
+- **CGT exclusion progress bar** — directly below the Estimated tax (CGT) line, a bar fills with `min(100, gain / R 50,000 × 100)%`. Below the bar: `<pct>% of CGT exclusion` on the left and `R <remaining> before CGT` on the right, where `remaining = max(0, R 50,000 − gain)`. Bar is emerald below 80%, amber from 80% up to 100%, red at or above 100% (gain has crossed the exclusion). Driven by the gain vs the R 50,000 exclusion only — independent of the marginal rate. Resets to 0% when `totalInvested === 0`.
 - **Net vs savings (after tax)** — `Net vs Savings − Estimated Tax`. Green when ≥ 0, red when < 0.
 
 These rows (and the CGT exclusion bar) are **not** shown on the TFSA or Crypto cards.
@@ -222,7 +242,7 @@ The **Transactions** card is a ledger built on the shared `createLedger` (§1.2)
 - **Order:** newest first (`sortByDateThenIdDesc`: date descending, then creation order descending). Edits do not re-sort; the next full render does.
 - **Filters:** **All** · **Discretionary** · **TFSA** · **Crypto**, each chip showing its count and total contributed, e.g. *TFSA (3) · R 12,000* (whole rand). Real buttons with `aria-pressed`; the choice is remembered per browser in `localStorage` (`investments.accountFilter`) and is not written to config.
 - **Footer:** *Total contributed R x* on All, or *TFSA contributed R x* for the selected account.
-- **Edits** write straight to the transaction (amounts as numbers via `bindAmountInput`) and update the chips, the footer, the per-account performance panels (§2.1), the TFSA cap bar, the Total BTC figure and the KPI strip, then auto-save. The History tab re-reads the transactions when it is shown.
+- **Edits** write straight to the transaction (amounts as numbers via `bindAmountInput`) and update the chips, the footer, the per-account performance panels (§2.1), the TFSA cap bar and the Total BTC figure, then auto-save. The History tab re-reads the transactions when it is shown.
 - **Quick-add:** a text field above the table (*Add a transaction — e.g. "tfsa etf 3000" or "luno 0.012 btc 6k"*), with a visually hidden label and a live preview line: *Will add **Crypto** · **Luno** · **R 6,000.00** · **0.012 BTC** on **2026-10-15***. Parsing is `parseInvestmentQuickAdd(text)` in `src/lib/quick-add.js`, on top of `parseQuickAddTokens`:
   1. A number followed by `btc` (for example `0.012 btc`) is the BTC quantity, not the rand amount.
   2. **Account keyword** (case-insensitive): `tfsa` → TFSA; `crypto` or `btc` → Crypto; `disc` or `discretionary` → Discretionary. Without a keyword the account is Crypto when a BTC quantity was typed, else Discretionary. An explicit TFSA/Discretionary keyword wins over a BTC quantity, which is then dropped (BTC belongs to Crypto rows only).
@@ -261,7 +281,7 @@ The **Extra Repayments** card is a ledger built on the shared `createLedger` (§
 - **Order:** newest first (`sortByDateThenIdDesc`).
 - **Filters by calendar year:** **All (n)** plus one chip per year present, newest year first, e.g. *2026 (2)*. A repayment's year is the `YYYY` part of its ISO date, the same grouping the History tab uses for *Debt Repaid*; rows without a valid date appear only under All. The choice is remembered per browser in `localStorage` (`debt.repaymentFilter`). When an edit moves the last row of the selected year to another year, that year stays selected (count 0) until the next full render, which falls back to All.
 - **Footer:** *Total R x* on All, or *2026 total R x* for the selected year.
-- **Edits** write straight to the repayment and re-run the projection (§3.3) and the KPI strip at once, then auto-save.
+- **Edits** write straight to the repayment and re-run the projection (§3.3) at once, then auto-save.
 - **Quick-add:** *Add a repayment — e.g. "5k bonus repayment" or "extra 4000 2026-03-25"*, with a live preview (*Will add **Bonus repayment** · **R 5,000.00** on **2026-10-15***). Parsing is `parseTransactionQuickAdd(text)` in `src/lib/quick-add.js` (no keywords): date as in §1.3, **today** when none is typed; a description and an amount are both required. **Enter** adds the row (switching the filter to All if its year is hidden) and clears the field; **Enter on an empty field** adds a blank row dated today and focuses its description. There is no **+ Add Repayment** button.
 - **Delete** uses the shared delete-with-undo (§0.5).
 - **Empty states:** *No extra repayments yet. Type one above, for example "5k bonus repayment".*; under a year with no rows, *No extra repayments in 2026.*
@@ -313,13 +333,13 @@ The tab-level `⋯` menu (§0.4 — Import CSV…) above a full-width main area 
 
 1. **RA Summary** — three columns:
    - Total contributed (R), count of contributions, first→last contribution date, current-tax-year total.
-   - Editable **Tax refund rate (%)** input (default 41) and the **expected refund for the current tax year** computed as `min(current_year_contributions, R 430,000) × refund_rate`. Caption: "based on actual contributions to date; deductible capped at R 430,000". When any tax year's bucketed contributions exceed R 430,000, a "cap hit in some year" amber pill appears beneath the value.
-   - **Performance** column (mirrors the Investments tab's per-fund layout): editable **Current fund value (R)** input (the actual statement balance — also the authoritative figure downstream consumers like the Retirement tab use as the projection starting point), then **Invested**, **Gain/Loss (R)**, **Gain/Loss %**, **Annualized %**, **6% savings would be**, and **Net vs savings** — all derived from `calculateInvestmentPerformance(raTransactions, raCurrentValue, today, marginalRate=0)` (CGT is not modelled for RA; pass `marginalRate=0` so no tax-adjusted rows are shown). When `totalInvested === 0`, all metrics render as muted zeros.
+   - **Tax column** (all from `calculateRaTaxSummary`, core §4.3): optional **Annual gross remuneration (R)** amount input (`#ra-remuneration`, placeholder "optional", saved as `ra_annual_remuneration`); **Flat refund rate (%)** input (default 41, used only when no remuneration is entered); **Deduction limit (2026/27)** with a note naming its source ("27.5% of remuneration (below the R 430,000 cap)", "R 430,000 cap (below 27.5% of remuneration)" or "R 430,000 cap only — enter remuneration to apply the 27.5% limit"); **Refund to date** and **Projected full year** side by side, with "on R 230,000: R 170,000 to date + 3 × R 20,000 to come"; a headroom line ("Room for R x more this tax year (≈ R y extra refund)", "At the deduction limit", or "R x over the limit — carries forward to later years"); a method note ("SARS 2026/27 tax brackets on your remuneration" or "flat 41% of the deductible amount"). When any tax year exceeds the limit, an amber pill "over the deduction limit in some year — excess carries forward" appears.
+   - **Performance** column (mirrors the Investments tab's per-fund layout): editable **Current fund value (R)** input (the actual statement balance — also the authoritative figure downstream consumers like the Retirement tab use as the projection starting point), then **Invested**, **Gain/Loss (R)**, **Gain/Loss %**, **Annualized %**, **6% savings would be**, and **Net vs savings** (market result vs 6% interest, refund excluded) — all derived from `calculateInvestmentPerformance(raTransactions, raCurrentValue, today, marginalRate=0)` (CGT is not modelled for RA; pass `marginalRate=0` so no tax-adjusted rows are shown). When `totalInvested === 0`, all metrics render as muted zeros. Below a divider: **Tax refund earned** (refund on all actual contributions, all tax years), **Real position (gain + refund)** = Gain/Loss + refund earned, and **Real vs 6% savings** = Net vs savings + refund earned (green when ≥ 0, red otherwise).
 2. **Contributions ledger (UX-4.4)** — built on the shared `createLedger` (§1.2) over the RA contributions; the RA CSV layout (§4.2) is unchanged and parse → generate reproduces it byte-for-byte.
    - **Columns:** **Date** · **Description** · **Amount** · delete, under a header row (`#ra-head`, shown from 640px). Newest first (`sortByDateThenIdDesc`).
    - **Filters by SA tax year:** **All (n)** plus one chip per tax year present, newest first, labelled `2026/27` (from `saTaxYear(date)`, 1 March to end February); rows without a valid date appear only under All. Remembered per browser in `localStorage` (`ra.taxYearFilter`). When an edit moves the last row of the selected tax year into another one, that tax year stays selected (count 0) until the next full render, which falls back to All.
    - **Footer:** *Total R x* on All, or *2026/27 total R x* for the selected tax year.
-   - **Edits** write straight to the contribution and update the summary (total, count, dates, current-tax-year total and refund, cap warning) and the performance column at once, then auto-save. A cleared amount is saved as `0`.
+   - **Edits** write straight to the contribution and update the summary (total, count, dates, current-tax-year total, limit, refunds to date and projected, headroom, limit warning) and the performance column at once, then auto-save. A cleared amount is saved as `0`.
    - **Quick-add:** *Add a contribution — e.g. "monthly 5000" or "top-up 20k 2027-02-20"*, with a live preview (*Will add **Monthly** · **R 5,000.00** on **2026-10-15** (tax year 2026/27)*). Parsing is `parseTransactionQuickAdd(text)` (as §3.2): **today** when no date is typed; description and amount required. **Enter** adds the row (switching to All if its tax year is hidden); **Enter on an empty field** adds a blank row dated today with the description `"monthly repayment"` and focuses its amount. There is no `+ Add` button.
    - **Delete** uses the shared delete-with-undo (§0.5).
    - **Empty states:** *No contributions yet. Type one above, for example "monthly 5000".*; under an empty tax year, *No contributions in tax year 2026/27.*
@@ -327,12 +347,13 @@ The tab-level `⋯` menu (§0.4 — Import CSV…) above a full-width main area 
 ### 4.2 Persistence
 
 - Auto-saves on any change (debounced 800ms) via POST to `/api/save/transactions_ra` and `/api/save/config_private` (or their `test_` prefixed variants in test mode).
-- Auto-loads `db/transactions/ra.csv` (or `db/test/transactions/ra.csv`) for contribution rows on page open; loads `db/config.private.json` (or `db/test/config.private.json`) for RA settings (`tax_refund_rate_pct`) and `db/config.public.json` (or `db/test/config.public.json`) for shared params (`nominal_return_pct`).
+- Auto-loads `db/transactions/ra.csv` (or `db/test/transactions/ra.csv`) for contribution rows on page open; loads `db/config.private.json` (or `db/test/config.private.json`) for RA settings (`tax_refund_rate_pct`, `ra_annual_remuneration`) and `db/config.public.json` (or `db/test/config.public.json`) for shared params (`nominal_return_pct`).
 - RA contribution transactions are stored in `db/transactions/ra.csv`. The actual current fund value is also stored in that file as a single `current_value,RA,<amount>,` row (mirroring the Investments tab pattern); when the input is blank, the row is omitted on save. RA settings (`tax_refund_rate_pct`, `nominal_return_pct`) are stored as keys in the appropriate config file (a flat JSON object), not inline with the transaction rows.
 
 ### 4.3 Defaults (first run, no saved file)
 
 - `tax_refund_rate_pct = 41`
+- `ra_annual_remuneration` unset (treated as 0: R 430,000 cap only, flat refund rate)
 - `nominal_return_pct = 10` — no longer surfaced in the RA tab UI but kept in `db/config.public.json` so the Retirement tab's `retRaPotToday()` fallback (used only when no actual RA current fund value has been entered) can still compound contributions forward at a sensible rate.
 
 ---
@@ -525,7 +546,7 @@ Descriptions are free text, so a comma in one would split its row: every generat
 **Budget transactions** (`db/transactions/budget.csv`):
 ```
 type,description,amount,date
-savings,,<amount>,
+savings,,<amount>,<as_of>
 debt,<description>,<amount>,
 provision,<description>,<amount>,<date>
 costfuturecost,<description>,<amount>,<date>
@@ -535,10 +556,11 @@ costfuturecost,<description>,<amount>,<date>
 ```
 Date,Description,amount,account type,crypto_value
 <DD-MM-YYYY>,<description>,<amount>,<type>,<btc_value>
-current_value,<account_type>,<amount>,
+current_value,<account_type>,<amount>,<as_of>
 ```
 - Transaction dates stored in `DD-MM-YYYY` format in CSV, converted to `YYYY-MM-DD` internally.
-- `current_value` rows store per-account current values (Discretionary, TFSA, Crypto).
+- `current_value` rows store per-account current values (Discretionary, TFSA, Crypto). The 4th column is the ISO date the value was last typed in (`currentValueDates`); it is blank in older files and when unknown, and editing the value sets it to today.
+- The same applies to the `savings` row of `budget.csv` (date column = when the balance was entered, `savingsDate`) and the RA `current_value,RA,<amount>,<as_of>` row (`currentValueDate`). The bond balance's date is the private config key `current_balance_asof`, set when `current_balance` is edited. Older files load unchanged; rows without a date round-trip byte-for-byte. The Overview uses these dates to flag balances older than 45 days.
 - `marginal_rate` is no longer emitted here; it is stored in `db/config.private.json`.
 
 **Debt transactions** (`db/transactions/debt.csv`):
@@ -573,6 +595,7 @@ Date,Description,Amount
 }
 ```
 - Contains personal data (DOB, balances), personal assumptions (marginal rate, tax rates), loan parameters, and all scenario toggles. Gitignored.
+- Overview keys: `networth_home_value`, `overview_target_monthly_income`, `mix_target_cash`, `mix_target_funds`, `mix_target_ra`, `mix_target_crypto` (§0.2), plus `current_balance_asof` (Debt).
 - Values are usually scalars; `ret_scenarios` is a JSON array of pinned retirement scenarios `{ id, label, params }` (§5.3), written as-is by `generateConfigJSON`.
 
 ### 7.2 Auto-Save
@@ -598,6 +621,7 @@ Date,Description,Amount
 ## 8. Sample data (test mode)
 
 - Toggle pill in the header, labelled **Sample data**, switches between real data and sample data.
+- Opening the page with `?sample` in the URL (e.g. `http://localhost:8000/budget_calculator.html?sample`) starts it in sample-data mode before anything loads, so that session never reads or writes the real files. Used for demos and browser checks.
 - When enabled:
   - A full-width amber banner under the header reads "You're viewing sample data. Changes are saved to the sample files, not your own." with a **Switch to my data** button that does the same as the pill.
   - All reads/writes use `db/test/` directory instead of `db/`, mirroring the same layout (`db/test/transactions/`, `db/test/config.public.json`, `db/test/config.private.json`).
@@ -641,8 +665,20 @@ All pure calculation logic is extracted into a separate ES module (`calculations
 | `taxYearLabel(date)` | Returns the SA tax-year bucket label `YYYY/YY` (e.g. `2026/27`) for a `Date` (local calendar fields); used by `calculateRaProjection` |
 | `saTaxYear(isoDate)` | SA tax year of an ISO date string, e.g. `'2026-03-01'` → `'2026/27'` (1 March to end February; `''` when invalid). Groups the RA contributions ledger and the RA summary's current-tax-year total and cap check |
 | `parseRaCSV(text)` / `generateRaCSV(data)` | RA CSV serialization (transactions + param rows) |
-| `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject}, today?)` | Per-tax-year refund buckets. The RA tab calls it with `assumedFutureMonthly: 0, futureYearsToProject: 0` and renders only the rows whose status is `actual`. Internal projection mechanics are retained for unit tests but no longer surfaced in the UI. |
+| `calculateRaTaxSummary({transactions, remuneration, refundRatePct}, todayIso)` | Everything the RA Summary shows about tax: `limit`, `limitSource`, `usesBrackets`, `actual`, `monthly`, `monthsRemaining`, `projected`, `refundToDate`, `refundProjected`, `headroom`, `headroomRefund`, `excessProjected`, `refundAllYears`, `overLimitYears` (core §4.3) |
+| `typicalMonthlyContribution(transactions)` / `remainingContributionMonths(transactions, todayIso)` | Median of the last three contributions; monthly contributions still to come to end February |
+| `incomeTax(taxable, taxYear?)` / `marginalRate(taxable, taxYear?)` / `raDeductionLimit(remuneration)` / `raRefund({deductible, remuneration, flatRatePct, taxYear})` | SA tax helpers in `src/calc/sa-tax.js` (single source of the R 430,000 cap, the 27.5% and the tax tables) |
+| `calculateRaProjection({transactions, taxRefundRatePct, assumedFutureMonthly, futureYearsToProject, remuneration?}, today?)` | Per-tax-year refund buckets; with `remuneration` applies the 27.5% limit and the bracket refund. The RA tab calls it with `assumedFutureMonthly: 0, futureYearsToProject: 0` and renders only the rows whose status is `actual`. Internal projection mechanics are retained for unit tests but no longer surfaced in the UI. |
 | `calculatePotValueToday(transactions, nominalReturnPct, today?)` | Monthly-compounded estimate of pot value as of today |
+| `CGT_ANNUAL_EXCLUSION` / `CGT_INCLUSION_RATE` / `TFSA_ANNUAL_CAP` / `TFSA_LIFETIME_CAP` / `taxYearEndIso(todayIso)` / `daysToTaxYearEnd(todayIso)` | Tax constants and tax-year end helpers in `src/calc/sa-tax.js` (R 50,000 / 40% / R 46,000 / R 500,000; the year ends on the last day of February) |
+| `buildBalanceSheet(input)` | Holdings and liabilities with dates and owning tab; `assets`, `owed`, `netWorth` (core §6a) |
+| `groupHoldings(sheet, lens, { includeHome, raVested, offshoreDiscretionaryPct, offshoreTfsaPct })` / `MIX_LENSES` | Rows `{ key, label, value, share }` and `total` for the `type`, `access`, `tax` or `currency` lens |
+| `withDrift(rows, targets)` / `mixInsights({ lens, rows, total, includeHome, hasHome, raAccessYear })` | Target and drift per row; one to three insight sentences per lens |
+| `buildNextSteps(input, { staleDays?, deadlineWindowDays? })` | Ranked next steps `{ id, severity, tab, title, body, working, tag?, daysLeft?, impact? }` (core §6a) |
+| `tfsaUsage(tfsaTransactions, todayIso)` / `savingsRate({...}, todayIso)` | TFSA contributions this tax year and lifetime; 12-month saving and its share of remuneration |
+| `retirementIncome(snapshot)` / `retirementLevers(params)` | Net monthly income at retirement (RA drawdown + lump-sum drawdown); one-change param overrides for the Overview levers |
+| `valueAgeDays(asOfIso, todayIso)` / `fmtShortDate(isoOrMs)` | Age of a balance in days (`null` when undated); `15 Mar 2027` |
+| `compareDestinations({ amount, years, bondRatePct, … })` | Bond / RA / TFSA / ETF / crypto after-tax values and annual returns, highest first, with flags (core §1.5a) |
 | `retirementParamsDiff(params)` | The retirement params (keys of the defaults, minus `show_real_terms`) whose values differ from the defaults; stored as a pinned scenario's `params` |
 | `resolveScenarioParams(currentParams, scenarioParams)` | `{ ...currentParams, ...defaults, ...scenarioParams }`, keeping the current `show_real_terms`; the full param set for Apply and scenario cards |
 | `defaultScenarioLabel(params)` | Default pinned-scenario label `Retire at <retirement_age> · <withdrawal_rate_pct>% draw` |

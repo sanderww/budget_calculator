@@ -4,5 +4,8 @@ export * from './calc/config.js';
 export * from './calc/budget.js';
 export * from './calc/investment.js';
 export * from './calc/debt.js';
+export * from './calc/sa-tax.js';
 export * from './calc/ra.js';
 export * from './calc/retirement.js';
+export * from './calc/overview.js';
+export * from './calc/compare.js';

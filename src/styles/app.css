@@ -579,3 +579,42 @@ input[type="number"].input-field {
     outline-offset: 2px;
     border-radius: 0.25rem;
 }
+
+/* Overview: lens buttons and the stacked "what you own" bar. */
+.ov-lens-btn {
+    padding: 0.375rem 0.75rem;
+    border-radius: 9999px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    color: #475569;
+    font-size: 0.8125rem;
+    font-weight: 500;
+    transition: background-color 0.15s, color 0.15s;
+}
+.ov-lens-btn:hover { background: #f8fafc; }
+.ov-lens-btn[aria-pressed="true"] {
+    background: #4f46e5;
+    border-color: #4f46e5;
+    color: #fff;
+}
+.ov-lens-btn:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+.ov-mix-bar {
+    display: flex;
+    gap: 2px;
+    height: 1.75rem;
+    border-radius: 0.5rem;
+    overflow: hidden;
+    background: #f1f5f9;
+}
+.ov-mix-bar > span {
+    display: block;
+    min-width: 3px;
+    transition: flex-basis 0.3s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+    .ov-mix-bar > span { transition: none; }
+}
+
+/* The Financial Summary card stops sticking while the comparison is open,
+   so its full height can be scrolled into view. */
+.card.sticky:has(#compare-panel[open]) { position: static; }

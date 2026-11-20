@@ -11,6 +11,7 @@ A personal finance tool for an individual to:
 5. **Manage a mortgage** — quantify the financial benefit of making extra repayments and see when the loan will be paid off.
 6. **View financial history** — a year-by-year summary of debt repaid and investments made.
 7. **Plan retirement** — project funds available at age 55 and 68, monthly net income, RA commutation impact, and optional scenarios (Dutch pension, TFSA top-ups, etc.).
+8. **See the whole picture and what to do next** — net worth and what it is made of (by asset type, access, tax treatment and currency), a ranked list of next steps with deadlines, retirement income against a target, the savings rate, and a fair after-tax comparison of where the next rand goes (§6a, §1.5a).
 
 Currency is South African Rand (R) throughout.
 
@@ -182,7 +183,24 @@ reported with the date of that point (the earliest one on a tie). It is shown ab
 
 **Headline:** above the chart, in plain words: `Save R X,XXX/month to keep above the R Y,YYY debts + provisions floor through R Z,ZZZ in future costs by DD MMM YYYY.` (without the "through … in future costs" part when no cost falls before the target date).
 
-**Interaction:** pan/zoom enabled via the chart toolbar; the adjusted window is **not** persisted. The target date can be set by dragging the range slider under the chart (same range as the chart, today → horizon) or by typing in the date input; both write the same `future-date` value, so the summary card and the KPI strip's "Net savings on [date]" follow.
+**Interaction:** pan/zoom enabled via the chart toolbar; the adjusted window is **not** persisted. The target date can be set by dragging the range slider under the chart (same range as the chart, today → horizon) or by typing in the date input; both write the same `future-date` value, so the summary card's "Net savings on [date]" follows.
+
+### 1.5a Compare where money goes
+
+Under the allocation, `compareDestinations` (`src/calc/compare.js`) values one amount `A` after `n` years (1–30) in five places, after tax, in future rand, using only assumptions other tabs own: bond rate and balance (Debt), fund/TFSA/RA/crypto returns and retirement tax rate (Retirement params), marginal rate (Investments), RA refund headroom and refund rate (RA tax summary), and TFSA room this tax year.
+
+```
+bond          = A × (1 + bondRate/1200)^(12n)                    (omitted when no bond balance or rate)
+afterCgt(x,r) = x·(1+r)^n − max(0, x·(1+r)^n − x) × 40% × marginal   (exclusion assumed used elsewhere)
+RA            = A·(1+r_RA)^n·(1 − retirementTax) + refund·(1+r_TFSA)^n,
+                refund = min(A, RA headroom) × (headroomRefund / headroom)
+TFSA          = fits·(1+r_TFSA)^n + afterCgt(A − fits, r_TFSA),   fits = min(A, TFSA room)
+Discretionary = afterCgt(A, r_disc)          Crypto = afterCgt(A, r_crypto)
+annual return = (value / A)^(1/n) − 1
+TFSA room     = max(0, min(R 46,000 − this tax year's TFSA contributions, R 500,000 − lifetime))
+```
+
+Rows are sorted by value. Flags carry what the number hides: guaranteed vs assumed return, RA locked until 55, refund or "no refund: over this year's limit", TFSA room, CGT on sale, volatility. The amount defaults to the allocation remainder (or R 10,000). It ranks the user's own assumptions and says it is not advice; it has no inputs of its own besides amount and horizon, and saves nothing.
 
 ---
 
@@ -283,7 +301,7 @@ Inputs:
 - `Marginal Rate` — user's marginal income tax rate as a percentage (default 41), persisted with the rest of the investments data.
 
 Constants:
-- `Annual Exclusion = R 40,000` (SARS annual CGT exclusion for individuals).
+- `Annual Exclusion = CGT_ANNUAL_EXCLUSION = R 50,000` (SARS annual CGT exclusion for individuals from 2026/27; was R 40,000). Defined once in `src/calc/sa-tax.js` with `CGT_INCLUSION_RATE`; the Investments bar and help text use the same constant.
 - `Inclusion Rate = 0.40` (SARS CGT inclusion rate for individuals).
 
 ```
@@ -302,9 +320,9 @@ Net vs Savings (after tax) = Net vs Savings − Estimated Tax
 Percent Used = (max(0, Absolute Return) / Annual Exclusion) × 100   // bar width clamped to 100%
 Remaining    = max(0, Annual Exclusion − Absolute Return)            // labelled "R <remaining> before CGT"
 ```
-Colour: emerald below 80%, amber at ≥ 80%, red at ≥ 100% (gain has crossed the exclusion and CGT now applies). The bar reflects the gain vs the R 40,000 threshold only; it is independent of the marginal rate.
+Colour: emerald below 80%, amber at ≥ 80%, red at ≥ 100% (gain has crossed the exclusion and CGT now applies). The bar reflects the gain vs the R 50,000 exclusion only; it is independent of the marginal rate.
 
-**Help popover:** an info icon button beside the "Estimated tax (CGT)" label explains, in an accessible toggle popover (button with `aria-expanded`, Escape/outside click closes), that the figure is the worst-case estimate (everything sold at once, single R 40,000 exclusion); that the exclusion resets each SA tax year and applies to the gain rather than the amount sold; and how **tax-gain harvesting** (keeping each year's realised gain under R 40,000, selling and rebuying to reset base cost) can reduce or avoid CGT. Includes a "general info, not tax advice" disclaimer.
+**Help popover:** an info icon button beside the "Estimated tax (CGT)" label explains, in an accessible toggle popover (button with `aria-expanded`, Escape/outside click closes), that the figure is the worst-case estimate (everything sold at once, single R 50,000 exclusion); that the exclusion resets each SA tax year and applies to the gain rather than the amount sold; and how **tax-gain harvesting** (keeping each year's realised gain under R 50,000, selling and rebuying to reset base cost) can reduce or avoid CGT. Includes a "general info, not tax advice" disclaimer.
 
 ### 2.3 Crypto: Total BTC
 For the Crypto account only, track the total Bitcoin quantity:
@@ -419,33 +437,51 @@ Result is the annualized yield (as a decimal, e.g. 0.12 = 12%).
 
 ### 4.1 Goal
 
-Track contributions to a South African Retirement Annuity, hold the actual current fund value reported on the user's RA statement, estimate the expected refund for the current tax year (based on actuals to date), and surface the deductible refund per past tax year.
+Track contributions to a South African Retirement Annuity, hold the actual current fund value reported on the user's RA statement, apply the SARS deduction limit (the lower of R 430,000 and 27.5% of remuneration), estimate the refund for the current tax year both on actuals to date and projected to the end of February, show the headroom left under the limit, and report the RA's real position including the tax refund.
 
 ### 4.2 Domain Concepts
 
 | Concept | Definition |
 |---|---|
 | **Contribution** | A single deposit into the RA. Has a date, description (default: "monthly repayment"), and ZAR amount. |
-| **Current fund value** | The actual ZAR balance of the RA pot, taken from the user's latest RA statement. Stored as a `current_value,RA,<amount>,` row in `db/transactions/ra.csv` (mirroring the Investments tab pattern). Optional — when absent, downstream consumers fall back to the contributions-based estimate. |
+| **Current fund value** | The actual ZAR balance of the RA pot, taken from the user's latest RA statement. Stored as a `current_value,RA,<amount>,<as_of>` row in `db/transactions/ra.csv` (mirroring the Investments tab pattern); `<as_of>` is the ISO date the value was last entered (blank when unknown). Optional — when absent, downstream consumers fall back to the contributions-based estimate. |
 | **Tax year (SA)** | Runs **1 March → 28/29 February**. A 2026/27 tax year covers 2026-03-01 → 2027-02-28. The pure `saTaxYear(isoDate) → '2026/27'` (`src/calc/ra.js`) reads the ISO date string itself (no time-zone shift): 28 Feb 2027 → `2026/27`, 29 Feb 2028 → `2027/28`, 1 Mar 2028 → `2028/29`; a missing or invalid date → `''`. Every RA grouping by tax year uses it: the contributions ledger filters, the current-tax-year total and the cap-hit check. |
 | **Contributions ledger** | The RA contributions are shown newest first in a ledger (see **Ledger**, §1.1) filtered by **SA tax year** (one chip per tax year present, labelled `2026/27`), because the refund applies per tax year; the footer shows the total for the selected tax year. Quick-add (`monthly 5000`) dates a line without a date today. The RA CSV layout is unchanged. |
-| **Tax refund rate** | The user's marginal income tax rate (%). Default 41. |
+| **Annual gross remuneration** | Optional (`ra_annual_remuneration`, R, private config). When set, it drives the 27.5% limit and the bracket-based refund. 0 / blank = unknown. The same figure is applied to every tax year. Employer pension/provident contributions (which share the same limit) are not modelled. |
+| **Tax refund rate** | Flat marginal rate (%) used only when no remuneration is entered. Default 41. |
 | **Nominal return rate** | Assumed annual return on the RA pot (%). Default 10. |
-| **SARS deductibility cap** | Hard constant: contributions deductible per tax year are capped at **R 430,000**. |
+| **SARS deduction limit** | Per tax year: `MIN(RA_DEDUCTION_CAP, RA_DEDUCTION_PCT% × remuneration)` = `MIN(R 430,000, 27.5% × remuneration)`; just R 430,000 when remuneration is unknown. Excess contributions carry forward (not modelled beyond the warning). |
+| **SA tax constants** | `src/calc/sa-tax.js` is the single source for `RA_DEDUCTION_CAP` (430,000), `RA_DEDUCTION_PCT` (27.5), the income-tax tables per tax year (`SA_TAX_TABLES`, currently 2026/27; other years fall back to the latest) and the primary rebate. The Retirement module's `RETIREMENT_CONSTANTS.RA_DEDUCTION_CAP` imports it. Update this file after each Budget. |
 
 ### 4.3 Total Contributed and Expected Refund (Current Tax Year)
 
+All figures come from the pure `calculateRaTaxSummary({transactions, remuneration, refundRatePct}, todayIso)` (`src/calc/ra.js`).
+
 ```
-Total Contributed = sum of all contribution amounts
+Total Contributed  = sum of all contribution amounts
 Current Year Total = sum of contributions where saTaxYear(date) = saTaxYear(today)
-Expected Refund (current tax year) = MIN(Current Year Total, R 430,000) × (Refund Rate / 100)
+Limit              = MIN(R 430,000, 27.5% × remuneration)      (R 430,000 when remuneration = 0)
+
+Refund(d)          = incomeTax(remuneration) − incomeTax(remuneration − d)   when remuneration > 0
+                   = d × Refund Rate / 100                                   otherwise
+incomeTax(x)       = progressive SARS brackets for the tax year − primary rebate, floored at 0
+
+Refund to date     = Refund(MIN(Current Year Total, Limit))
+Typical monthly    = median of the last three contribution amounts
+Months remaining   = months after this month up to February, + 1 if no contribution is dated in this month
+Projected total    = Current Year Total + Typical monthly × Months remaining
+                     (only when there are ≥ 3 contributions, the latest ≤ 62 days ago, and the
+                      current tax year already has a contribution; otherwise Projected = Current Year Total)
+Projected refund   = Refund(MIN(Projected total, Limit))
+Headroom           = MAX(0, Limit − Projected total);  extra refund = Refund(Projected + Headroom) − Projected refund
+Refund earned      = Σ over tax years of Refund(MIN(year total, Limit))
 ```
 
-The expected-refund figure is based on actual contributions to date only (no future projection). When `Current Year Total > R 430,000`, a `capHit` warning is shown.
+The bracket method prices a deduction that crosses into a lower bracket correctly; the flat rate does not.
 
 ### 4.4 Cap-Hit Detection
 
-Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds **R 430,000**, the RA Summary surfaces a "cap hit in some year" amber pill beneath the Expected refund value. No per-year breakdown is rendered.
+Each contribution is bucketed into the SA tax year of its date. If any tax year's bucketed total exceeds the **deduction limit** (§4.2), the RA Summary surfaces an "over the deduction limit in some year — excess carries forward" amber pill. No per-year breakdown is rendered.
 
 ### 4.5 Performance Metrics
 
@@ -458,7 +494,10 @@ The RA Summary card mirrors the Investments tab's per-fund performance layout, t
 | **Gain/Loss %** | `(current_value − invested) / invested × 100`. |
 | **Annualized %** | True cash-flow-weighted XIRR over the actual contribution dates (falls back to simple CAGR if XIRR fails to converge). Returns `N/A` when fewer than ~0.1 years of holding history exists. |
 | **6% savings would be** | Hypothetical gain if each contribution had instead earned 6% p.a. with daily compounding from its date to today. |
-| **Net vs savings** | `Gain/Loss − (6% savings)`. |
+| **Net vs savings** | `Gain/Loss − (6% savings)`. Market result only — excludes the tax refund. |
+| **Tax refund earned** | `Refund earned` from §4.3 (all tax years, actual contributions). |
+| **Real position (gain + refund)** | `Gain/Loss + Tax refund earned`. |
+| **Real vs 6% savings** | `Net vs savings + Tax refund earned`. |
 
 All formulas come from the shared `calculateInvestmentPerformance` helper (the same one used by the Investments tab); for RA it is invoked with `marginalRate=0` because RA withdrawals are taxed via the lump-sum / income-tax tables, not CGT, so the tax-adjusted "after tax" rows are not rendered.
 
@@ -636,6 +675,71 @@ Two ApexCharts visualisations accompany the table. Both use one shared category 
 
 ---
 
+## 6a. Overview Module
+
+### 6a.1 Goal
+
+Answer the three questions no single tab answers: *where do I stand in total*, *am I on track*, and *what should I do next*. The Overview is the first tab. It shows only figures no other tab shows; it replaced the former header KPI strip (R35).
+
+### 6a.2 Net worth
+
+```
+assets    = cash savings (Budget) + Discretionary + TFSA + Crypto (Investments current values)
+            + RA (actual value, else the contributions estimate) + home value (optional)
+owed      = bond balance (Debt current_balance) + total Budget debts
+net worth = assets − owed
+```
+Provisions and future costs are not liabilities: they are plans for money already counted in savings. The home value is the Overview's own input (`networth_home_value`); without it the home is left out but the bond is still owed.
+
+Every balance carries the date it was last entered (`savingsDate`, `currentValueDates`, RA `currentValueDate`, `current_balance_asof`). A balance older than 45 days, or without a date, is **stale**.
+
+### 6a.3 Mix lenses
+
+`groupHoldings(sheet, lens)` regroups the same rands; a holding may split across groups. Home equity = max(0, home − bond), shown only when "Include home equity" is on.
+
+| Lens | Groups |
+|---|---|
+| Asset type | Cash · Funds (Discretionary + TFSA) · Retirement annuity · Crypto · Home equity |
+| Access | Within days (cash, Discretionary, crypto) · Within days but TFSA allowance lost (TFSA) · RA savings pot · RA from 55 · Home |
+| Tax treatment | Taxable growth (cash, Discretionary, crypto) · Tax-free (TFSA) · Tax-deferred (RA) · Home |
+| Currency | Rand · Offshore funds · Crypto (dollar-priced) · Home |
+
+- RA savings pot = (RA − min(vested balance, RA)) × 33% (the two-pot split used by the Retirement module); the rest is "from 55".
+- Offshore funds = Discretionary × `offshore_discretionary_pct` + TFSA × `offshore_tfsa_pct`. The RA's offshore share is not tracked and counts as rand.
+- **Targets** (optional, Asset type lens, investable assets only): `mix_target_<cash|funds|ra|crypto>` in %. Drift = share − target in points; a drift of ≥ 2 points is called out with the rand gap (`|drift| × investable total`).
+
+### 6a.4 Next steps
+
+`buildNextSteps` returns ranked steps from existing state; nothing is stored. Order: severity (Act now → deadline → tax idea → tidy-up), then days left, then rand impact.
+
+| Step | Severity | Shown when | Content |
+|---|---|---|---|
+| Runway below buffer | Act now | the planned runway's lowest point is below the minimum buffer (§1.6) | date and size of the lowest point; raise = max(0, save-per-month-to-stay-above-buffer − planned) |
+| RA refund headroom | Deadline | ≤ 120 days to tax-year end, headroom ≥ R 1,000 and a refund > 0 | refund on min(R 10,000, headroom) at `headroomRefund / headroom` (§4.3) |
+| TFSA allowance unused | Deadline | ≤ 120 days to tax-year end and room ≥ R 1,000 | room = min(R 46,000 − this tax year, R 500,000 − lifetime); unused room does not carry over |
+| CGT harvesting | Tax idea | ≤ 120 days to tax-year end, Discretionary gain ≥ R 1,000, marginal rate > 0 | realise min(gain, R 50,000) tax-free; tax avoided later = that × 40% × marginal |
+| Past-due future costs | Tidy-up | any future cost is past due (§1.1a) | up to three names and dates; move to provisions or delete |
+| Stale balances | Tidy-up | any non-zero balance is stale (§6a.2); RA estimates are skipped | each balance with its age or "date unknown" |
+
+Every priced step carries its working (the formula lines) and the tab that fixes it.
+
+### 6a.5 Retirement income and levers
+
+```
+projected income = snapshot.monthly.atRetirement.net + snapshot.monthly.lumpSumDrawdown   (today's money)
+on track %       = projected income / overview_target_monthly_income × 100
+```
+The snapshot is `calculateRetirementSnapshot` with the current Retirement params and `show_real_terms = 1`. Levers each change one param and report the change in projected income: retirement age + 2 (if still below life expectancy); `opt_ra_monthly_enabled = 1`, `opt_ra_monthly_amount` + R 3,000; `opt_tfsa_enabled = 1` (only when off).
+
+### 6a.6 Savings rate
+
+```
+saved (last 365 days) = investment transactions + RA contributions + Debt extra repayments
+savings rate          = saved / ra_annual_remuneration × 100      (none without a remuneration figure)
+```
+
+---
+
 ## 7. Hard Requirements Summary
 
 | # | Requirement |
@@ -658,9 +762,9 @@ Two ApexCharts visualisations accompany the table. Both use one shared category 
 | R15 | History is grouped by calendar year, sorted ascending, with a totals row. |
 | R16 | All calculations update in real time on any data change (no manual "calculate" step required, except for monthly allocation which is triggered explicitly). |
 | R17 | RA tax year runs 1 March → 28/29 February; bucketing label is `YYYY/YY` (e.g. `2026/27`). |
-| R18 | RA per-tax-year deductible is capped at R 430,000 (SARS hard cap). The lifetime refund figure ignores the cap and shows a warning when any year exceeds it. |
-| R19 | RA Summary shows expected refund for the current tax year only, computed from actual contributions to date as `min(current_year_contributions, R 430,000) × refund_rate`. No future projection is performed. |
-| R20 | RA settings (refund rate) are persisted as keys in `db/config.private.json` (a flat JSON object); RA contribution transactions are stored in `db/transactions/ra.csv`. The public param `nominal_return_pct` lives in `db/config.public.json`. |
+| R18 | RA per-tax-year deductible is capped at `MIN(R 430,000, 27.5% × remuneration)` (R 430,000 when remuneration is unknown); a warning shows when any year exceeds it. The cap and percentage live only in `src/calc/sa-tax.js`. |
+| R19 | RA Summary shows the current-tax-year refund both on actual contributions to date and projected to 28/29 February (typical monthly × months remaining), plus headroom under the limit. With remuneration the refund uses the SARS brackets; without, the flat refund rate. |
+| R20 | RA settings (refund rate, `ra_annual_remuneration`) are persisted as keys in `db/config.private.json` (a flat JSON object); RA contribution transactions are stored in `db/transactions/ra.csv`. The public param `nominal_return_pct` lives in `db/config.public.json`. |
 | R21 | Retirement two-pot split: post-Sep-2024 RA balance is split 33% savings / 67% retirement; pre-Sep-2024 balance is "vested" and grows passively. |
 | R22 | Retirement de minimis: RA pot < R 360,000 at retirement collapses to a full-commutation banner; monthly drawdown = 0. The same rule applies at age 55 — when the RA pot at 55 is below R 360,000 (and no 1/3 commutation is otherwise taken), the full pot net of lump-sum tax is added to the Age-55 lump sum, an amber note explains monthly RA drawdown is N/A, and `snapshot.lumpSum.ra55IsDeMinimis` is set. |
 | R23 | Living-annuity threshold: annuitised pot < R 150,000 post-retirement triggers a commutation warning at age `ageAtThreshold`. |
@@ -675,7 +779,7 @@ Two ApexCharts visualisations accompany the table. Both use one shared category 
 | R32 | Snapshot card includes a "Monthly from lump sum" row computed as a PMT annuity that depletes the at-retirement lump sum to zero by age `life_expectancy` (default 95) at annual return `lump_sum_drawdown_return_pct` (default 6, monthly-compounded). Both params are user-configurable in the Core sidebar; `life_expectancy` and `lump_sum_drawdown_return_pct` are public params persisted in `db/config.public.json`. The Snapshot also shows a "Max estimated monthly income" row per age column = projected RA monthly net + lump-sum monthly. Real-terms toggle deflates each cell by years from today to its respective age. |
 | R33 | The Budget Timeline chart draws two savings trajectories: a solid **Planned** line (the user's planned monthly rate) and a dashed **Recommended** line (always the `requiredMonthlySavings`). `buildBudgetTimelineSeries` returns both `savingsLine` (planned) and `recommendedLine`; they coincide when no planned override is set. The planned amount persists in `db/config.private.json` under `budget_planned_monthly_savings` (non-public; absent → follow the recommendation) and is restored to the input on load. |
 | R34 | *(Superseded by R38.)* The Retirement tab previously rendered two stacked-bar "Retirement at a glance" charts (Age 55 / Age D / Retirement age) and an auto-PMT year-by-year timeline; both were replaced by the single interactive scenario timeline in R38. |
-| R35 | A header KPI strip shows four read-only figures above the tab bar — Net savings now, Net savings on the selected date, Portfolio value (sum of the three Investments current values), and Debt-free by (projected payoff month, or `Never`; `—`, like the Debt results card, while the balance, repayment or next payment date is missing, so no stale projection stays on screen). These are mirrors of values the tabs already compute; the strip introduces no calculations of its own and updates on the same triggers as its source tab. |
+| R35 | *(Replaced by R44.)* Formerly: a header KPI strip showed four read-only figures above the tab bar — Net savings now, Net savings on the selected date, Portfolio value (sum of the three Investments current values), and Debt-free by (projected payoff month, or `Never`; `—`, like the Debt results card, while the balance, repayment or next payment date is missing, so no stale projection stays on screen). These are mirrors of values the tabs already compute; the strip introduces no calculations of its own and updates on the same triggers as its source tab. |
 | R36 | A header save-status chip aggregates the state of all auto-save POSTs: `Saving…` while any save is in flight, `All changes saved` after the last in-flight save succeeds, `⚠ Save failed — Retry` on any error. A failure indication persists until a successful save, so a silent failed write cannot go unnoticed, and clicking the chip re-sends every save that failed since its last success (`retryFailedSaves`). Auto-save is the only save model: no per-tab Save buttons and no header Refresh button. The chip is a real `<button>` inside a wrapping `role="status"` / `aria-live="polite"` span. **Saves never cross data modes:** the sample-data toggle first dismisses the undo toast, sends every pending debounced save in the current mode (`flushPendingSaves`) and waits for all saves in flight; it refuses to switch while any save has failed (chip: `⚠ Save failed — Retry before switching data`); it drops saves while the new mode loads. Every Import CSV… also dismisses the undo toast, and an Undo clicked after the mode changed does nothing. Start-up and the toggle share `loadAll()`, which rejects when any dataset fails to load (loaders never keep the previous mode's data). A failed toggle reverts the flag and reloads the original mode; if that reload also fails, all saves are blocked and the chip reads `⚠ Data failed to load — reload the page`. |
 | R37 | Allocation validation failures (R5/R6) are presented inline in the budget summary card, not as blocking browser alerts. |
 | R38 | The Retirement tab renders one interactive scenario timeline (`snapshot.scenario`, from `buildRetirementScenarioTimeline`; §5.5a) below the Snapshot card, replacing the older chart cards. It walks the projection month-by-month from today and samples per integer age over `[min(55, retirement_age), life_expectancy]`, with a vertical line at the retirement age. Two stacked-area charts: monthly net income by source (RA annuity / RA savings-pot / Dutch pension / user capital drawdown) and available capital by pool (discretionary / TFSA / crypto / RA lump + one-offs / annuitised RA pot). A user-entered `ret_scenario_monthly_drawdown` (persisted, private) replaces the automatic PMT: from the retirement age it is drawn **proportionally** across the liquid pools, capped so capital never goes negative. RA annuitises at `max(retirement_age, 55)` (full commutation below the R360k de minimis; sub-R150k residual commutes to liquid capital mid-retirement). All ticked optional-scenario boxes (fund inclusion, max TFSA, extra RA, savings-pot, house, inheritance, bond, Dutch) fold into the projection. Respects the real-terms toggle (R26) and re-renders on the same triggers as Card 0 (R28). |
@@ -684,6 +788,11 @@ Two ApexCharts visualisations accompany the table. Both use one shared category 
 | R41 | The Budget tab opens with the runway timeline (§1.6), full width above the Commitments ledger. The chart runs from today to a horizon = max(target date, latest dated future cost) + 3 months, at least 12 months, and is drawn even when no cost falls in range. `buildBudgetTimelineSeries` takes `horizonDate` separately from `futureDate`; with `horizonDate === futureDate` its output is unchanged (regression-tested). The target date is set by a range slider under the chart (an x-axis annotation marks it) or by the date input; both write `future-date`. Each dated future cost is a point on the planned line that links to its ledger row. "Lowest point ahead" = min(planned trajectory − floor) with its date, amber below the minimum buffer; "Save per month to stay above buffer" = the required-savings loop with floor + buffer over every cost up to the horizon and at the horizon. The buffer is the private config key `budget_min_buffer` (default 0; blank removes it). |
 | R42 | The Retirement tab has a **Pin scenario** button above the results that saves the current params as a scenario (max 3) in the private config key `ret_scenarios` (array of `{ id, label, params }`, `params` = only the keys that differ from the defaults; not in `PUBLIC_PARAMS`). A Current card and one card per scenario show net monthly income at 55 and at the Dutch-pension age and capital at retirement, recalculated live from `calculateRetirementSnapshot` and following the real-terms toggle. Each scenario card has an editable label, **Apply** (loads the params into the sidebar, undoable via the undo toast) and **Remove** (undoable). |
 | R43 | Retirement sidebar assumptions people vary most (retirement age, life expectancy, lump-sum drawdown return, withdrawal rate, tax rate, CPI, per-fund returns, offshore %, ZAR depreciation, extra RA monthly amount) each have a range slider under the input, paired by `attachSlider` (`src/lib/slider.js`). The input remains the source of truth: dragging writes it and fires its `input` event (same save and re-render path as typing); typing and programmatic sets (Apply, Undo, Import, config load) move the slider. Values outside the slider's range stay valid in the input. Ranges are listed in functional §5.2. |
+| R44 | The **Overview** tab is first and selected on load; there is no header KPI strip. It shows net worth (§6a.2) with a "Balances used" list giving each balance's age (amber when older than 45 days or undated), the mix under four lenses with optional targets and drift (§6a.3), ranked next steps with their working and a link to the fixing tab (§6a.4), retirement income vs a target with three levers (§6a.5), and the savings rate (§6a.6). It never repeats a figure another tab shows. Its own keys are `networth_home_value`, `overview_target_monthly_income` and `mix_target_*` (private); lens and include-home are per-browser `localStorage` conveniences. |
+| R45 | The Budget allocation card has a **Compare where money goes** disclosure (§1.5a) that ranks bond / RA / TFSA / ETF / crypto by after-tax value for an amount (default: the allocation remainder, else R 10,000) and a 1–30 year horizon, reading every assumption live from the tab that owns it and naming each source. It adds no assumption inputs, saves nothing and states it is not advice. |
+| R46 | Balances record when they were entered: the 4th column of the Investments and RA `current_value` rows and of the Budget `savings` row, and the private key `current_balance_asof` for the bond. Editing a value sets today's date. Files without dates load unchanged and round-trip byte-for-byte. |
+| R47 | The CGT annual exclusion (R 50,000 from 2026/27), the 40% inclusion rate and the TFSA annual (R 46,000) and lifetime (R 500,000) caps are defined once in `src/calc/sa-tax.js`; the Investments CGT estimate, bar and help text, the Retirement constants, the Overview and the comparison all use them. |
+| R48 | Opening the page with `?sample` starts it in sample-data mode before anything loads (functional §8). |
 
 ---
 
@@ -695,7 +804,7 @@ Live data lives under `db/`:
 
 - `db/transactions/{budget,ra,investments,debt}.csv` — date-stamped rows and `current_value` snapshots. All gitignored.
 - `db/config.public.json` — generic modelling assumptions (return rates, CPI, withdrawal rate, etc.). Tracked in git.
-- `db/config.private.json` — personal data (DOB, balances) and personal assumptions (tax rates, scenario toggles). Gitignored. Values are scalars except `ret_scenarios`, an array of pinned retirement scenarios (§5.5b). Private keys added in the 2026-10 UX redesign: `budget_min_buffer` (§1.6), `budget_alloc_available`, `budget_alloc_mortgage_pct`, `budget_alloc_etf_pct` (§1.5) and `ret_scenarios` (§5.5b); none of them is in `PUBLIC_PARAMS`.
+- `db/config.private.json` — personal data (DOB, balances) and personal assumptions (tax rates, scenario toggles). Gitignored. Values are scalars except `ret_scenarios`, an array of pinned retirement scenarios (§5.5b). Private keys added for the Overview (2026-11): `networth_home_value`, `overview_target_monthly_income`, `mix_target_cash`, `mix_target_funds`, `mix_target_ra`, `mix_target_crypto` (§6a) and `current_balance_asof` (R46). Private keys added in the 2026-10 UX redesign: `budget_min_buffer` (§1.6), `budget_alloc_available`, `budget_alloc_mortgage_pct`, `budget_alloc_etf_pct` (§1.5) and `ret_scenarios` (§5.5b); none of them is in `PUBLIC_PARAMS`.
 
 Test mode mirrors the same layout under `db/test/`. Sample seed data lives under `db/examples/`.
 

@@ -1,5 +1,7 @@
 // Retirement tab: two-pot RA projection, TFSA/lump-sum/annuity maths, and the retirement snapshot.
 
+import { RA_DEDUCTION_CAP, TFSA_ANNUAL_CAP, TFSA_LIFETIME_CAP } from './sa-tax.js';
+
 // ============================================================================
 // Retirement Tab
 // ============================================================================
@@ -8,9 +10,9 @@ export const RETIREMENT_CONSTANTS = {
     RA_ACCESS_AGE: 55,
     DUTCH_PENSION_AGE: 68,
     DUTCH_PENSION_EUR_MONTHLY: 900,
-    TFSA_ANNUAL_CAP: 46_000,
-    TFSA_LIFETIME_CAP: 500_000,
-    RA_DEDUCTION_CAP: 430_000,
+    TFSA_ANNUAL_CAP,
+    TFSA_LIFETIME_CAP,
+    RA_DEDUCTION_CAP,
     DE_MINIMIS: 360_000,
     LIVING_ANNUITY_THRESHOLD: 150_000,
     LUMP_SUM_TAX_FREE: 550_000,
